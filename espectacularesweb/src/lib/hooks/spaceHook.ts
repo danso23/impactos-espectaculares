@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { createSpace, getSpaceCoords } from "@/lib/services/spaceService"
+import { useQuery } from "@tanstack/react-query"
+import { getSpaceCoords } from "@/lib/services/spaceService"
 import { tokenStore } from "../auth"
 
 export function useSpaceCoords() {
@@ -8,7 +8,7 @@ export function useSpaceCoords() {
   return useQuery({
     queryKey: ["spaces", "coords"],
     queryFn: getSpaceCoords,
-    enabled: !!access,        // 👈 clave
+    enabled: !!access,
     staleTime: 30_000,
     retry: (count, err: any) => {
       // si es 401 no reintentes en loop

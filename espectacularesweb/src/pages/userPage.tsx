@@ -1,9 +1,6 @@
-import * as React from "react"
 import { Button } from "@/components/ui/button"
 
 export default function UsersPage() {
-    // const { data, isLoading } = useQuery(...)
-
     return (
         <div className="p-6">
             <div className="mb-4 flex items-center justify-between">

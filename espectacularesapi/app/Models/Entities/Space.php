@@ -30,4 +30,9 @@ class Space extends Model
         'longitude' => 'decimal:7',
         'active' => 'boolean',
     ];
+    
+    public function images()
+    {
+        return $this->hasMany(SpaceImage::class);
+    }
 }

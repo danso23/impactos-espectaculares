@@ -40,7 +40,7 @@ export function RowActionsMenu<T>({
                     variant="ghost"
                     size="icon"
                     aria-label="Abrir acciones"
-                    onClick={(e) => e.stopPropagation()} // clave: evita seleccionar el item al abrir menu
+                    onClick={(e) => e.stopPropagation()}
                 >
                     <MoreHorizontal className="h-4 w-4" />
                 </Button>

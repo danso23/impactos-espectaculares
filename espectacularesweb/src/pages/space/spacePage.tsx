@@ -252,8 +252,6 @@ export default function SpacePage() {
             <SpaceCreateDialog
                 onCreated={(values) => {
                     console.log("CREATED:", values)
-                    // aquí luego lo conectamos a la API (POST /spaces)
-                    // por ahora puedes meterlo a tu estado dummy si quieres
                 }}
             />
 

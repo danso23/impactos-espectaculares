@@ -15,7 +15,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { apiFetch } from "@/lib/api" // ✅ usa tu wrapper
+import { apiFetch } from "@/lib/api"
+import { clearAuth } from "@/lib/auth"
 
 type LogoutButtonProps = {
   className?: string
@@ -24,21 +25,17 @@ type LogoutButtonProps = {
 }
 
 function forceLocalLogout(navigate: ReturnType<typeof useNavigate>) {
-  localStorage.removeItem("token")
-  localStorage.removeItem("user")
+  clearAuth();
   navigate("/login", { replace: true })
 }
 
 async function logoutRequest() {
-  // ✅ NO uses fetch directo. apiFetch mete Bearer y maneja 401.
   const res = await apiFetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
     method: "POST",
   })
 
-  // Algunos backends responden 204/empty, así que no forzamos json
   if (res.status === 204) return null
 
-  // Si hay body json, lo intentamos
   try {
     return await res.json()
   } catch {
@@ -62,15 +59,10 @@ export function LogoutButton({
     try {
       await logoutRequest()
 
-      // ✅ aunque haya sido OK, cerramos local y mandamos a login
       forceLocalLogout(navigate)
     } catch (e: any) {
-      // ✅ Si fue 401, apiFetch ya limpió y pudo redirigir.
-      // Pero por si no (o por otro error), forzamos logout local igual:
       forceLocalLogout(navigate)
 
-      // Si quieres mostrar el error, comenta las 2 líneas de arriba y deja esto:
-      // setError(e?.message ?? "Ocurrió un error al cerrar sesión.")
     } finally {
       setLoading(false)
     }
