@@ -25,7 +25,6 @@ async function refreshToken(): Promise<string> {
 
   if (!res.ok) throw new Error(data?.message ?? "Refresh failed")
 
-  // ✅ tu backend puede mandar access_token y (si rotas) refresh_token nuevo
   if (data?.access_token) localStorage.setItem("token", data.access_token)
   if (data?.refresh_token) localStorage.setItem("refresh_token", data.refresh_token)
 

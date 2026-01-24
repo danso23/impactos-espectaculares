@@ -50,7 +50,7 @@ type Props = {
   markerDraggable?: boolean
   children?: React.ReactNode
 
-  // 👇 para sincronizar lista ↔ mapa
+  // para sincronizar lista ↔ mapa
   existingMarkers?: ExistingMarker[]
   selectedMarkerId?: number | null
   onSelectMarker?: (id: number) => void
@@ -155,7 +155,6 @@ export function MapPicker({
         <LeafletGeocoderControl
           onSelect={(coords, address) => {
             onChange(coords)
-            // si quieres guardar address, lo haces en el padre
             console.log("Dirección:", address)
           }}
         />
@@ -184,7 +183,7 @@ export function MapPicker({
           />
         )}
 
-        {/* Click en mapa = escoger coords */}
+        {/* Click en mapa = coords */}
         <ClickHandler onPick={onChange} />
 
         {/* Markers EXISTENTES */}

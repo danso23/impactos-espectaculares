@@ -77,7 +77,7 @@ function AppLayout() {
             </div>
           </div>
 
-          {/* Nav scrollable SOLO si el menú crece */}
+          {/* Nav scrollable */}
           <ScrollArea className="flex-1 p-2">
             <nav className="space-y-1">
               {NAV.map(({ to, label, icon: Icon }) => (
@@ -107,13 +107,13 @@ function AppLayout() {
           </div>
         </aside>
 
-        {/* Right panel: Topbar fijo + contenido con scroll */}
+        {/* Right panel */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Topbar fijo */}
           <div className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex h-14 items-center justify-between px-3 sm:px-4">
               <div className="flex items-center gap-2">
-                {/* Mobile menu trigger (igual que ya tienes) */}
+                {/* Mobile menu trigger */}
                 <Sheet>
                   <SheetTrigger asChild>
                     <Button
@@ -136,7 +136,7 @@ function AppLayout() {
             </div>
           </div>
 
-          {/* ESTE es el scroll del contenido */}
+          {/* Scroll del contenido */}
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
             <Outlet />
           </div>
@@ -152,7 +152,6 @@ export default function AppRoot() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          {/* <Route index element={<RouteStub title="Espacios" />} /> */}
           <Route path="espacios" element={<SpacePage />} />
           <Route path="rentas" element={<RouteStub title="Rentas" />} />
           <Route path="usuarios" element={<UsersPage />} />

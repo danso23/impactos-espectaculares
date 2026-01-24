@@ -13,7 +13,6 @@ export async function refreshAccessToken(): Promise<string> {
   })
 
   if (!res.ok) {
-    // intenta leer mensaje de lumen
     let msg = "Refresh failed"
     try {
       const data = await res.json()

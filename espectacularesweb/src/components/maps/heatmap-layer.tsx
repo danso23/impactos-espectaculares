@@ -6,7 +6,7 @@ import "leaflet.heat"
 type HeatPoint = {
   lat: number
   lng: number
-  weight?: number // intensidad opcional (default 1)
+  weight?: number
 }
 
 type Props = {

@@ -28,7 +28,7 @@ export function SpacesHeatmapMap({
         .map((s) => ({
           lat: s.latitude as number,
           lng: s.longitude as number,
-          weight: 1, // ← aquí puedes ponderar
+          weight: 1,
         })),
     [spaces],
   )

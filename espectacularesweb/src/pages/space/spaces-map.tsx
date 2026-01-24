@@ -21,7 +21,6 @@ function FocusOnSelected({ selected }: { selected: Space | null }) {
   return null
 }
 
-// Iconos simple: normal vs seleccionado
 const iconNormal = new L.DivIcon({
   className: "marker-normal",
   html: `<div class="pin"></div>`,
