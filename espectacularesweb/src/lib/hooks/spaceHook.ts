@@ -1,6 +1,8 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useQuery } from "@tanstack/react-query"
-import { getSpaceCoords } from "@/lib/services/spaceService"
+import { createSpace, getSpaceCoords } from "@/lib/services/spaceService"
 import { tokenStore } from "../auth"
+import type { SpaceFormValues } from "@/types/Space"
 
 export function useSpaceCoords() {
   const access = tokenStore.getAccess()
@@ -15,6 +17,20 @@ export function useSpaceCoords() {
       const msg = String(err?.message ?? "")
       if (msg.includes("401")) return false
       return count < 2
+    },
+  })
+}
+
+export function useCreateSpace() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SpaceFormValues & { images?: File[] }) =>
+    createSpace(payload),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["spaces", "coords"],
+      })
     },
   })
 }

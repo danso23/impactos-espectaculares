@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Entities\Space;
 use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Carbon;
 
 class SpaceController extends BaseCrudController
 {
@@ -60,7 +60,14 @@ class SpaceController extends BaseCrudController
     // --- override store ---
     public function store(Request $request)
     {
-        $data = $request->validate($this->rulesStore($request));
+        $validator = Validator::make($request->all(), $this->rulesStore($request));
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $data = $validator->validated();
         $data = $this->beforeStore($data, $request);
 
         /** @var Space $space */
@@ -81,7 +88,14 @@ class SpaceController extends BaseCrudController
         /** @var Space $space */
         $space = Space::findOrFail($id);
 
-        $data = $request->validate($this->rulesUpdate($request));
+        $validator = Validator::make($request->all(), $this->rulesUpdate($request));
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $data = $validator->validated();
         $data = $this->beforeUpdate($data, $request, $space);
 
         $space->update($data);
@@ -110,15 +124,42 @@ class SpaceController extends BaseCrudController
 
         foreach ($files as $file) {
             $ext = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
-            $name = now()->format('Ymd_His') . '_' . Str::random(12) . '.' . $ext;
-
+            $name = Carbon::now()->format('Ymd_His') . '_' . Str::random(12) . '.' . $ext;
 
             $path = $file->storeAs("spaces/{$space->id}/original", $name, "public");
             $space->images()->create([
                 'path' => $path,
+                'filename' => $name,
                 'position' => ++$position,
                 'is_cover' => false,
             ]);
         }
+    }
+
+    /**
+     * GET /api/spaces/coords
+     * Regresa solo coordenadas para mapa/heatmap (ligero)
+     */
+    public function coords(Request $request)
+    {
+        $q = Space::query();
+
+        // Opcional: solo activos (por default true)
+        $onlyActive = $request->query('active', '1'); // '1'|'0'
+        if ($onlyActive === '1' || $onlyActive === 1 || $onlyActive === true || $onlyActive === 'true') {
+            $q->where(function ($qq) {
+                $qq->whereNull('active')->orWhere('active', true);
+            });
+        }
+
+        $data = $q->select(['id', 'title', 'latitude', 'longitude', 'active'])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return response()->json([
+            'data' => $data,
+        ]);
     }
 }

@@ -19,24 +19,25 @@ $router->post('/setuser1','UserController@Register');
 $router->post('/password/email', 'AuthController@sendResetLink');
 $router->post('/password/reset', 'AuthController@resetPassword');
 
-$router->post('/api/login', ['uses' => 'AuthController@login']);
 $router->post('/auth/refresh', 'AuthController@refresh');
 
+$router->group(['prefix' => 'api'], function () use ($router) {
 
-$router->group(['middleware' => 'authToken'], function () use ($router) {
-    $router->get('/api/me', function (\Illuminate\Http\Request $request) {
-        return response()->json($request->attributes->get('auth_user'));
+    $router->post('login', ['uses' => 'AuthController@login']);
+    $router->post('logout', ['uses' => 'AuthController@logout']);
+
+    $router->group(['middleware' => 'authToken'], function () use ($router) {
+
+        $router->get('me', function (\Illuminate\Http\Request $request) {
+            return response()->json($request->attributes->get('auth_user'));
+        });
+
+        $router->post('spaces', ['uses' => 'SpaceController@store']);
+        $router->get('spaces', ['uses' => 'SpaceController@index']);
+        $router->get('spaces/coords', ['uses' => 'SpaceController@coords']);
+
+        $router->put('spaces/{space}', ['uses' => 'SpaceController@update']);
+        $router->patch('spaces/{space}', ['uses' => 'SpaceController@update']);
+        $router->delete('spaces/{space}', ['uses' => 'SpaceController@destroy']);
     });
-
-
-    $router->post('/api/spaces', ['uses' => 'SpaceController@store']);
-    $router->get('/api/spaces', ['uses' => 'SpaceController@index']);
-    $router->put('/spaces/{space}', [SpaceController::class, 'update']);
-    $router->patch('/spaces/{space}', [SpaceController::class, 'update']);
-    $router->delete('/spaces/{space}', [SpaceController::class, 'destroy']);
-
-    // Obtener solo coordenadas (mapa / heatmap)
-    $router->get('/api/spaces/coords', ['uses' => 'SpaceController@coords']);
-
-    $router->post('/api/logout', ['uses' => 'AuthController@logout']);
 });

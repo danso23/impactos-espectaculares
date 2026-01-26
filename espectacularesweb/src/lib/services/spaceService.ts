@@ -1,4 +1,6 @@
 import { apiFetch } from "@/lib/services/clientService"
+import type { SpaceFormValues } from "@/types/Space"
+import type { ApiResponse } from "@/types/Response"
 
 export type SpaceCoord = {
   id: number
@@ -17,23 +19,23 @@ export function getSpaceCoords() {
   return apiFetch<SpaceCoordsResponse>("/api/spaces/coords")
 }
 
-export type CreateSpaceInput = {
-  title: string
-  description?: string
-  comments?: string
-  latitude?: number
-  longitude?: number
-  price?: number
-  type?: string
-  socioeconomic_level?: string
-  width_m?: number
-  height_m?: number
-  active?: boolean
-}
+export function createSpace(payload: SpaceFormValues & { images?: File[] }) {
+  const fd = new FormData()
 
-export function createSpace(input: CreateSpaceInput) {
-  return apiFetch<{ message: string; data: any }>("/api/spaces", {
+
+  fd.append("title", payload.title)
+  if (payload.description) fd.append("description", payload.description)
+  if (payload.comments) fd.append("comments", payload.comments)
+
+  if (payload.latitude !== undefined) fd.append("latitude", String(payload.latitude))
+  if (payload.longitude !== undefined) fd.append("longitude", String(payload.longitude))
+
+
+  // images[]:
+  ;(payload.images ?? []).forEach((file) => fd.append("images[]", file))
+
+  return apiFetch<ApiResponse>("/api/spaces", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: fd,
   })
 }

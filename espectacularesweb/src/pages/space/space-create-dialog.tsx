@@ -1,8 +1,8 @@
 import * as React from "react"
 import type { LatLngLiteral } from "leaflet"
 import type { SpaceFormValues } from "@/types/Space"
-import type { ExistingSpacePoint } from "@/types/Map"
 
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
     Dialog,
@@ -19,13 +19,12 @@ import { Switch } from "@/components/ui/switch"
 
 import { MapPicker } from "@/components/maps/map-picker"
 import { HeatmapLayer } from "@/components/maps/heatmap-layer"
-import { useSpaceCoords } from "@/lib/hooks/spaceHook"
+import { useSpaceCoords, useCreateSpace } from "@/lib/hooks/spaceHook"
 
 
 type Props = {
-    existingPoints?: ExistingSpacePoint[]
     onCreated?: (values: SpaceFormValues) => void
-};
+}
 
 export function SpaceCreateDialog({ onCreated }: Props) {
     const [open, setOpen] = React.useState(false)
@@ -37,11 +36,13 @@ export function SpaceCreateDialog({ onCreated }: Props) {
     const coordsQuery = useSpaceCoords()
     const coordsData = coordsQuery.data?.data ?? []
 
+    const createSpaceMutation = useCreateSpace()
+
     React.useEffect(() => {
-        if (open) {
-            coordsQuery.refetch()
-        }
-    }, [open]);
+        if (!open) return
+        coordsQuery.refetch()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open])
 
     React.useEffect(() => {
         // crear previews
@@ -76,17 +77,6 @@ export function SpaceCreateDialog({ onCreated }: Props) {
         setImages((prev) => prev.filter((_, i) => i !== idx))
     }
 
-    const existingSpaces = React.useMemo(
-        () =>
-            coordsData.map((p) => ({
-                id: p.id, // <-- si tu API no trae id, usamos index (te lo dejo abajo)
-                title: p.title ?? `Espacio #${p.id}`,
-                coords: { lat: Number(p.latitude), lng: Number(p.longitude) },
-                raw: p,
-            })),
-        [coordsData],
-    )
-
     const coords: LatLngLiteral | undefined =
         form.latitude !== undefined && form.longitude !== undefined
             ? { lat: form.latitude, lng: form.longitude }
@@ -112,41 +102,36 @@ export function SpaceCreateDialog({ onCreated }: Props) {
     const handlePick = (c: LatLngLiteral) => {
         setField("latitude", c.lat)
         setField("longitude", c.lng)
-    };
+    }
 
-    const handleSubmit = () => {
-        if (!form.title.trim()) {
-            alert("El título es requerido.")
+    const handleSubmit = async () => {
+        if (!form.title.trim()){
+            toast.error("Falta el título", { description: "El título es requerido." })
             return
         }
-
-        if (form.latitude === undefined || form.longitude === undefined) {
-            alert("Selecciona una ubicación en el mapa.")
+        if (form.latitude === undefined || form.longitude === undefined){
+            toast.error("Falta la ubicación", { description: "Selecciona una ubicación en el mapa." })
             return
         }
+            
 
-        onCreated?.({ ...form, images })
-        onCreated?.(form)
+        try {
+            const payload = { ...form, images }
+            await createSpaceMutation.mutateAsync(payload)
+            toast.success("Espacio creado", { description: "Se guardó correctamente." })
+            onCreated?.(payload)
 
-        // reset y cerrar
-        setForm({
-            title: "",
-            description: "",
-            comments: "",
-            latitude: undefined,
-            longitude: undefined,
-        });
-        setShowHeat(true)
-        setImages([])
-        setOpen(false)
-    };
+            resetForm()
+            setOpen(false)
+        } catch (err: any) {
+            toast.error("No se pudo guardar", {
+                description: err?.message ?? "Intenta nuevamente.",
+            })
+        }
+    }
 
-    const handleCancel = () => {
-        setOpen(false)
-    };
 
     const existingMarkers = React.useMemo(() => {
-        // si coordsData trae id y title úsalo; si no, usa index
         return coordsData.map((p: any, idx: number) => ({
             id: Number(p.id ?? idx + 1),
             title: String(p.title ?? `Espacio ${p.id ?? idx + 1}`),
@@ -154,8 +139,34 @@ export function SpaceCreateDialog({ onCreated }: Props) {
         }))
     }, [coordsData])
 
+    const resetForm = () => {
+        setForm({
+            title: "",
+            description: "",
+            comments: "",
+            latitude: undefined,
+            longitude: undefined,
+        })
+        setShowHeat(true)
+        setImages([])
+        setImagePreviews([])
+        setSelectedExistingId(null)
+    }
+
+    const handleCancel = () => {
+        resetForm()
+        setOpen(false)
+    }
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog 
+            open={open} 
+            onOpenChange={(v) => {
+            if (createSpaceMutation.isPending) return
+                setOpen(v)
+                if (!v) resetForm()
+            }}
+        >
             <DialogTrigger asChild>
                 <Button>Agregar</Button>
             </DialogTrigger>
@@ -196,7 +207,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
                             {/* LISTA IZQUIERDA */}
                             <div className="h-[320px] overflow-auto rounded-md border bg-background">
                                 {existingMarkers.map((m) => {
-                                    const active = m.id === selectedExistingId;
+                                    const active = m.id === selectedExistingId
                                     return (
                                         <button
                                             key={m.id}
@@ -219,7 +230,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
                                                 {m.position.lng.toFixed(5)}
                                             </div>
                                         </button>
-                                    );
+                                    )
                                 })}
                             </div>
 
@@ -295,6 +306,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
                             accept="image/*"
                             multiple
                             onChange={handleImagesChange}
+                            disabled={createSpaceMutation.isPending}
                         />
 
                         <p className="text-xs text-muted-foreground">
@@ -324,10 +336,20 @@ export function SpaceCreateDialog({ onCreated }: Props) {
                     </div>
                 </div>
                 <DialogFooter className="gap-2">
-                    <Button variant="outline" onClick={handleCancel}>
+                    <Button
+                        variant="outline"
+                        onClick={handleCancel}
+                        disabled={createSpaceMutation.isPending}
+                    >
                         Cancelar
                     </Button>
-                    <Button onClick={handleSubmit}>Guardar</Button>
+
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={createSpaceMutation.isPending}
+                    >
+                        {createSpaceMutation.isPending ? "Guardando..." : "Guardar"}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
