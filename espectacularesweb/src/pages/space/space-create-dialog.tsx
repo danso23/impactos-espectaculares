@@ -27,13 +27,13 @@ type Props = {
     onCreated?: (values: SpaceFormValues) => void
 };
 
-export function SpaceCreateDialog({ existingPoints = [], onCreated }: Props) {
+export function SpaceCreateDialog({ onCreated }: Props) {
     const [open, setOpen] = React.useState(false)
     const [showHeat, setShowHeat] = React.useState(true)
-    const [selectedExistingId, setSelectedExistingId] = React.useState<
-        number | null
-    >(null)
-
+    const [selectedExistingId, setSelectedExistingId] = React.useState<number | null>(null)
+    const [images, setImages] = React.useState<File[]>([])
+    const [imagePreviews, setImagePreviews] = React.useState<string[]>([])
+    
     const coordsQuery = useSpaceCoords()
     const coordsData = coordsQuery.data?.data ?? []
 
@@ -41,8 +41,15 @@ export function SpaceCreateDialog({ existingPoints = [], onCreated }: Props) {
         if (open) {
             coordsQuery.refetch()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
+
+    React.useEffect(() => {
+        // crear previews
+        const urls = images.map((f) => URL.createObjectURL(f))
+        setImagePreviews(urls)
+        // limpiar objectURLs
+        return () => urls.forEach((u) => URL.revokeObjectURL(u))
+    }, [images])
 
     const [form, setForm] = React.useState<SpaceFormValues>({
         title: "",
@@ -51,6 +58,23 @@ export function SpaceCreateDialog({ existingPoints = [], onCreated }: Props) {
         latitude: undefined,
         longitude: undefined,
     })
+
+    const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? [])
+        if (!files.length) return
+
+        const onlyImages = files.filter((f) => f.type.startsWith("image/"))
+        const merged = [...images, ...onlyImages].slice(0, 5)
+
+        setImages(merged)
+
+        e.target.value = ""
+    }
+
+
+    const removeImage = (idx: number) => {
+        setImages((prev) => prev.filter((_, i) => i !== idx))
+    }
 
     const existingSpaces = React.useMemo(
         () =>
@@ -101,6 +125,7 @@ export function SpaceCreateDialog({ existingPoints = [], onCreated }: Props) {
             return
         }
 
+        onCreated?.({ ...form, images })
         onCreated?.(form)
 
         // reset y cerrar
@@ -112,6 +137,7 @@ export function SpaceCreateDialog({ existingPoints = [], onCreated }: Props) {
             longitude: undefined,
         });
         setShowHeat(true)
+        setImages([])
         setOpen(false)
     };
 
@@ -260,8 +286,43 @@ export function SpaceCreateDialog({ existingPoints = [], onCreated }: Props) {
                             placeholder="Notas internas (opcional)"
                         />
                     </div>
-                </div>
 
+                    <div className="space-y-2 sm:col-span-2">
+                        <Label>Imágenes</Label>
+
+                        <Input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleImagesChange}
+                        />
+
+                        <p className="text-xs text-muted-foreground">
+                            Puedes subir hasta 5 imágenes (JPG/PNG/WebP).
+                        </p>
+
+                        {imagePreviews.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                                {imagePreviews.map((src, idx) => (
+                                    <div key={src} className="relative overflow-hidden rounded-md border">
+                                        <img
+                                            src={src}
+                                            alt={`Imagen ${idx + 1}`}
+                                            className="h-28 w-full object-cover"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(idx)}
+                                            className="absolute right-2 top-2 rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
+                                        >
+                                            Quitar
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
                 <DialogFooter className="gap-2">
                     <Button variant="outline" onClick={handleCancel}>
                         Cancelar

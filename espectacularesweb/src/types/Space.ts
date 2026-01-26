@@ -12,4 +12,5 @@ export type SpaceFormValues = {
     comments?: string
     latitude?: number
     longitude?: number
+    images ?: File[]
 };
