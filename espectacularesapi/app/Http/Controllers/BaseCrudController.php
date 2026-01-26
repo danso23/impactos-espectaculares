@@ -55,13 +55,21 @@ abstract class BaseCrudController extends Controller
         $q = $this->indexOrder($q, $request);
 
         $perPage = (int) $request->get('perPage', 10);
+        $page = (int) $request->get('page', 1);
 
-        // paginate() regresa estructura estándar
-        $items = $q->select($this->indexSelect())->paginate($perPage);
+        $items = $q->select($this->indexSelect())->paginate($perPage, ['*'], 'page', $page);
 
-        return response()->json($items);
+        return response()->json([
+            'data' => $items->items(),
+            'meta' => [
+                'page' => $items->currentPage(),
+                'perPage' => $items->perPage(),
+                'total' => $items->total(),
+                'totalPages' => $items->lastPage(),
+            ],
+        ]);
     }
-
+    
     /** GET /resource/{id} */
     public function find($id)
     {

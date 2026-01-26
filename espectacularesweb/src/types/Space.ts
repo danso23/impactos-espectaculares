@@ -4,6 +4,7 @@ export type Space = {
   price?: number
   coords: { lat: number; lng: number }
   status: "Disponible" | "Bloqueado" | "Rentado"
+  createdAt: string
 }
 
 export type SpaceFormValues = {
@@ -28,4 +29,16 @@ export type CreateSpaceInput = {
   width_m?: number
   height_m?: number
   active?: boolean
+}
+
+// PARA DATATABLE
+export type SpaceApi = {
+  id: number
+  title: string
+  type?: string | null
+  active?: boolean | number | null
+  created_at?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  price?: number | null
 }

@@ -1,273 +1,223 @@
 import * as React from "react"
-import type {
-    ColumnDef,
-} from "@tanstack/react-table"
+import type { ColumnDef } from "@tanstack/react-table"
 import type { FilterValues } from "@/types/Filter"
 import type { TableAction } from "@/types/TableAction"
+import type { Space, SpaceApi } from "@/types/Space"
 
 import { useNavigate } from "react-router-dom"
 import { DataTable } from "@/components/generic/data-table"
-
 import { Filter } from "@/components/generic/filter"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { SpaceCreateDialog } from "./space-create-dialog"
+
 import { Pencil, Eye, Trash2, FileText } from "lucide-react"
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 
+import { useSpaces } from "@/lib/hooks/spaceHook"
 
-type Space = {
-    id: string
-    nombre: string
-    ubicacion: string
-    tipo: "espectacular" | "muro" | "parabus"
-    activo: boolean
-    pagado: boolean
-    createdAt: string // YYYY-MM-DD
+function apiToUiStatus(active?: boolean | number | null): Space["status"] {
+  // active = 0 => Bloqueado, si active = 1 => Disponible Por lo pronto en que agrego otro campo
+  const isActive = active === true || active === 1
+  return isActive ? "Disponible" : "Bloqueado"
 }
 
-const DUMMY_SPACES: Space[] = [
-    { id: "1", nombre: "Espacio Norte 1", ubicacion: "Mérida - Norte", tipo: "espectacular", activo: true, pagado: true, createdAt: "2026-01-02" },
-    { id: "2", nombre: "Muro Centro 3", ubicacion: "Mérida - Centro", tipo: "muro", activo: true, pagado: false, createdAt: "2026-01-05" },
-    { id: "3", nombre: "Parabús 12", ubicacion: "Mérida - Oriente", tipo: "parabus", activo: false, pagado: false, createdAt: "2025-12-20" },
-    { id: "4", nombre: "Espacio Periférico 7", ubicacion: "Periférico", tipo: "espectacular", activo: true, pagado: false, createdAt: "2026-01-12" },
-]
-
-function inDateRange(date: string, from?: string, to?: string) {
-    if (from && date < from) return false
-    if (to && date > to) return false
-    return true
-}
-
-function applyLocalFilters(data: Space[], filters: FilterValues) {
-    return data.filter((s) => {
-        if (!inDateRange(s.createdAt, filters.dateFrom, filters.dateTo)) return false
-
-        const tipo = filters.selects["tipo"]
-        if (tipo && s.tipo !== tipo) return false
-
-        const ubicacion = filters.selects["ubicacion"]
-        if (ubicacion && s.ubicacion !== ubicacion) return false
-
-        const activo = filters.checks["activo"]
-        if (activo !== undefined && s.activo !== activo) return false
-
-        const pagado = filters.checks["pagado"]
-        if (pagado !== undefined && s.pagado !== pagado) return false
-
-        return true
-    })
-}
-
-function tipoLabel(t: Space["tipo"]) {
-    if (t === "espectacular") return "Espectacular"
-    if (t === "muro") return "Muro"
-    return "Parabús"
-}
-
-function boolLabel(v: boolean) {
-    return v ? "Sí" : "No"
+function apiToUiSpace(r: SpaceApi): Space {
+  return {
+    id: r.id,
+    title: r.title,
+    price: r.price ?? undefined,
+    coords: {
+      lat: Number(r.latitude ?? 0),
+      lng: Number(r.longitude ?? 0),
+    },
+    status: apiToUiStatus(r.active),
+    createdAt: (r.created_at ?? "").slice(0, 10),
+  }
 }
 
 export default function SpacePage() {
-    const [filters, setFilters] = React.useState<FilterValues>({
-        dateFrom: undefined,
-        dateTo: undefined,
-        selects: {},
-        checks: {},
-    })
-    const navigate = useNavigate()
-    const data = React.useMemo(() => applyLocalFilters(DUMMY_SPACES, filters), [filters])
+  const [filters, setFilters] = React.useState<FilterValues>({
+    dateFrom: undefined,
+    dateTo: undefined,
+    selects: {},
+    checks: {},
+  })
 
-    const actions = React.useMemo<TableAction<Space>[]>(() => {
+  const [page, setPage] = React.useState(1)
+  const perPage = 10
+
+  const handleApplyFilters = (v: FilterValues) => {
+    setFilters(v)
+    setPage(1)
+  }
+
+  const spacesQuery = useSpaces(filters, page, perPage)
+  const rowsApi = spacesQuery.data?.data ?? []
+  const meta = spacesQuery.data?.meta
+
+  const totalPages = meta?.totalPages ?? 1
+  const total = meta?.total ?? rowsApi.length
+
+  const data: Space[] = React.useMemo(() => rowsApi.map(apiToUiSpace), [rowsApi])
+
+  const navigate = useNavigate()
+
+  const actions = React.useMemo<TableAction<Space>[]>(() => {
     return [
-        {
-            key: "quote",
-            label: "Cotizar",
-            icon: <FileText className="h-4 w-4" />,
-            onClick: (row) => {
-            console.log("Cotizar", row.id)
-            // navigate(`/spaces/${row.id}/quote`)
-            },
+      {
+        key: "quote",
+        label: "Cotizar",
+        icon: <FileText className="h-4 w-4" />,
+        onClick: (row) => console.log("Cotizar", row.id),
+      },
+      {
+        key: "view",
+        label: "Ver",
+        icon: <Eye className="h-4 w-4" />,
+        onClick: (row) => {
+          console.log("Ver", row.id)
+          // navigate(`/spaces/${row.id}`)
         },
-        {
-            key: "view",
-            label: "Ver",
-            icon: <Eye className="h-4 w-4" />,
-            onClick: (row) => {
-            console.log("Ver", row.id)
-            // navigate(`/spaces/${row.id}`)
-            },
+      },
+      {
+        key: "edit",
+        label: "Editar",
+        icon: <Pencil className="h-4 w-4" />,
+        onClick: (row) => {
+          console.log("Editar", row.id)
+          // navigate(`/spaces/${row.id}/edit`)
         },
-        {
-            key: "edit",
-            label: "Editar",
-            icon: <Pencil className="h-4 w-4" />,
-            onClick: (row) => {
-            console.log("Editar", row.id)
-            // navigate(`/spaces/${row.id}/edit`)
-            },
+      },
+      {
+        key: "delete",
+        label: "Eliminar",
+        variant: "destructive",
+        icon: <Trash2 className="h-4 w-4" />,
+        separatorBefore: true,
+        onClick: async (row) => {
+          const ok = confirm(`¿Eliminar "${row.title}"?`)
+          if (!ok) return
+          console.log("Eliminar", row.id)
         },
-        {
-            key: "delete",
-            label: "Eliminar",
-            variant: "destructive",
-            icon: <Trash2 className="h-4 w-4" />,
-            separatorBefore: true,
-            onClick: async (row) => {
-            const ok = confirm(`¿Eliminar "${row.nombre}"?`)
-            if (!ok) return
-            console.log("Eliminar", row.id)
-            // aquí conectas tu mutation delete
-            },
-            // ejemplo: no permitir eliminar si ya está pagado
-            disabled: (row) => row.pagado === true,
-        },
+      },
     ]
-    }, [navigate])
+  }, [navigate])
 
-    const columns = React.useMemo<ColumnDef<Space>[]>(() => {
-        return [
-        {
-            accessorKey: "nombre",
-            header: ({ column }) => (
-            <Button
-                variant="ghost"
-                className="-ml-3"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-                Nombre
-            </Button>
-            ),
-            cell: ({ row }) => <div className="font-medium">{row.getValue("nombre")}</div>,
+  const columns = React.useMemo<ColumnDef<Space>[]>(() => {
+    return [
+      {
+        accessorKey: "title",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="-ml-3"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Título
+          </Button>
+        ),
+        cell: ({ row }) => <div className="font-medium">{row.getValue("title")}</div>,
+      },
+      {
+        accessorKey: "price",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="-ml-3"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Precio
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const v = row.getValue("price") as number | undefined
+          return v === undefined ? "-" : `$${v.toLocaleString("es-MX")}`
         },
-        {
-            accessorKey: "ubicacion",
-            header: ({ column }) => (
-            <Button
-                variant="ghost"
-                className="-ml-3"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-                Ubicación
-            </Button>
-            ),
+      },
+      {
+        accessorKey: "coords",
+        header: "Coords",
+        cell: ({ row }) => {
+          const c = row.getValue("coords") as Space["coords"]
+          return `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`
         },
-        {
-            accessorKey: "tipo",
-            header: ({ column }) => (
-            <Button
-                variant="ghost"
-                className="-ml-3"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-                Tipo
-            </Button>
-            ),
-            cell: ({ row }) => tipoLabel(row.getValue("tipo")),
-        },
-        {
-            accessorKey: "activo",
-            header: ({ column }) => (
-            <Button
-                variant="ghost"
-                className="-ml-3"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-                Activo
-            </Button>
-            ),
-            cell: ({ row }) => boolLabel(row.getValue("activo")),
-        },
-        {
-            accessorKey: "pagado",
-            header: ({ column }) => (
-            <Button
-                variant="ghost"
-                className="-ml-3"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-                Pagado
-            </Button>
-            ),
-            cell: ({ row }) => boolLabel(row.getValue("pagado")),
-        },
-        {
-            accessorKey: "createdAt",
-            header: ({ column }) => (
-            <Button
-                variant="ghost"
-                className="-ml-3"
-                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            >
-                Creado
-            </Button>
-            ),
-        },
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="-ml-3"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Estatus
+          </Button>
+        ),
+      },
+      {
+        accessorKey: "createdAt",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="-ml-3"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Creado
+          </Button>
+        ),
+      },
 
-        // Columna Acciones
-        createActionsColumn<Space>({
-            header: "Acciones",
-            actions,
-            align: "end",
-        }),
-        ]
-    }, [actions])
+      createActionsColumn<Space>({
+        header: "Acciones",
+        actions,
+        align: "end",
+      }),
+    ]
+  }, [actions])
 
+  return (
+    <div className="space-y-4 p-6">
+      <Filter
+        title="Filtros de espacios"
+        enableDateRange
+        dropdowns={[
+          {
+            key: "tipo",
+            label: "Tipo",
+            placeholder: "Selecciona tipo",
+            options: [
+              { label: "Espectacular", value: "espectacular" },
+              { label: "Muro", value: "muro" },
+              { label: "Parabús", value: "parabus" },
+            ],
+          },
+        ]}
+        checkboxes={[{ key: "activo", label: "Activo" }]}
+        onApply={handleApplyFilters}
+      />
 
-    return (
-        <div className="space-y-4 p-6">
-            <Filter
-                title="Filtros de espacios"
-                enableDateRange
-                dropdowns={[
-                    {
-                        key: "tipo",
-                        label: "Tipo",
-                        placeholder: "Selecciona tipo",
-                        options: [
-                            { label: "Espectacular", value: "espectacular" },
-                            { label: "Muro", value: "muro" },
-                            { label: "Parabús", value: "parabus" },
-                        ],
-                    },
-                    {
-                        key: "ubicacion",
-                        label: "Ubicación",
-                        placeholder: "Selecciona ubicación",
-                        options: [
-                            { label: "Mérida - Norte", value: "Mérida - Norte" },
-                            { label: "Mérida - Centro", value: "Mérida - Centro" },
-                            { label: "Mérida - Oriente", value: "Mérida - Oriente" },
-                            { label: "Periférico", value: "Periférico" },
-                        ],
-                    },
-                ]}
-                checkboxes={[
-                    { key: "activo", label: "Activo" },
-                    { key: "pagado", label: "Pagado" },
-                ]}
-                onApply={(v: FilterValues) => setFilters(v)}
-            />
-            <SpaceCreateDialog
-                onCreated={(values) => {
-                    console.log("CREATED:", values)
-                }}
-            />
+      <SpaceCreateDialog onCreated={() => setPage(1)} />
 
-            <Card>
-                <CardContent className="py-2">
-                    <DataTable
-                        title={`Espacios (${data.length})`}
-                        columns={columns}
-                        data={data}
-                        enableSearch
-                        searchPlaceholder="Buscar..."
-                        pageSize={10}
-                        onRowClick={(row) => console.log("click", row)}
-                    />
-                </CardContent>
-            </Card>
-        </div>
-    )
+      <Card>
+        <CardContent className="py-2">
+          <DataTable
+            title={`Espacios (${total})`}
+            columns={columns}
+            data={data}
+            enableSearch
+            searchPlaceholder="Buscar..."
+            pageSize={perPage}
+            enablePagination
+            manualPagination
+            pageIndex={(meta?.page ?? page) - 1}
+            pageCount={totalPages}
+            onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
+            isLoading={spacesQuery.isFetching}
+            onRowClick={(row) => console.log("click", row)}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
