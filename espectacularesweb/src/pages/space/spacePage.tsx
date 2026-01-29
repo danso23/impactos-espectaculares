@@ -33,7 +33,7 @@ function apiToUiSpace(r: SpaceApi): Space {
 
     assigned_id: r.assigned_id ?? undefined,
     faces: r.faces ?? undefined,
-    hasLights: r.has_lights === true || r.has_lights === 1,
+    has_lights: r.has_lights === true || r.has_lights === 1,
     viewType: r.view_type ?? undefined,
   }
 }

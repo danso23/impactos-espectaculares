@@ -64,7 +64,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
     width_m: undefined,
     height_m: undefined,
     description: "",
-    hasLights: false,
+    has_lights: false,
     viewType: undefined,
     comments: "",
   });
@@ -389,12 +389,12 @@ export function SpaceCreateDialog({ onCreated }: Props) {
 
             <div className="flex w-full items-center justify-between rounded-md border px-4 py-3">
               <span className="text-sm text-muted-foreground">
-                {form.hasLights ? "Sí" : "No"}
+                {form.has_lights ? "Sí" : "No"}
               </span>
 
               <Switch
-                checked={form.hasLights}
-                onCheckedChange={(v) => setField("hasLights", v)}
+                checked={form.has_lights}
+                onCheckedChange={(v) => setField("has_lights", v)}
               />
             </div>
           </div>

@@ -18,38 +18,46 @@ class SpaceController extends BaseCrudController
     protected function rulesStore(Request $request): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-            'type' => ['nullable', 'string', 'max:50'],
-            'socioeconomic_level' => ['nullable', 'string', 'max:50'],
-            'width_m' => ['nullable', 'numeric', 'min:0'],
-            'height_m' => ['nullable', 'numeric', 'min:0'],
-            'description' => ['nullable', 'string'],
-            'comments' => ['nullable', 'string'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'active' => ['nullable', 'boolean'],
+            'title'                 => ['required', 'string', 'max:255'],
+            'price'                 => ['nullable', 'numeric', 'min:0'],
+            'type'                  => ['nullable', 'string', 'max:50'],
+            'socioeconomic_level'   => ['nullable', 'string', 'max:50'],
+            'width_m'               => ['nullable', 'numeric', 'min:0'],
+            'height_m'              => ['nullable', 'numeric', 'min:0'],
+            'description'           => ['nullable', 'string'],
+            'comments'              => ['nullable', 'string'],
+            'latitude'              => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude'             => ['nullable', 'numeric', 'between:-180,180'],
+            'active'                => ['nullable', 'boolean'],
+            'faces'                 => ['required', 'numeric', 'min:0'],
+            'has_lights'            => ['required', 'boolean'],
+            'view_type'             => ['nullable', 'string', 'max:255'],
+            'assigned_id'           => ['nullable', 'string', 'max:50'],
 
             // imágenes
-            'images' => ['nullable', 'array', 'max:10'],
-            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images'                => ['nullable', 'array', 'max:10'],
+            'images.*'              => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
 
     protected function rulesUpdate(Request $request): array
     {
         return [
-            'title' => ['sometimes', 'required', 'string', 'max:255'],
-            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'type' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'socioeconomic_level' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'width_m' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'height_m' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'description' => ['sometimes', 'nullable', 'string'],
-            'comments' => ['sometimes', 'nullable', 'string'],
-            'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-            'active' => ['sometimes', 'nullable', 'boolean'],
+            'title'                 => ['sometimes', 'required', 'string', 'max:255'],
+            'price'                 => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'type'                  => ['sometimes', 'nullable', 'string', 'max:50'],
+            'socioeconomic_level'   => ['sometimes', 'nullable', 'string', 'max:50'],
+            'width_m'               => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'height_m'              => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'description'           => ['sometimes', 'nullable', 'string'],
+            'comments'              => ['sometimes', 'nullable', 'string'],
+            'latitude'              => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'longitude'             => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
+            'active'                => ['sometimes', 'nullable', 'boolean'],
+            'faces'                 => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'has_lights'            => ['sometimes', 'boolean'],
+            'view_type'             => ['sometimes', 'nullable', 'string', 'max:255'],
+            'assigned_id'           => ['sometimes', 'nullable', 'string', 'max:50'],
 
             // mágenes (en update las agregamos)
             'images' => ['sometimes', 'nullable', 'array', 'max:10'],

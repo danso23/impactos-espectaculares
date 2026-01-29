@@ -10,7 +10,7 @@ export type Space = {
   // nuevos (opcionales)
   assigned_id?: string
   faces?: number
-  hasLights?: boolean
+  has_lights?: boolean
   viewType?: "Vista natural" | "Vista cruzada" | string
 }
 
@@ -25,7 +25,7 @@ export type SpaceFormValues = {
   width_m?: number
   height_m?: number
   description?: string
-  hasLights?: boolean
+  has_lights?: boolean
   viewType?: "Vista natural" | "Vista cruzada"
   images?: File[]
   comments?: string

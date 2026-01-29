@@ -15,6 +15,10 @@ class Space extends Model
         'socioeconomic_level',
         'width_m',
         'height_m',
+        'has_lights',
+        'assigned_id',
+        'faces',
+        'view_type',
         'description',
         'comments',
         'latitude',
@@ -28,6 +32,8 @@ class Space extends Model
         'height_m' => 'decimal:2',
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
+        'has_lights' => 'boolean',
+        'faces' => 'integer',
         'active' => 'boolean',
     ];
     
