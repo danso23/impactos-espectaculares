@@ -1,25 +1,25 @@
-import * as React from "react"
-import type { ColumnDef } from "@tanstack/react-table"
-import type { FilterValues } from "@/types/Filter"
-import type { TableAction } from "@/types/TableAction"
-import type { Space, SpaceApi } from "@/types/Space"
+import * as React from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import type { FilterValues } from "@/types/Filter";
+import type { TableAction } from "@/types/TableAction";
+import type { Space, SpaceApi } from "@/types/Space";
 
-import { useNavigate } from "react-router-dom"
-import { DataTable } from "@/components/generic/data-table"
-import { Filter } from "@/components/generic/filter"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { SpaceCreateDialog } from "./space-create-dialog"
+import { useNavigate } from "react-router-dom";
+import { DataTable } from "@/components/generic/data-table";
+import { Filter } from "@/components/generic/filter";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { SpaceCreateDialog } from "./space-create-dialog";
 
-import { Pencil, Eye, Trash2, FileText } from "lucide-react"
-import { createActionsColumn } from "@/components/generic/create-actions-column"
+import { Pencil, Eye, Trash2, FileText } from "lucide-react";
+import { createActionsColumn } from "@/components/generic/create-actions-column";
 
-import { useSpaces } from "@/lib/hooks/spaceHook"
+import { useSpaces } from "@/lib/hooks/spaceHook";
 
 function apiToUiStatus(active?: boolean | number | null): Space["status"] {
   // active = 0 => Bloqueado, si active = 1 => Disponible Por lo pronto en que agrego otro campo
-  const isActive = active === true || active === 1
-  return isActive ? "Disponible" : "Bloqueado"
+  const isActive = active === true || active === 1;
+  return isActive ? "Disponible" : "Bloqueado";
 }
 
 function apiToUiSpace(r: SpaceApi): Space {
@@ -33,35 +33,42 @@ function apiToUiSpace(r: SpaceApi): Space {
     },
     status: apiToUiStatus(r.active),
     createdAt: (r.created_at ?? "").slice(0, 10),
-  }
+  };
 }
 
 export default function SpacePage() {
   const [filters, setFilters] = React.useState<FilterValues>({
     dateFrom: undefined,
     dateTo: undefined,
-    selects: {},
+    selects: {
+      estatus: "",
+      tipo: "",
+      conLuz: "",
+    },
     checks: {},
-  })
+  });
 
-  const [page, setPage] = React.useState(1)
-  const perPage = 10
+  const [page, setPage] = React.useState(1);
+  const perPage = 10;
 
   const handleApplyFilters = (v: FilterValues) => {
-    setFilters(v)
-    setPage(1)
-  }
+    setFilters(v);
+    setPage(1);
+  };
 
-  const spacesQuery = useSpaces(filters, page, perPage)
-  const rowsApi = spacesQuery.data?.data ?? []
-  const meta = spacesQuery.data?.meta
+  const spacesQuery = useSpaces(filters, page, perPage);
+  const rowsApi = spacesQuery.data?.data ?? [];
+  const meta = spacesQuery.data?.meta;
 
-  const totalPages = meta?.totalPages ?? 1
-  const total = meta?.total ?? rowsApi.length
+  const totalPages = meta?.totalPages ?? 1;
+  const total = meta?.total ?? rowsApi.length;
 
-  const data: Space[] = React.useMemo(() => rowsApi.map(apiToUiSpace), [rowsApi])
+  const data: Space[] = React.useMemo(
+    () => rowsApi.map(apiToUiSpace),
+    [rowsApi],
+  );
 
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const actions = React.useMemo<TableAction<Space>[]>(() => {
     return [
@@ -76,7 +83,7 @@ export default function SpacePage() {
         label: "Ver",
         icon: <Eye className="h-4 w-4" />,
         onClick: (row) => {
-          console.log("Ver", row.id)
+          console.log("Ver", row.id);
           // navigate(`/spaces/${row.id}`)
         },
       },
@@ -85,7 +92,7 @@ export default function SpacePage() {
         label: "Editar",
         icon: <Pencil className="h-4 w-4" />,
         onClick: (row) => {
-          console.log("Editar", row.id)
+          console.log("Editar", row.id);
           // navigate(`/spaces/${row.id}/edit`)
         },
       },
@@ -96,13 +103,13 @@ export default function SpacePage() {
         icon: <Trash2 className="h-4 w-4" />,
         separatorBefore: true,
         onClick: async (row) => {
-          const ok = confirm(`¿Eliminar "${row.title}"?`)
-          if (!ok) return
-          console.log("Eliminar", row.id)
+          const ok = confirm(`¿Eliminar "${row.title}"?`);
+          if (!ok) return;
+          console.log("Eliminar", row.id);
         },
       },
-    ]
-  }, [navigate])
+    ];
+  }, [navigate]);
 
   const columns = React.useMemo<ColumnDef<Space>[]>(() => {
     return [
@@ -117,7 +124,9 @@ export default function SpacePage() {
             Título
           </Button>
         ),
-        cell: ({ row }) => <div className="font-medium">{row.getValue("title")}</div>,
+        cell: ({ row }) => (
+          <div className="font-medium">{row.getValue("title")}</div>
+        ),
       },
       {
         accessorKey: "price",
@@ -131,16 +140,16 @@ export default function SpacePage() {
           </Button>
         ),
         cell: ({ row }) => {
-          const v = row.getValue("price") as number | undefined
-          return v === undefined ? "-" : `$${v.toLocaleString("es-MX")}`
+          const v = row.getValue("price") as number | undefined;
+          return v === undefined ? "-" : `$${v.toLocaleString("es-MX")}`;
         },
       },
       {
         accessorKey: "coords",
         header: "Coords",
         cell: ({ row }) => {
-          const c = row.getValue("coords") as Space["coords"]
-          return `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`
+          const c = row.getValue("coords") as Space["coords"];
+          return `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
         },
       },
       {
@@ -173,8 +182,8 @@ export default function SpacePage() {
         actions,
         align: "end",
       }),
-    ]
-  }, [actions])
+    ];
+  }, [actions]);
 
   return (
     <div className="space-y-4 p-6">
@@ -219,5 +228,5 @@ export default function SpacePage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
