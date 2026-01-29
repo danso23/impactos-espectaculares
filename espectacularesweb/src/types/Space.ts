@@ -15,8 +15,8 @@ export type SpaceFormValues = {
   title: string;
   price?: number;
   type?: "Espectacular" | "Muro" | "Parabus";
-  width?: number;
-  height?: number;
+  width_m?: number;
+  height_m?: number;
   description?: string;
   hasLights?: boolean;
   viewType?: "Vista natural" | "Vista cruzada";

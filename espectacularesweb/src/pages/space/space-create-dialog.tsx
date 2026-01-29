@@ -61,8 +61,8 @@ export function SpaceCreateDialog({ onCreated }: Props) {
     title: "",
     price: undefined,
     type: undefined,
-    width: undefined,
-    height: undefined,
+    width_m: undefined,
+    height_m: undefined,
     description: "",
     hasLights: false,
     viewType: undefined,
@@ -133,14 +133,14 @@ export function SpaceCreateDialog({ onCreated }: Props) {
       return;
     }
 
-    if (form.width === undefined || form.width === null || form.width <= 0) {
+    if (form.width_m === undefined || form.width_m === null || form.width_m <= 0) {
       toast.error("Falta el ancho", {
         description: "Ingresa un ancho válido.",
       });
       return;
     }
 
-    if (form.height === undefined || form.height === null || form.height <= 0) {
+    if (form.height_m === undefined || form.height_m === null || form.height_m <= 0) {
       toast.error("Falta el alto", { description: "Ingresa un alto válido." });
       return;
     }
@@ -362,16 +362,16 @@ export function SpaceCreateDialog({ onCreated }: Props) {
             <Label>Ancho (en metros)</Label>
             <Input
               type="number"
-              value={form.width ?? ""}
-              onChange={(e) => setField("width", Number(e.target.value))}
+              value={form.width_m ?? ""}
+              onChange={(e) => setField("width_m", Number(e.target.value))}
             />
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label>Alto (en metros)</Label>
             <Input
               type="number"
-              value={form.height ?? ""}
-              onChange={(e) => setField("height", Number(e.target.value))}
+              value={form.height_m ?? ""}
+              onChange={(e) => setField("height_m", Number(e.target.value))}
             />
           </div>
 

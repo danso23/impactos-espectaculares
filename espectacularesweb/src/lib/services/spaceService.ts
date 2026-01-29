@@ -24,18 +24,33 @@ export function getSpaces(params?: Record<string, any>) {
   return apiFetch<ApiListResponse<SpaceApi>>(`/api/spaces${qs}`)
 }
 
-export function createSpace(payload: SpaceFormValues & { images?: File[] }) {
+export function createSpace(payload: SpaceFormValues) {
   const fd = new FormData()
 
-  fd.append("title", payload.title)
-  if (payload.description) fd.append("description", payload.description)
-  if (payload.comments) fd.append("comments", payload.comments)
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return
 
-  if (payload.latitude !== undefined) fd.append("latitude", String(payload.latitude))
-  if (payload.longitude !== undefined) fd.append("longitude", String(payload.longitude))
+    // imágenes
+    if (key === "images" && Array.isArray(value)) {
+      value.forEach((file) => fd.append("images[]", file))
+      return
+    }
 
-  // images[]:
-  ;(payload.images ?? []).forEach((file) => fd.append("images[]", file))
+    // Booleans → 1 / 0
+    if (typeof value === "boolean") {
+      fd.append(key, value ? "1" : "0")
+      return
+    }
+
+    // Números string
+    if (typeof value === "number") {
+      fd.append(key, value.toString())
+      return
+    }
+
+    // Strings u otros
+    fd.append(key, String(value))
+  })
 
   return apiFetch<ApiResponse<Space>>("/api/spaces", {
     method: "POST",
