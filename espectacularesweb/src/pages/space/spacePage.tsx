@@ -27,13 +27,15 @@ function apiToUiSpace(r: SpaceApi): Space {
     id: r.id,
     title: r.title,
     price: r.price ?? undefined,
-    coords: {
-      lat: Number(r.latitude ?? 0),
-      lng: Number(r.longitude ?? 0),
-    },
+    coords: { lat: Number(r.latitude ?? 0), lng: Number(r.longitude ?? 0) },
     status: apiToUiStatus(r.active),
     createdAt: (r.created_at ?? "").slice(0, 10),
-  };
+
+    assigned_id: r.assigned_id ?? undefined,
+    faces: r.faces ?? undefined,
+    hasLights: r.has_lights === true || r.has_lights === 1,
+    viewType: r.view_type ?? undefined,
+  }
 }
 
 export default function SpacePage() {

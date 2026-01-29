@@ -57,7 +57,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
     faces: undefined,
     latitude: undefined,
     longitude: undefined,
-    idAsignado: "",
+    assigned_id: "",
     title: "",
     price: undefined,
     type: undefined,
@@ -320,8 +320,8 @@ export function SpaceCreateDialog({ onCreated }: Props) {
           <div className="space-y-2 sm:col-span-2">
             <Label>ID</Label>
             <Input
-              value={form.idAsignado ?? ""}
-              onChange={(e) => setField("idAsignado", e.target.value)}
+              value={form.assigned_id ?? ""}
+              onChange={(e) => setField("assigned_id", e.target.value)}
               placeholder="ESP-001"
             />
           </div>
