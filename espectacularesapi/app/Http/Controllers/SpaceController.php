@@ -54,8 +54,8 @@ class SpaceController extends BaseCrudController
             'latitude'              => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude'             => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'active'                => ['sometimes', 'nullable', 'boolean'],
-            'faces'                 => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'has_lights'            => ['sometimes', 'boolean'],
+            'faces'                 => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'has_lights'            => ['sometimes', 'nullable', 'boolean'],
             'view_type'             => ['sometimes', 'nullable', 'string', 'max:255'],
             'assigned_id'           => ['sometimes', 'nullable', 'string', 'max:50'],
 

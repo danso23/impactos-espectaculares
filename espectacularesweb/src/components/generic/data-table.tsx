@@ -37,6 +37,14 @@ type DataTableProps<TData> = {
   enableSearch?: boolean
   searchPlaceholder?: string
 
+  /**
+   * ✅ Search controlado (para server-side)
+   * Si se manda searchValue + onSearchChange, el DataTable NO filtra local,
+   * solo refleja el valor y dispara el callback.
+   */
+  searchValue?: string
+  onSearchChange?: (value: string) => void
+
   /** Paginación */
   pageSize?: number
   enablePagination?: boolean
@@ -70,6 +78,8 @@ export function DataTable<TData>({
   description,
   enableSearch = true,
   searchPlaceholder = "Buscar...",
+  searchValue,
+  onSearchChange,
   pageSize = 10,
   enablePagination = true,
 
@@ -84,10 +94,22 @@ export function DataTable<TData>({
   className,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
+
+  // Si se pasan estas props, el search es server-side (controlado)
+  const isControlledSearch = typeof searchValue === "string" && typeof onSearchChange === "function"
+
+  // Solo usado cuando el search NO es controlado (client-side)
   const [globalFilter, setGlobalFilter] = React.useState("")
 
+  const searchText = isControlledSearch ? (searchValue ?? "") : (globalFilter ?? "")
+
+  const handleSearch = (value: string) => {
+    if (isControlledSearch) onSearchChange?.(value)
+    else setGlobalFilter(value)
+  }
+
   // Pagination state:
-  // - client-side: interno
+  // - client-side: interno (si manualPagination=false)
   // - server-side: viene de props (pageIndex) y se notifica con onPageChange
   const paginationState: PaginationState = {
     pageIndex: manualPagination ? pageIndex ?? 0 : 0,
@@ -97,16 +119,23 @@ export function DataTable<TData>({
   const table = useReactTable({
     data,
     columns,
+
     state: {
       sorting,
-      globalFilter,
       pagination: paginationState,
+      ...(isControlledSearch ? {} : { globalFilter }),
     },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: "includesString",
 
-    // para server-side
+    onSortingChange: setSorting,
+
+    ...(isControlledSearch
+      ? {}
+      : {
+          onGlobalFilterChange: setGlobalFilter,
+          globalFilterFn: "includesString",
+        }),
+
+    // para server-side pagination
     manualPagination,
     pageCount: manualPagination ? pageCount ?? 1 : undefined,
 
@@ -121,9 +150,11 @@ export function DataTable<TData>({
 
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
 
-    // solo aplica si NO es server-side
+    // Filtrado local (client-side)
+    ...(isControlledSearch ? {} : { getFilteredRowModel: getFilteredRowModel() }),
+
+    // Paginación local si NO es server-side
     getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
 
     initialState: manualPagination
@@ -134,13 +165,14 @@ export function DataTable<TData>({
   })
 
   const currentPage = table.getState().pagination.pageIndex + 1
-  const totalPages = manualPagination
-    ? pageCount ?? 1
-    : table.getPageCount()
+  const totalPages = manualPagination ? pageCount ?? 1 : table.getPageCount()
 
-  const canPrev = manualPagination ? (pageIndex ?? 0) > 0 : table.getCanPreviousPage()
+  const canPrev = manualPagination
+    ? (pageIndex ?? 0) > 0
+    : table.getCanPreviousPage()
+
   const canNext = manualPagination
-    ? (pageIndex ?? 0) < (totalPages - 1)
+    ? (pageIndex ?? 0) < totalPages - 1
     : table.getCanNextPage()
 
   return (
@@ -159,8 +191,8 @@ export function DataTable<TData>({
 
             {enableSearch && (
               <Input
-                value={globalFilter ?? ""}
-                onChange={(e) => setGlobalFilter(e.target.value)}
+                value={searchText}
+                onChange={(e) => handleSearch(e.target.value)}
                 placeholder={searchPlaceholder}
                 className="sm:w-64"
               />
@@ -225,17 +257,22 @@ export function DataTable<TData>({
               variant="outline"
               size="sm"
               onClick={() =>
-                manualPagination ? onPageChange?.((pageIndex ?? 0) - 1) : table.previousPage()
+                manualPagination
+                  ? onPageChange?.((pageIndex ?? 0) - 1)
+                  : table.previousPage()
               }
               disabled={!canPrev || isLoading}
             >
               Anterior
             </Button>
+
             <Button
               variant="outline"
               size="sm"
               onClick={() =>
-                manualPagination ? onPageChange?.((pageIndex ?? 0) + 1) : table.nextPage()
+                manualPagination
+                  ? onPageChange?.((pageIndex ?? 0) + 1)
+                  : table.nextPage()
               }
               disabled={!canNext || isLoading}
             >

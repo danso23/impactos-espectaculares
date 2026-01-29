@@ -1,191 +1,55 @@
-import * as React from "react";
-import type { ColumnDef } from "@tanstack/react-table";
-import type { FilterValues } from "@/types/Filter";
-import type { TableAction } from "@/types/TableAction";
-import type { Space, SpaceApi } from "@/types/Space";
+import * as React from "react"
+import type { FilterValues } from "@/types/Filter"
+import type { Space } from "@/types/Space"
 
-import { useNavigate } from "react-router-dom";
-import { DataTable } from "@/components/generic/data-table";
-import { Filter } from "@/components/generic/filter";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { SpaceCreateDialog } from "./space-create-dialog";
+import { DataTable } from "@/components/generic/data-table"
+import { Filter } from "@/components/generic/filter"
+import { Card, CardContent } from "@/components/ui/card"
+import { SpaceCreateDialog } from "./space-create-dialog"
 
-import { Pencil, Eye, Trash2, FileText } from "lucide-react";
-import { createActionsColumn } from "@/components/generic/create-actions-column";
-
-import { useSpaces } from "@/lib/hooks/spaceHook";
-
-function apiToUiStatus(active?: boolean | number | null): Space["status"] {
-  // active = 0 => Bloqueado, si active = 1 => Disponible Por lo pronto en que agrego otro campo
-  const isActive = active === true || active === 1;
-  return isActive ? "Disponible" : "Bloqueado";
-}
-
-function apiToUiSpace(r: SpaceApi): Space {
-  return {
-    id: r.id,
-    title: r.title,
-    price: r.price ?? undefined,
-    coords: { lat: Number(r.latitude ?? 0), lng: Number(r.longitude ?? 0) },
-    status: apiToUiStatus(r.active),
-    createdAt: (r.created_at ?? "").slice(0, 10),
-
-    assigned_id: r.assigned_id ?? undefined,
-    faces: r.faces ?? undefined,
-    has_lights: r.has_lights === true || r.has_lights === 1,
-    viewType: r.view_type ?? undefined,
-  }
-}
+import { useSpaces } from "@/lib/hooks/spaceHook"
+import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper"
+import { useSpaceTable } from "./spaceTable"
 
 export default function SpacePage() {
   const [filters, setFilters] = React.useState<FilterValues>({
     dateFrom: undefined,
     dateTo: undefined,
-    selects: {
-      estatus: "",
-      tipo: "",
-      conLuz: "",
-    },
+    selects: { estatus: "", tipo: "", conLuz: "" },
     checks: {},
-  });
+  })
 
-  const [page, setPage] = React.useState(1);
-  const perPage = 10;
+  const [page, setPage] = React.useState(1)
+  const [search, setSearch] = React.useState("")
+  const perPage = 10
 
   const handleApplyFilters = (v: FilterValues) => {
-    setFilters(v);
-    setPage(1);
-  };
+    setFilters(v)
+    setPage(1)
+  }
 
-  const spacesQuery = useSpaces(filters, page, perPage);
-  const rowsApi = spacesQuery.data?.data ?? [];
-  const meta = spacesQuery.data?.meta;
+  const params = React.useMemo(
+    () => buildSpacesParams(filters, page, perPage, search),
+    [filters, page, perPage, search]
+  )
 
-  const totalPages = meta?.totalPages ?? 1;
-  const total = meta?.total ?? rowsApi.length;
+  const spacesQuery = useSpaces(params)
+  const rowsApi = spacesQuery.data?.data ?? []
+  const meta = spacesQuery.data?.meta
 
-  const data: Space[] = React.useMemo(
-    () => rowsApi.map(apiToUiSpace),
-    [rowsApi],
-  );
+  const totalPages = meta?.totalPages ?? 1
+  const total = meta?.total ?? rowsApi.length
 
-  const navigate = useNavigate();
+  const data: Space[] = React.useMemo(() => rowsApi.map(apiToUiSpace), [rowsApi])
 
-  const actions = React.useMemo<TableAction<Space>[]>(() => {
-    return [
-      {
-        key: "quote",
-        label: "Cotizar",
-        icon: <FileText className="h-4 w-4" />,
-        onClick: (row) => console.log("Cotizar", row.id),
-      },
-      {
-        key: "view",
-        label: "Ver",
-        icon: <Eye className="h-4 w-4" />,
-        onClick: (row) => {
-          console.log("Ver", row.id);
-          // navigate(`/spaces/${row.id}`)
-        },
-      },
-      {
-        key: "edit",
-        label: "Editar",
-        icon: <Pencil className="h-4 w-4" />,
-        onClick: (row) => {
-          console.log("Editar", row.id);
-          // navigate(`/spaces/${row.id}/edit`)
-        },
-      },
-      {
-        key: "delete",
-        label: "Eliminar",
-        variant: "destructive",
-        icon: <Trash2 className="h-4 w-4" />,
-        separatorBefore: true,
-        onClick: async (row) => {
-          const ok = confirm(`¿Eliminar "${row.title}"?`);
-          if (!ok) return;
-          console.log("Eliminar", row.id);
-        },
-      },
-    ];
-  }, [navigate]);
-
-  const columns = React.useMemo<ColumnDef<Space>[]>(() => {
-    return [
-      {
-        accessorKey: "title",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Título
-          </Button>
-        ),
-        cell: ({ row }) => (
-          <div className="font-medium">{row.getValue("title")}</div>
-        ),
-      },
-      {
-        accessorKey: "price",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Precio
-          </Button>
-        ),
-        cell: ({ row }) => {
-          const v = row.getValue("price") as number | undefined;
-          return v === undefined ? "-" : `$${v.toLocaleString("es-MX")}`;
-        },
-      },
-      {
-        accessorKey: "coords",
-        header: "Coords",
-        cell: ({ row }) => {
-          const c = row.getValue("coords") as Space["coords"];
-          return `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
-        },
-      },
-      {
-        accessorKey: "status",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Estatus
-          </Button>
-        ),
-      },
-      {
-        accessorKey: "createdAt",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Creado
-          </Button>
-        ),
-      },
-
-      createActionsColumn<Space>({
-        header: "Acciones",
-        actions,
-        align: "end",
-      }),
-    ];
-  }, [actions]);
+  const { columns } = useSpaceTable({
+    onDelete: async (row) => {
+      const ok = confirm(`¿Eliminar "${row.title}"?`)
+      if (!ok) return
+      // aquí llamas tu delete endpoint
+      console.log("Eliminar", row.id)
+    },
+  })
 
   return (
     <div className="space-y-4 p-6">
@@ -203,6 +67,15 @@ export default function SpacePage() {
               { label: "Parabús", value: "parabus" },
             ],
           },
+          {
+            key: "conLuz",
+            label: "Con luz",
+            placeholder: "Selecciona",
+            options: [
+              { label: "Sí", value: "1" },
+              { label: "No", value: "0" },
+            ],
+          },
         ]}
         checkboxes={[{ key: "activo", label: "Activo" }]}
         onApply={handleApplyFilters}
@@ -218,6 +91,11 @@ export default function SpacePage() {
             data={data}
             enableSearch
             searchPlaceholder="Buscar..."
+            searchValue={search}
+            onSearchChange={(v) => {
+              setSearch(v)
+              setPage(1)
+            }}
             pageSize={perPage}
             enablePagination
             manualPagination
@@ -230,5 +108,5 @@ export default function SpacePage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
