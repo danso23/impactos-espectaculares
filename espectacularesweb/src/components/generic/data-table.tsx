@@ -28,7 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type DataTableProps<TData> = {
-  columns: ColumnDef<TData, any>[];
+  columns: ColumnDef<TData, unknown>[];
   data: TData[];
   title?: string;
   description?: string;
@@ -175,10 +175,6 @@ export function DataTable<TData>({
           pagination: { pageIndex: 0, pageSize },
         },
   });
-
-  const selectedSpaces = table
-    .getSelectedRowModel()
-    .rows.map((row) => row.original);
 
   const currentPage = table.getState().pagination.pageIndex + 1;
   const totalPages = manualPagination ? (pageCount ?? 1) : table.getPageCount();

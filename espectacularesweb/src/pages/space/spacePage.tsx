@@ -38,7 +38,11 @@ export default function SpacePage() {
   );
 
   const spacesQuery = useSpaces(params);
-  const rowsApi = spacesQuery.data?.data ?? [];
+  const rowsApi = React.useMemo(
+    () => spacesQuery.data?.data ?? [],
+    [spacesQuery.data?.data]
+  )
+
   const meta = spacesQuery.data?.meta;
 
   const totalPages = meta?.totalPages ?? 1;
@@ -47,7 +51,7 @@ export default function SpacePage() {
   const data: Space[] = React.useMemo(
     () => rowsApi.map(apiToUiSpace),
     [rowsApi],
-  );
+  )
 
   const { columns } = useSpaceTable({
     onDelete: async (row) => {

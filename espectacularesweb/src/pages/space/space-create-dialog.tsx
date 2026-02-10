@@ -1,9 +1,9 @@
-import * as React from "react";
-import type { LatLngLiteral } from "leaflet";
-import type { SpaceFormValues } from "@/types/Space";
+import * as React from "react"
+import type { LatLngLiteral } from "leaflet"
+import type { SpaceFormValues } from "@/types/Space"
 
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -11,49 +11,56 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 
-import { MapPicker } from "@/components/maps/map-picker";
-import { HeatmapLayer } from "@/components/maps/heatmap-layer";
-import { useSpaceCoords, useCreateSpace } from "@/lib/hooks/spaceHook";
+import { MapPicker } from "@/components/maps/map-picker"
+import { HeatmapLayer } from "@/components/maps/heatmap-layer"
+import { useSpaceCoords, useCreateSpace } from "@/lib/hooks/spaceHook"
 
+type SpaceCreatePayload = SpaceFormValues & { images: File[] }
+export type SpaceType = "Espectacular" | "Muro" | "Parabus";
+export type ViewType = "Vista natural" | "Vista cruzada"
 type Props = {
-  onCreated?: (values: SpaceFormValues) => void;
-};
+  onCreated?: (values: SpaceCreatePayload) => void
+}
 
 export function SpaceCreateDialog({ onCreated }: Props) {
-  const [open, setOpen] = React.useState(false);
-  const [showHeat, setShowHeat] = React.useState(true);
+  const [open, setOpen] = React.useState(false)
+  const [showHeat, setShowHeat] = React.useState(true)
   const [selectedExistingId, setSelectedExistingId] = React.useState<
     number | null
-  >(null);
-  const [images, setImages] = React.useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = React.useState<string[]>([]);
+  >(null)
+  const [images, setImages] = React.useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = React.useState<string[]>([])
 
-  const coordsQuery = useSpaceCoords();
-  const coordsData = coordsQuery.data?.data ?? [];
+  const coordsQuery = useSpaceCoords()
+  const coordsData = React.useMemo(
+    () => coordsQuery.data?.data ?? [],
+    [coordsQuery.data?.data],
+  )
 
-  const createSpaceMutation = useCreateSpace();
+
+  const createSpaceMutation = useCreateSpace()
 
   React.useEffect(() => {
-    if (!open) return;
-    coordsQuery.refetch();
+    if (!open) return
+    coordsQuery.refetch()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open])
 
   React.useEffect(() => {
     // crear previews
-    const urls = images.map((f) => URL.createObjectURL(f));
-    setImagePreviews(urls);
+    const urls = images.map((f) => URL.createObjectURL(f))
+    setImagePreviews(urls)
     // limpiar objectURLs
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [images]);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u))
+  }, [images])
 
-  const [form, setForm] = React.useState<SpaceFormValues>({
+  const initialForm: SpaceFormValues = {
     faces: undefined,
     latitude: undefined,
     longitude: undefined,
@@ -67,28 +74,54 @@ export function SpaceCreateDialog({ onCreated }: Props) {
     has_lights: false,
     viewType: undefined,
     comments: "",
-  });
+  }
+
+  const [form, setForm] = React.useState<SpaceFormValues>(initialForm)
+
+  // const [form, setForm] = React.useState<SpaceFormValues>({
+  //   faces: undefined,
+  //   latitude: undefined,
+  //   longitude: undefined,
+  //   assigned_id: "",
+  //   title: "",
+  //   price: undefined,
+  //   type: undefined,
+  //   width_m: undefined,
+  //   height_m: undefined,
+  //   description: "",
+  //   has_lights: false,
+  //   viewType: undefined,
+  //   comments: "",
+  // })
+
+  const resetForm = () => {
+    setForm(initialForm)
+    setShowHeat(true)
+    setImages([])
+    setImagePreviews([]) // <- opcional, tu useEffect ya lo maneja
+    setSelectedExistingId(null)
+  }
 
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
 
-    const onlyImages = files.filter((f) => f.type.startsWith("image/"));
-    const merged = [...images, ...onlyImages].slice(0, 5);
+    const onlyImages = files.filter((f) => f.type.startsWith("image/"))
+    const merged = [...images, ...onlyImages].slice(0, 5)
 
-    setImages(merged);
+    setImages(merged)
 
-    e.target.value = "";
-  };
+    e.target.value = ""
+  }
 
   const removeImage = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-  };
+    setImages((prev) => prev.filter((_, i) => i !== idx))
+  }
 
   const coords: LatLngLiteral | undefined =
     form.latitude !== undefined && form.longitude !== undefined
       ? { lat: form.latitude, lng: form.longitude }
-      : undefined;
+      : undefined
 
   const heatPoints = React.useMemo(
     () =>
@@ -98,123 +131,124 @@ export function SpaceCreateDialog({ onCreated }: Props) {
         weight: 1,
       })),
     [coordsData],
-  );
+  )
 
   const setField = <K extends keyof SpaceFormValues>(
     key: K,
     value: SpaceFormValues[K],
   ) => {
-    setForm((p) => ({ ...p, [key]: value }));
-  };
+    setForm((p) => ({ ...p, [key]: value }))
+  }
 
   const handlePick = (c: LatLngLiteral) => {
-    setField("latitude", c.lat);
-    setField("longitude", c.lng);
-  };
+    setField("latitude", c.lat)
+    setField("longitude", c.lng)
+  }
 
   const handleSubmit = async () => {
-    console.log(form);
+    console.log(form)
     if (form.faces === undefined || form.faces === null || form.faces <= 0) {
       toast.error("Falta el número de caras", {
         description: "Ingresa un número válido.",
-      });
-      return;
+      })
+      return
     }
 
     if (form.price === undefined || form.price === null || form.price <= 0) {
       toast.error("Falta el precio", {
         description: "Ingresa un precio válido.",
-      });
-      return;
+      })
+      return
     }
 
     if (!form.type) {
-      toast.error("Falta el tipo", { description: "Selecciona un tipo." });
-      return;
+      toast.error("Falta el tipo", { description: "Selecciona un tipo." })
+      return
     }
 
     if (form.width_m === undefined || form.width_m === null || form.width_m <= 0) {
       toast.error("Falta el ancho", {
         description: "Ingresa un ancho válido.",
-      });
-      return;
+      })
+      return
     }
 
     if (form.height_m === undefined || form.height_m === null || form.height_m <= 0) {
-      toast.error("Falta el alto", { description: "Ingresa un alto válido." });
-      return;
+      toast.error("Falta el alto", { description: "Ingresa un alto válido." })
+      return
     }
 
     if (!form.viewType) {
       toast.error("Falta el tipo de vista", {
         description: "Selecciona un tipo de vista.",
-      });
-      return;
+      })
+      return
     }
 
     if (!form.title.trim()) {
       toast.error("Falta el título", {
         description: "El título es requerido.",
-      });
-      return;
+      })
+      return
     }
     if (form.latitude === undefined || form.longitude === undefined) {
       toast.error("Falta la ubicación", {
         description: "Selecciona una ubicación en el mapa.",
-      });
-      return;
+      })
+      return
     }
     try {
-      const payload = { ...form, images };
-      await createSpaceMutation.mutateAsync(payload);
+      const payload = { ...form, images }
+      await createSpaceMutation.mutateAsync(payload)
       toast.success("Espacio creado", {
         description: "Se guardó correctamente.",
-      });
-      onCreated?.(payload);
+      })
+      onCreated?.(payload)
 
-      resetForm();
-      setOpen(false);
-    } catch (err: any) {
-      toast.error("No se pudo guardar", {
-        description: err?.message ?? "Intenta nuevamente.",
-      });
+      resetForm()
+      setOpen(false)
+    } catch (err: unknown) {
+        toast.error("No se pudo guardar", {
+          description: err instanceof Error ? err.message : "Intenta nuevamente.",
+        })
     }
-  };
+  }
 
+  type SpaceCoord = { id?: number; title?: string; latitude: string | number; longitude: string | number }
   const existingMarkers = React.useMemo(() => {
-    return coordsData.map((p: any, idx: number) => ({
+    return coordsData.map((p: SpaceCoord, idx: number) => ({
       id: Number(p.id ?? idx + 1),
       title: String(p.title ?? `Espacio ${p.id ?? idx + 1}`),
       position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-    }));
-  }, [coordsData]);
+    }))
+  }, [coordsData])
 
-  const resetForm = () => {
-    setForm({
-      title: "",
-      description: "",
-      comments: "",
-      latitude: undefined,
-      longitude: undefined,
-    });
-    setShowHeat(true);
-    setImages([]);
-    setImagePreviews([]);
-    setSelectedExistingId(null);
-  };
+  // const resetForm = () => {
+  //   setForm({
+  //     title: "",
+  //     description: "",
+  //     comments: "",
+  //     latitude: undefined,
+  //     longitude: undefined,
+  //   })
+  //   setShowHeat(true)
+  //   setImages([])
+  //   setImagePreviews([])
+  //   setSelectedExistingId(null)
+  // }
 
   const handleCancel = () => {
-    resetForm();
-    setOpen(false);
-  };
+    resetForm()
+    setOpen(false)
+  }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (createSpaceMutation.isPending) return;
-        setOpen(v);
-        if (!v) resetForm();
+        if (createSpaceMutation.isPending) return
+        setOpen(v)
+        if (!v) resetForm()
       }}
     >
       <DialogTrigger asChild>
@@ -255,7 +289,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
               {/* LISTA IZQUIERDA */}
               <div className="h-[320px] overflow-auto rounded-md border bg-background">
                 {existingMarkers.map((m) => {
-                  const active = m.id === selectedExistingId;
+                  const active = m.id === selectedExistingId
                   return (
                     <button
                       key={m.id}
@@ -273,7 +307,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
                         {m.position.lat.toFixed(5)}, {m.position.lng.toFixed(5)}
                       </div>
                     </button>
-                  );
+                  )
                 })}
               </div>
 
@@ -349,7 +383,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
             <select
               className="w-full rounded-md border px-3 py-2 text-sm"
               value={form.type ?? ""}
-              onChange={(e) => setField("type", e.target.value as any)}
+              onChange={(e) => setField("type", e.target.value as SpaceType)}
             >
               <option value="">Seleccionar</option>
               <option value="Espectacular">Espectacular</option>
@@ -404,7 +438,7 @@ export function SpaceCreateDialog({ onCreated }: Props) {
             <select
               className="w-full rounded-md border px-3 py-2 text-sm"
               value={form.viewType ?? ""}
-              onChange={(e) => setField("viewType", e.target.value as any)}
+              onChange={(e) => setField("viewType", e.target.value as ViewType)}
             >
               <option value="">Seleccionar</option>
               <option value="Vista natural">Vista natural</option>
@@ -479,5 +513,5 @@ export function SpaceCreateDialog({ onCreated }: Props) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

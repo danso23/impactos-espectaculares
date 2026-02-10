@@ -1,8 +1,6 @@
-import React from "react"
 import { Routes, Route, NavLink, Outlet, Navigate } from "react-router-dom"
 import {
   Menu,
-  X,
   PanelsTopLeft,
   MapPin,
   HandCoins,
@@ -20,7 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { LogoutButton } from "./components/auth/logout-button"
 import { LoginPage } from "./pages/auth/login"
-import { ProtectedRoute } from "@/routes/ProtectedRoute";
+import { ProtectedRoute } from "@/routes/ProtectedRoute"
 import { getUser } from "@/lib/auth"
 import UsersPage from "@/pages/userPage"
 import SpacePage from "./pages/space/spacePage"

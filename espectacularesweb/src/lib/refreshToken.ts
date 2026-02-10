@@ -17,7 +17,7 @@ export async function refreshAccessToken(): Promise<string> {
     try {
       const data = await res.json()
       msg = data?.message ?? msg
-    } catch {}
+    } catch (e){console.log(e)}
     throw new Error(msg)
   }
 

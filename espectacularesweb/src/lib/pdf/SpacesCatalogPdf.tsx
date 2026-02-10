@@ -1,18 +1,5 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-
-type Space = {
-  id: number;
-  title: string;
-  price: string | null;
-  type: string | null;
-  has_lights: boolean;
-  faces: number;
-  width_m: string | null;
-  height_m: string | null;
-  socioeconomic_level: string | null;
-  latitude: string;
-  longitude: string;
-};
+import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
+import type { SpaceApi } from "@/types/Space"
 
 const styles = StyleSheet.create({
   page: {
@@ -69,9 +56,30 @@ const styles = StyleSheet.create({
     color: "#999",
     textAlign: "right",
   },
-});
+})
 
-export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
+type SpacePdf = SpaceApi & {
+  // estos vienen en tu API aunque no estén en el type base
+  has_lights?: boolean | number | string | null
+  faces?: number | null
+  width_m?: string | number | null
+  height_m?: string | number | null
+  socioeconomic_level?: string | null
+  latitude?: string | number | null
+  longitude?: string | number | null
+}
+
+function boolFromApi(v: unknown) {
+  return v === true || v === 1 || v === "1" || v === "true"
+}
+
+function numToMoney(v: unknown) {
+  const n = typeof v === "number" ? v : v ? Number(v) : NaN
+  if (!Number.isFinite(n)) return "N/A"
+  return `$${n.toLocaleString("es-MX")}`
+}
+
+export function SpacesCatalogDocument({ spaces }: { spaces: SpacePdf[] }) {
   return (
     <Document>
       {spaces.map((space, index) => (
@@ -93,14 +101,10 @@ export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
           <View style={styles.body}>
             <View style={styles.column}>
               <Text style={styles.label}>Precio</Text>
-              <Text style={styles.value}>
-                {space.price
-                  ? `$${Number(space.price).toLocaleString("es-MX")}`
-                  : "N/A"}
-              </Text>
+              <Text style={styles.value}>{numToMoney(space.price)}</Text>
 
               <Text style={styles.label}>Caras</Text>
-              <Text style={styles.value}>{space.faces}</Text>
+              <Text style={styles.value}>{space.faces ?? 0}</Text>
 
               <Text style={styles.label}>Dimensiones</Text>
               <Text style={styles.value}>
@@ -115,11 +119,13 @@ export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
               </Text>
 
               <Text style={styles.label}>Iluminación</Text>
-              <Text style={styles.value}>{space.has_lights ? "Sí" : "No"}</Text>
+              <Text style={styles.value}>
+                {boolFromApi(space.has_lights) ? "Sí" : "No"}
+              </Text>
 
               <Text style={styles.label}>Ubicación</Text>
               <Text style={styles.value}>
-                {space.latitude}, {space.longitude}
+                {space.latitude ?? "-"}, {space.longitude ?? "-"}
               </Text>
             </View>
           </View>
@@ -131,5 +137,5 @@ export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
         </Page>
       ))}
     </Document>
-  );
+  )
 }

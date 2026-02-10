@@ -1,5 +1,13 @@
 import type { FilterValues } from "@/types/Filter"
 import type { Space, SpaceApi } from "@/types/Space"
+import type { QueryParams } from "@/types/QueryParam"
+
+type SpaceApiExtras = SpaceApi & {
+  assigned_id?: number | null
+  faces?: number | null
+  has_lights?: boolean | number | string | null
+  view_type?: string | null
+}
 
 export function apiToUiStatus(active?: boolean | number | string | null): Space["status"] {
   const isActive = active === true || active === 1 || active === "1" || active === "true"
@@ -7,19 +15,21 @@ export function apiToUiStatus(active?: boolean | number | string | null): Space[
 }
 
 export function apiToUiSpace(r: SpaceApi): Space {
+  const x = r as SpaceApiExtras
+
   return {
     id: r.id,
     title: r.title,
     price: r.price ?? undefined,
     coords: { lat: Number(r.latitude ?? 0), lng: Number(r.longitude ?? 0) },
-    status: apiToUiStatus(r.active as any),
+    status: apiToUiStatus(r.active),
     createdAt: (r.created_at ?? "").slice(0, 10),
 
-    assigned_id: (r as any).assigned_id ?? undefined,
-    faces: (r as any).faces ?? undefined,
+    assigned_id: x.assigned_id ?? undefined,
+    faces: x.faces ?? undefined,
     has_lights:
-      (r as any).has_lights === true || (r as any).has_lights === 1 || (r as any).has_lights === "1",
-    viewType: (r as any).view_type ?? undefined,
+      x.has_lights === true || x.has_lights === 1,
+    viewType: x.view_type ?? undefined,
   }
 }
 
@@ -29,7 +39,7 @@ export function buildSpacesParams(
   perPage: number,
   search?: string
 ) {
-  const params: Record<string, any> = {
+  const params: QueryParams = {
     page,
     per_page: perPage,
   }

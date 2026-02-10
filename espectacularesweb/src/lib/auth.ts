@@ -1,4 +1,4 @@
-export type AuthUser = any
+export type AuthUser = unknown
 
 // --- Tokens  ---
 export const tokenStore = {

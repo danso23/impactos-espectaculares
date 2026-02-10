@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/services/clientService"
 import type { Space, SpaceFormValues, SpaceApi } from "@/types/Space"
 import type { ApiListResponse, ApiResponse } from "@/types/Api"
+import type { QueryParams } from "@/types/QueryParam"
 
 export type SpaceCoord = {
   id: number
@@ -19,8 +20,16 @@ export function getSpaceCoords() {
   return apiFetch<SpaceCoordsResponse>("/api/spaces/coords")
 }
 
-export function getSpaces(params?: Record<string, any>) {
-  const qs = params ? `?${new URLSearchParams(params as any).toString()}` : ""
+export function getSpaces(params?: QueryParams) {
+  const qs = params
+    ? `?${new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined && v !== null)
+            .map(([k, v]) => [k, String(v)])
+        )
+      ).toString()}`
+    : ""
   return apiFetch<ApiListResponse<SpaceApi>>(`/api/spaces${qs}`)
 }
 

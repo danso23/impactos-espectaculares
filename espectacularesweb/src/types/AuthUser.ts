@@ -9,5 +9,5 @@ export type AuthUser = {
 export type AnyUser = Partial<AuthUser> & {
   nombre?: string
   correo?: string
-  user?: any
+  user?: string
 }

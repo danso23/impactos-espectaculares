@@ -60,9 +60,9 @@ export function LogoutButton({
       await logoutRequest()
 
       forceLocalLogout(navigate)
-    } catch (e: any) {
+    } catch (e) {
+      console.log(e);
       forceLocalLogout(navigate)
-
     } finally {
       setLoading(false)
     }
