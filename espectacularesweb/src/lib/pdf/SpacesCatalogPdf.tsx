@@ -1,85 +1,142 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
-import type { SpaceApi } from "@/types/Space"
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Image,
+} from "@react-pdf/renderer";
+
+type Space = {
+  id: number;
+  title: string;
+  price: string | null;
+  type: string | null;
+  has_lights: boolean;
+  faces: number;
+  width_m: string | null;
+  height_m: string | null;
+  socioeconomic_level: string | null;
+  latitude: string;
+  longitude: string;
+};
 
 const styles = StyleSheet.create({
   page: {
-    flexDirection: "column",
-    padding: 40,
-    fontSize: 12,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#0B0F1A",
+    padding: 5,
+    fontSize: 11,
+    color: "#FFFFFF",
   },
 
-  header: {
-    marginBottom: 20,
-    borderBottom: "2 solid #000",
-    paddingBottom: 10,
+  image: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+  },
+
+  content: {
+    flex: 1,
+  },
+
+  /* ================= IMÁGENES ================= */
+  imagesSection: {
+    height: "70%", // 70% del alto de la página
+    gap: 10,
+  },
+
+  imagesRow: {
+    height: "50%", // mitad del bloque de imágenes
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  imageBox: {
+    width: "50%",
+    height: "100%",
+    backgroundColor: "#1A1F36",
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+
+  /* ================= INFO ================= */
+  infoSection: {
+    height: "30%", // 30%
+    marginTop: 5,
+    padding: 3,
+    backgroundColor: "#121735",
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 24,
+    border: "1 solid #1E245A",
+  },
+
+  infoColumnMain: {
+    flex: 1.5,
+    justifyContent: "flex-start",
+    gap: 8,
+  },
+
+  infoColumn: {
+    flex: 1,
+    justifyContent: "flex-start",
+    gap: 6,
   },
 
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
   },
 
   subtitle: {
-    fontSize: 12,
-    color: "#666",
+    fontSize: 11,
+    color: "#9AA0C3",
     marginTop: 4,
   },
 
-  body: {
-    flex: 1,
-    marginTop: 20,
-    flexDirection: "row",
-    gap: 30,
+  price: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#6EE7FF",
+    marginTop: 3,
   },
 
-  column: {
-    flex: 1,
-    gap: 8,
+  badge: {
+    marginTop: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "#22C55E",
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    borderRadius: 20,
+    fontSize: 9,
+    fontWeight: "bold",
+    color: "#022C22",
   },
 
   label: {
-    fontSize: 10,
-    color: "#555",
+    fontSize: 9,
+    color: "#8E93B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
 
   value: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "bold",
+    marginBottom: 3,
   },
 
   footer: {
-    marginTop: 30,
-    borderTop: "1 solid #eee",
-    paddingTop: 10,
-    fontSize: 10,
-    color: "#999",
+    marginTop: 3,
+    fontSize: 9,
+    color: "#6C7199",
     textAlign: "right",
   },
-})
+});
 
-type SpacePdf = SpaceApi & {
-  // estos vienen en tu API aunque no estén en el type base
-  has_lights?: boolean | number | string | null
-  faces?: number | null
-  width_m?: string | number | null
-  height_m?: string | number | null
-  socioeconomic_level?: string | null
-  latitude?: string | number | null
-  longitude?: string | number | null
-}
-
-function boolFromApi(v: unknown) {
-  return v === true || v === 1 || v === "1" || v === "true"
-}
-
-function numToMoney(v: unknown) {
-  const n = typeof v === "number" ? v : v ? Number(v) : NaN
-  if (!Number.isFinite(n)) return "N/A"
-  return `$${n.toLocaleString("es-MX")}`
-}
-
-export function SpacesCatalogDocument({ spaces }: { spaces: SpacePdf[] }) {
+export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
   return (
     <Document>
       {spaces.map((space, index) => (
@@ -89,53 +146,106 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpacePdf[] }) {
           orientation="landscape"
           style={styles.page}
         >
-          {/* HEADER */}
-          <View style={styles.header}>
-            <Text style={styles.title}>{space.title}</Text>
-            <Text style={styles.subtitle}>
-              ID #{space.id} · Tipo: {space.type ?? "N/A"}
-            </Text>
-          </View>
+          <View style={styles.content}>
+            {/* ================= IMÁGENES ================= */}
+            <View style={styles.imagesSection}>
+              <View style={styles.imagesRow}>
+                <View style={styles.imageBox}>
+                  <Image
+                    src="https://picsum.photos/seed/picsum/200/300
+"
+                    style={styles.image}
+                  />
+                </View>
+                <View style={styles.imageBox}>
+                  <Image
+                    src="https://picsum.photos/seed/picsum/200/300
+"
+                    style={styles.image}
+                  />
+                </View>
+              </View>
 
-          {/* BODY */}
-          <View style={styles.body}>
-            <View style={styles.column}>
-              <Text style={styles.label}>Precio</Text>
-              <Text style={styles.value}>{numToMoney(space.price)}</Text>
-
-              <Text style={styles.label}>Caras</Text>
-              <Text style={styles.value}>{space.faces ?? 0}</Text>
-
-              <Text style={styles.label}>Dimensiones</Text>
-              <Text style={styles.value}>
-                {space.width_m ?? "-"} × {space.height_m ?? "-"} m
-              </Text>
+              <View style={styles.imagesRow}>
+                <View style={styles.imageBox}>
+                  <Image
+                    src="https://picsum.photos/seed/picsum/200/300
+"
+                    style={styles.image}
+                  />
+                </View>
+                <View style={styles.imageBox}>
+                  <Image
+                    src="https://picsum.photos/seed/picsum/200/300
+"
+                    style={styles.image}
+                  />
+                </View>
+              </View>
             </View>
 
-            <View style={styles.column}>
-              <Text style={styles.label}>Nivel socioeconómico</Text>
-              <Text style={styles.value}>
-                {space.socioeconomic_level ?? "N/A"}
-              </Text>
+            {/* ================= INFO ================= */}
+            <View style={styles.infoSection}>
+              <View style={styles.infoColumnMain}>
+                <View>
+                  <Text style={styles.title}>{space.title}</Text>
+                  <Text style={styles.subtitle}>
+                    ID #{space.id} · {space.type ?? "Espacio Publicitario"}
+                  </Text>
 
-              <Text style={styles.label}>Iluminación</Text>
-              <Text style={styles.value}>
-                {boolFromApi(space.has_lights) ? "Sí" : "No"}
-              </Text>
+                  <Text style={styles.price}>
+                    {space.price
+                      ? `$${Number(space.price).toLocaleString("es-MX")}`
+                      : "Precio a consultar"}
+                  </Text>
 
-              <Text style={styles.label}>Ubicación</Text>
-              <Text style={styles.value}>
-                {space.latitude ?? "-"}, {space.longitude ?? "-"}
-              </Text>
+                  <Text style={styles.badge}>DISPONIBLE</Text>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Ubicación</Text>
+                  <Text style={styles.value}>
+                    {space.latitude}, {space.longitude}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.infoColumn}>
+                <View>
+                  <Text style={styles.label}>Dimensiones</Text>
+                  <Text style={styles.value}>
+                    {space.width_m ?? "-"} × {space.height_m ?? "-"} m
+                  </Text>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Caras</Text>
+                  <Text style={styles.value}>{space.faces}</Text>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Iluminación</Text>
+                  <Text style={styles.value}>
+                    {space.has_lights ? "Sí" : "No"}
+                  </Text>
+                </View>
+
+                <View>
+                  <Text style={styles.label}>Nivel Socioeconómico</Text>
+                  <Text style={styles.value}>
+                    {space.socioeconomic_level ?? "N/A"}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
 
-          {/* FOOTER */}
+          {/* ================= FOOTER ================= */}
           <View style={styles.footer}>
             <Text>Catálogo de Espacios · Página {index + 1}</Text>
           </View>
         </Page>
       ))}
     </Document>
-  )
+  );
 }
