@@ -4,6 +4,7 @@ import { createSpace, getSpaceCoords, getSpaces } from "@/lib/services/spaceServ
 import { tokenStore } from "../auth"
 import type { SpaceFormValues } from "@/types/Space"
 import type { QueryParams } from "@/types/QueryParam"
+import { updateSpace } from "@/lib/services/spaceService"
 
 export function useSpaceCoords() {
   const access = tokenStore.getAccess()
@@ -50,5 +51,24 @@ export function useSpaces(params: QueryParams) {
     enabled: !!access,
     staleTime: 10_000,
     placeholderData: (prev) => prev,
+  })
+}
+
+export function useUpdateSpace() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: number
+      payload: SpaceFormValues & { images?: File[] }
+    }) => updateSpace(id, payload),
+
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["spaces"] })
+      await queryClient.invalidateQueries({ queryKey: ["spaces", "coords"] })
+    },
   })
 }

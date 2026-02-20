@@ -15,7 +15,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { LogoutButton } from "./components/auth/logout-button"
 import { LoginPage } from "./pages/auth/login"
 import { ProtectedRoute } from "@/routes/ProtectedRoute"
@@ -124,8 +125,12 @@ function AppLayout() {
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="left" className="w-72 p-0">
-                    {/* (tu contenido móvil igual) */}
-                    {/* ... */}
+                    <SheetHeader>
+                      <VisuallyHidden>
+                        <SheetTitle>Menú principal</SheetTitle>
+                      </VisuallyHidden>
+                    </SheetHeader>
+
                   </SheetContent>
                 </Sheet>
 
