@@ -16,6 +16,7 @@ type BuildSpaceTableOptions = {
 };
 
 export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
+  /** ACCIONES DEL DATATABLE */
   const actions = React.useMemo<TableAction<Space>[]>(() => {
     return [
       {
@@ -233,7 +234,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         ),
       },
       {
-        accessorKey: "view_type",
+        accessorKey: "viewType",
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -244,7 +245,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
           </Button>
         ),
         cell: ({ row }) => (
-          <div className="font-medium">{row.getValue("view_type")}</div>
+          <div className="font-medium">{row.getValue("viewType")}</div>
         ),
       },
       {

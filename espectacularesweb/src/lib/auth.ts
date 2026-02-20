@@ -1,3 +1,5 @@
+import type { AnyUser } from "@/types/AuthUser"
+
 export type AuthUser = unknown
 
 // --- Tokens  ---
@@ -36,11 +38,12 @@ export function setToken(accessToken: string) {
   localStorage.setItem("token", accessToken)
 }
 
-export function getUser(): AuthUser | null {
+export function getUser(): AnyUser | null {
   const raw = localStorage.getItem("user")
   if (!raw) return null
+
   try {
-    return JSON.parse(raw)
+    return JSON.parse(raw) as AnyUser
   } catch {
     return null
   }

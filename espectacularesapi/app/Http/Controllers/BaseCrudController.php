@@ -19,6 +19,37 @@ abstract class BaseCrudController extends Controller
     /** Hook opcional: filtros/busqueda/paginación */
     protected function applyIndexQuery($query, Request $request)
     {
+        // active: 1/0
+        if ($request->filled('active')) {
+            $query->where('active', (int) $request->get('active'));
+        }
+
+        // type
+        if ($request->filled('type')) {
+            $query->where('type', $request->get('type'));
+        }
+
+        // has_lights: 1/0
+        if ($request->filled('has_lights')) {
+            $query->where('has_lights', (int) $request->get('has_lights'));
+        }
+
+        // date range (ejemplo con created_at)
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->get('date_to'));
+        }
+
+        // query (búsqueda)
+        if ($request->filled('q')) {
+            $term = $request->get('q');
+            $query->where(function ($qq) use ($term) {
+                $qq->where('title', 'like', "%{$term}%")
+                ->orWhere('assigned_id', 'like', "%{$term}%");
+            });
+        }
         return $query;
     }
 

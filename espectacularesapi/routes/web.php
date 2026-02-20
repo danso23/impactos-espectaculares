@@ -36,8 +36,8 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->get('spaces', ['uses' => 'SpaceController@index']);
         $router->get('spaces/coords', ['uses' => 'SpaceController@coords']);
 
-        $router->put('spaces/{space}', ['uses' => 'SpaceController@update']);
-        $router->patch('spaces/{space}', ['uses' => 'SpaceController@update']);
-        $router->delete('spaces/{space}', ['uses' => 'SpaceController@destroy']);
+        $router->put('spaces/{id}', ['uses' => 'SpaceController@update']);
+        $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);
+        $router->delete('spaces/{id}', ['uses' => 'SpaceController@delete']);
     });
 });

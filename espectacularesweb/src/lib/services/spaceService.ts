@@ -33,35 +33,65 @@ export function getSpaces(params?: QueryParams) {
   return apiFetch<ApiListResponse<SpaceApi>>(`/api/spaces${qs}`)
 }
 
-export function createSpace(payload: SpaceFormValues) {
+/** CREATE y UPDATE */
+function buildSpaceFormData(payload: SpaceFormValues & { images?: File[] }) {
   const fd = new FormData()
 
-  Object.entries(payload).forEach(([key, value]) => {
+  const keyMap: Partial<Record<keyof SpaceFormValues, string>> = {
+    viewType: "view_type",
+  }
+
+  Object.entries(payload).forEach(([rawKey, value]) => {
     if (value === undefined || value === null) return
 
+    const key = rawKey as keyof SpaceFormValues
+    const apiKey = keyMap[key] ?? rawKey
+
     // imágenes
-    if (key === "images" && Array.isArray(value)) {
+    if (rawKey === "images" && Array.isArray(value)) {
       value.forEach((file) => fd.append("images[]", file))
       return
     }
 
-    // Booleans → 1 / 0
+    // Booleans
     if (typeof value === "boolean") {
-      fd.append(key, value ? "1" : "0")
+      fd.append(apiKey, value ? "1" : "0")
       return
     }
 
-    // Números string
+    // Números
     if (typeof value === "number") {
-      fd.append(key, value.toString())
+      fd.append(apiKey, value.toString())
       return
     }
 
     // Strings u otros
-    fd.append(key, String(value))
+    fd.append(apiKey, String(value))
   })
 
+  return fd
+}
+
+/** CREATE */
+export function createSpace(payload: SpaceFormValues & { images?: File[] }) {
+  const fd = buildSpaceFormData(payload)
+
   return apiFetch<ApiResponse<Space>>("/api/spaces", {
+    method: "POST",
+    body: fd,
+  })
+}
+
+/** UPDATE */
+export function updateSpace(
+  id: number,
+  payload: SpaceFormValues & { images?: File[] }
+) {
+  const fd = buildSpaceFormData(payload)
+
+  fd.append("_method", "PUT")
+
+  return apiFetch<ApiResponse<Space>>(`/api/spaces/${id}`, {
     method: "POST",
     body: fd,
   })

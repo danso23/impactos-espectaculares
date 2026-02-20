@@ -1,13 +1,7 @@
 import type { FilterValues } from "@/types/Filter"
 import type { Space, SpaceApi } from "@/types/Space"
 import type { QueryParams } from "@/types/QueryParam"
-
-type SpaceApiExtras = SpaceApi & {
-  assigned_id?: number | null
-  faces?: number | null
-  has_lights?: boolean | number | string | null
-  view_type?: string | null
-}
+import { asViewType } from "../helpers/viewTypeHelper"
 
 export function apiToUiStatus(active?: boolean | number | string | null): Space["status"] {
   const isActive = active === true || active === 1 || active === "1" || active === "true"
@@ -15,21 +9,35 @@ export function apiToUiStatus(active?: boolean | number | string | null): Space[
 }
 
 export function apiToUiSpace(r: SpaceApi): Space {
-  const x = r as SpaceApiExtras
-
   return {
     id: r.id,
     title: r.title,
-    price: r.price ?? undefined,
-    coords: { lat: Number(r.latitude ?? 0), lng: Number(r.longitude ?? 0) },
-    status: apiToUiStatus(r.active),
-    createdAt: (r.created_at ?? "").slice(0, 10),
+    price: r.price != null ? Number(r.price) : undefined,
 
-    assigned_id: x.assigned_id ?? undefined,
-    faces: x.faces ?? undefined,
+    coords: {
+      lat: r.latitude != null ? Number(r.latitude) : 0,
+      lng: r.longitude != null ? Number(r.longitude) : 0,
+    },
+
+    status: apiToUiStatus(r.active),
+    createdAt: r.created_at ? r.created_at.slice(0, 10) : "",
+
+    type: r.type ?? null,
+    socioeconomic_level: r.socioeconomic_level ?? null,
+    width_m: r.width_m != null ? Number(r.width_m) : undefined,
+    height_m: r.height_m != null ? Number(r.height_m) : undefined,
+    description: r.description ?? null,
+    comments: r.comments ?? null,
+
+    assigned_id: r.assigned_id != null ? String(r.assigned_id) : undefined,
+    faces: r.faces != null ? Number(r.faces) : undefined,
+
     has_lights:
-      x.has_lights === true || x.has_lights === 1,
-    viewType: x.view_type ?? undefined,
+      r.has_lights === true ||
+      r.has_lights === 1 ||
+      r.has_lights === "1",
+
+    viewType: asViewType(r.view_type),
   }
 }
 
@@ -60,7 +68,12 @@ export function buildSpacesParams(
 
   const estatus = filters.selects?.estatus
   if (estatus === "disponible") params.active = 1
-  if (estatus === "bloqueado") params.active = 0
+  else if (estatus === "bloqueado") params.active = 0
+  else {
+    const activo = filters.checks?.activo
+    if (activo === true) params.active = 1
+    else if (activo === false) params.active = 0
+  }
 
   // Checkboxes
   const activo = filters.checks?.activo
