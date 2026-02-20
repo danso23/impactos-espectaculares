@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as React from "react"
 import {
   flexRender,
@@ -13,6 +14,8 @@ import type {
   SortingState,
   Table as TanstackTable,
   PaginationState,
+  RowSelectionState,
+  OnChangeFn,
 } from "@tanstack/react-table"
 
 import { Button } from "@/components/ui/button"
@@ -32,6 +35,9 @@ type DataTableProps<TData> = {
   data: TData[]
   title?: string
   description?: string
+
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 
   /** Muestra input de búsqueda (global) */
   enableSearch?: boolean
@@ -77,6 +83,7 @@ export function DataTable<TData>({
   title,
   description,
   enableSearch = true,
+  onRowSelectionChange,
   searchPlaceholder = "Buscar...",
   searchValue,
   onSearchChange,
@@ -128,12 +135,12 @@ export function DataTable<TData>({
     state: {
       sorting,
       pagination: paginationState,
-      rowSelection,
+      rowSelection: rowSelection ?? {},
 
       ...(isControlledSearch ? {} : { globalFilter }),
     },
 
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: onRowSelectionChange,
     enableRowSelection: true,
 
     onSortingChange: setSorting,

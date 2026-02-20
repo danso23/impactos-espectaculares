@@ -7,9 +7,10 @@ import { Filter } from "@/components/generic/filter"
 import { Card, CardContent } from "@/components/ui/card"
 import { SpaceForm } from "./spaceForm"
 
-import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog"
-import { Button } from "@/components/ui/button"
-import { FileDown } from "lucide-react"
+import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
+import { Button } from "@/components/ui/button";
+import { FileDown } from "lucide-react";
+import type { RowSelectionState } from "@tanstack/react-table";
 
 import { useCreateSpace, useSpaces, useUpdateSpace } from "@/lib/hooks/spaceHook"
 import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper"
@@ -50,6 +51,8 @@ export default function SpacePage() {
 
     return () => window.clearTimeout(t)
   }, [searchInput])
+
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   const handleApplyFilters = (v: FilterValues) => {
     setFilters(v)
@@ -132,12 +135,29 @@ export default function SpacePage() {
         onReset={handleResetFilters}
         applyOnReset={true}
       />
+      <Button
+        variant="outline"
+        className="flex gap-2"
+        onClick={() => {
+          console.log("Seleccionados", rowSelection);
+          const selectedIds = Object.keys(rowSelection);
+
+          const selectedSpaces = data.filter((space) =>
+            selectedIds.includes(String(space.id)),
+          );
+
+          downloadSpacesCatalog(selectedSpaces);
+        }}
+      >
+        <FileDown className="h-4 w-4" />
+        Descargar catálogo PDF
+      </Button>
 
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
           className="flex gap-2"
-          onClick={() => downloadSpacesCatalog(rowsApi)}
+          onClick={() => downloadSpacesCatalog(data)}
         >
           <FileDown className="h-4 w-4" />
           Descargar catálogo PDF
@@ -194,6 +214,8 @@ export default function SpacePage() {
             columns={columns}
             data={data}
             enableSearch
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
             searchPlaceholder="Buscar..."
             searchValue={searchInput}
             onSearchChange={(v) => {

@@ -7,19 +7,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 
-type Space = {
-  id: number;
-  title: string;
-  price: string | null;
-  type: string | null;
-  has_lights: boolean;
-  faces: number;
-  width_m: string | null;
-  height_m: string | null;
-  socioeconomic_level: string | null;
-  latitude: string;
-  longitude: string;
-};
+import type { Space } from "@/types/Space"
 
 const styles = StyleSheet.create({
   page: {
@@ -205,7 +193,7 @@ export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
                 <View>
                   <Text style={styles.label}>Ubicación</Text>
                   <Text style={styles.value}>
-                    {space.latitude}, {space.longitude}
+                    {space.coords?.lat?.toFixed(6) ?? "-"}, {space.coords?.lng?.toFixed(6) ?? "-"}
                   </Text>
                 </View>
               </View>
