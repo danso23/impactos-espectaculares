@@ -13,6 +13,8 @@ import type {
   SortingState,
   Table as TanstackTable,
   PaginationState,
+  RowSelectionState,
+  OnChangeFn,
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,9 @@ type DataTableProps<TData> = {
   data: TData[];
   title?: string;
   description?: string;
+
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 
   /** Muestra input de búsqueda (global) */
   enableSearch?: boolean;
@@ -77,6 +82,8 @@ export function DataTable<TData>({
   title,
   description,
   enableSearch = true,
+  rowSelection,
+  onRowSelectionChange,
   searchPlaceholder = "Buscar...",
   searchValue,
   onSearchChange,
@@ -119,8 +126,6 @@ export function DataTable<TData>({
     pageSize,
   };
 
-  const [rowSelection, setRowSelection] = React.useState({});
-
   const table = useReactTable({
     data,
     columns,
@@ -128,12 +133,12 @@ export function DataTable<TData>({
     state: {
       sorting,
       pagination: paginationState,
-      rowSelection,
+      rowSelection: rowSelection ?? {},
 
       ...(isControlledSearch ? {} : { globalFilter }),
     },
 
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: onRowSelectionChange,
     enableRowSelection: true,
 
     onSortingChange: setSorting,

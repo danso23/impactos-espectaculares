@@ -10,6 +10,7 @@ import { SpaceCreateDialog } from "./space-create-dialog";
 import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
+import type { RowSelectionState } from "@tanstack/react-table";
 
 import { useSpaces } from "@/lib/hooks/spaceHook";
 import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper";
@@ -27,6 +28,8 @@ export default function SpacePage() {
   const [search, setSearch] = React.useState("");
   const perPage = 10;
 
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
   const handleApplyFilters = (v: FilterValues) => {
     setFilters(v);
     setPage(1);
@@ -40,8 +43,8 @@ export default function SpacePage() {
   const spacesQuery = useSpaces(params);
   const rowsApi = React.useMemo(
     () => spacesQuery.data?.data ?? [],
-    [spacesQuery.data?.data]
-  )
+    [spacesQuery.data?.data],
+  );
 
   const meta = spacesQuery.data?.meta;
 
@@ -51,7 +54,7 @@ export default function SpacePage() {
   const data: Space[] = React.useMemo(
     () => rowsApi.map(apiToUiSpace),
     [rowsApi],
-  )
+  );
 
   const { columns } = useSpaceTable({
     onDelete: async (row) => {
@@ -94,7 +97,16 @@ export default function SpacePage() {
       <Button
         variant="outline"
         className="flex gap-2"
-        onClick={() => downloadSpacesCatalog(rowsApi)}
+        onClick={() => {
+          console.log("Seleccionados", rowSelection);
+          const selectedIds = Object.keys(rowSelection);
+
+          const selectedSpaces = data.filter((space) =>
+            selectedIds.includes(String(space.id)),
+          );
+
+          downloadSpacesCatalog(selectedSpaces);
+        }}
       >
         <FileDown className="h-4 w-4" />
         Descargar catálogo PDF
@@ -109,6 +121,8 @@ export default function SpacePage() {
             columns={columns}
             data={data}
             enableSearch
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
             searchPlaceholder="Buscar..."
             searchValue={search}
             onSearchChange={(v) => {
