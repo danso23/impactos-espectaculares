@@ -1,22 +1,27 @@
-import * as React from "react"
-import type { FilterValues } from "@/types/Filter"
-import type { Space } from "@/types/Space"
+import * as React from "react";
+import type { FilterValues } from "@/types/Filter";
+import type { Space } from "@/types/Space";
+import { useNavigate } from "react-router-dom";
 
-import { DataTable } from "@/components/generic/data-table"
-import { Filter } from "@/components/generic/filter"
-import { Card, CardContent } from "@/components/ui/card"
-import { SpaceForm } from "./spaceForm"
+import { DataTable } from "@/components/generic/data-table";
+import { Filter } from "@/components/generic/filter";
+import { Card, CardContent } from "@/components/ui/card";
+import { SpaceForm } from "./spaceForm";
 
 import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 import type { RowSelectionState } from "@tanstack/react-table";
 
-import { useCreateSpace, useSpaces, useUpdateSpace } from "@/lib/hooks/spaceHook"
-import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper"
-import { useSpaceTable } from "./spaceTable"
-import { asViewType } from "@/lib/helpers/viewTypeHelper"
-import { asSpaceType } from "@/lib/helpers/spaceTypeHelper"
+import {
+  useCreateSpace,
+  useSpaces,
+  useUpdateSpace,
+} from "@/lib/hooks/spaceHook";
+import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper";
+import { useSpaceTable } from "./spaceTable";
+import { asViewType } from "@/lib/helpers/viewTypeHelper";
+import { asSpaceType } from "@/lib/helpers/spaceTypeHelper";
 
 const initialFilters: FilterValues = {
   dateFrom: undefined,
@@ -29,70 +34,78 @@ const initialFilters: FilterValues = {
   checks: {
     activo: undefined,
   },
-}
+};
 
 export default function SpacePage() {
-  const [filters, setFilters] = React.useState<FilterValues>(initialFilters)
-  const [page, setPage] = React.useState(1)
-    const [searchInput, setSearchInput] = React.useState("")
-  const [search, setSearch] = React.useState("")
-  const perPage = 10
-  const [editOpen, setEditOpen] = React.useState(false)
-  const [editingSpace, setEditingSpace] = React.useState<Space | null>(null)
-  
-  const createMutation = useCreateSpace()
-  const updateMutation = useUpdateSpace()
+  const navigate = useNavigate();
+  const [filters, setFilters] = React.useState<FilterValues>(initialFilters);
+  const [page, setPage] = React.useState(1);
+  const [searchInput, setSearchInput] = React.useState("");
+  const [search, setSearch] = React.useState("");
+  const perPage = 10;
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editingSpace, setEditingSpace] = React.useState<Space | null>(null);
+
+  const createMutation = useCreateSpace();
+  const updateMutation = useUpdateSpace();
 
   React.useEffect(() => {
     const t = window.setTimeout(() => {
-      setSearch(searchInput)
-      setPage(1)
-    }, 350)
+      setSearch(searchInput);
+      setPage(1);
+    }, 350);
 
-    return () => window.clearTimeout(t)
-  }, [searchInput])
+    return () => window.clearTimeout(t);
+  }, [searchInput]);
 
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   const handleApplyFilters = (v: FilterValues) => {
-    setFilters(v)
-    setPage(1)
-  }
+    setFilters(v);
+    setPage(1);
+  };
 
   const handleResetFilters = () => {
-    setFilters(initialFilters)
-    setPage(1)
-  }
+    setFilters(initialFilters);
+    setPage(1);
+  };
 
   const params = React.useMemo(
     () => buildSpacesParams(filters, page, perPage, search),
     [filters, page, perPage, search],
-  )
+  );
 
-  const spacesQuery = useSpaces(params)
+  const spacesQuery = useSpaces(params);
 
   const rowsApi = React.useMemo(
     () => spacesQuery.data?.data ?? [],
     [spacesQuery.data?.data],
-  )
+  );
 
-  const meta = spacesQuery.data?.meta
-  const totalPages = meta?.totalPages ?? 1
-  const total = meta?.total ?? rowsApi.length
+  const meta = spacesQuery.data?.meta;
+  const totalPages = meta?.totalPages ?? 1;
+  const total = meta?.total ?? rowsApi.length;
 
-  const data: Space[] = React.useMemo(() => rowsApi.map(apiToUiSpace), [rowsApi])
+  const data: Space[] = React.useMemo(
+    () => rowsApi.map(apiToUiSpace),
+    [rowsApi],
+  );
 
   const { columns } = useSpaceTable({
     onEdit: (row) => {
-      setEditingSpace(row)
-      setEditOpen(true)
+      setEditingSpace(row);
+      setEditOpen(true);
     },
     onDelete: async (row) => {
-      const ok = confirm(`¿Eliminar "${row.title}"?`)
-      if (!ok) return
-      console.log("Eliminar", row.id)
+      const ok = confirm(`¿Eliminar "${row.title}"?`);
+      if (!ok) return;
+      console.log("Eliminar", row.id);
     },
-  })
+  });
+
+  const selectedSpaces = React.useMemo(() => {
+    return rowsApi.filter((space) => rowSelection[String(space.id)]);
+  }, [rowSelection, rowsApi]);
 
   return (
     <div className="space-y-4 p-6">
@@ -135,29 +148,33 @@ export default function SpacePage() {
         onReset={handleResetFilters}
         applyOnReset={true}
       />
-      <Button
-        variant="outline"
-        className="flex gap-2"
-        onClick={() => {
-          console.log("Seleccionados", rowSelection);
-          const selectedIds = Object.keys(rowSelection);
+      <div className="flex gap-3 items-center">
+        <Button
+          variant="outline"
+          className="flex gap-2"
+          disabled={selectedSpaces.length === 0}
+          onClick={() => downloadSpacesCatalog(selectedSpaces)}
+        >
+          <FileDown className="h-4 w-4" />
+          Descargar catálogo PDF
+        </Button>
 
-          const selectedSpaces = data.filter((space) =>
-            selectedIds.includes(String(space.id)),
-          );
-
-          downloadSpacesCatalog(selectedSpaces);
-        }}
-      >
-        <FileDown className="h-4 w-4" />
-        Descargar catálogo PDF
-      </Button>
+        <Button
+          onClick={() => {
+            navigate("/cotizaciones/nueva", {
+              state: { spaces: selectedSpaces },
+            });
+          }}
+        >
+          Crear cotización
+        </Button>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <SpaceForm
           mode="create"
           onSubmit={async (payload) => {
-            await createMutation.mutateAsync(payload)
+            await createMutation.mutateAsync(payload);
           }}
           isSubmitting={createMutation.isPending}
           onSaved={() => spacesQuery.refetch()}
@@ -169,8 +186,8 @@ export default function SpacePage() {
             hideTrigger
             open={editOpen}
             onOpenChange={(v) => {
-              setEditOpen(v)
-              if (!v) setEditingSpace(null)
+              setEditOpen(v);
+              if (!v) setEditingSpace(null);
             }}
             initialValues={{
               faces: editingSpace.faces,
@@ -178,8 +195,12 @@ export default function SpacePage() {
               title: editingSpace.title ?? "",
               price: editingSpace.price,
               type: asSpaceType(editingSpace.type),
-              width_m: editingSpace.width_m ? parseFloat(editingSpace.width_m.toString()) : undefined,
-              height_m: editingSpace.height_m ? parseFloat(editingSpace.height_m.toString()) : undefined,
+              width_m: editingSpace.width_m
+                ? parseFloat(editingSpace.width_m.toString())
+                : undefined,
+              height_m: editingSpace.height_m
+                ? parseFloat(editingSpace.height_m.toString())
+                : undefined,
               has_lights: editingSpace.has_lights ?? false,
               viewType: asViewType(editingSpace.viewType),
 
@@ -191,8 +212,11 @@ export default function SpacePage() {
             }}
             isSubmitting={updateMutation.isPending}
             onSubmit={async (payload) => {
-              await updateMutation.mutateAsync({ id: editingSpace.id, payload })
-              await spacesQuery.refetch()
+              await updateMutation.mutateAsync({
+                id: editingSpace.id,
+                payload,
+              });
+              await spacesQuery.refetch();
             }}
           />
         ) : null}
@@ -210,8 +234,8 @@ export default function SpacePage() {
             searchPlaceholder="Buscar..."
             searchValue={searchInput}
             onSearchChange={(v) => {
-              setSearchInput(v)
-              setPage(1)
+              setSearchInput(v);
+              setPage(1);
             }}
             pageSize={perPage}
             enablePagination
@@ -224,5 +248,5 @@ export default function SpacePage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

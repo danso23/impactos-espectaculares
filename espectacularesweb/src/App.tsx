@@ -1,4 +1,4 @@
-import { Routes, Route, NavLink, Outlet, Navigate } from "react-router-dom"
+import { Routes, Route, NavLink, Outlet, Navigate } from "react-router-dom";
 import {
   Menu,
   PanelsTopLeft,
@@ -10,23 +10,29 @@ import {
   Contact2,
   Building2,
   Settings,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
-import { LogoutButton } from "./components/auth/logout-button"
-import { LoginPage } from "./pages/auth/login"
-import { ProtectedRoute } from "@/routes/ProtectedRoute"
-import { getUser } from "@/lib/auth"
-import UsersPage from "@/pages/userPage"
-import SpacePage from "./pages/space/spacePage"
-
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { LogoutButton } from "./components/auth/logout-button";
+import { LoginPage } from "./pages/auth/login";
+import { ProtectedRoute } from "@/routes/ProtectedRoute";
+import { getUser } from "@/lib/auth";
+import UsersPage from "@/pages/userPage";
+import SpacePage from "./pages/space/spacePage";
+import QuoteCreatePage from "@/pages/quotes/quoteCreatePage";
 
 function cn(...classes: Array<string | undefined | false>) {
-  return classes.filter(Boolean).join(" ")
+  return classes.filter(Boolean).join(" ");
 }
 
 const NAV = [
@@ -40,7 +46,7 @@ const NAV = [
   { to: "/caseros", label: "Caseros", icon: MapPin },
   { to: "/servicios", label: "Servicios", icon: Settings },
   { to: "/colaboradores", label: "Colaboradores", icon: Users },
-] as const
+] as const;
 
 function RouteStub({ title }: { title: string }) {
   return (
@@ -50,13 +56,13 @@ function RouteStub({ title }: { title: string }) {
         Contenido de <span className="font-medium text-gray-900">{title}</span>.
       </div>
     </div>
-  )
+  );
 }
 
 function AppLayout() {
-  const user = getUser()
-  const displayName = user?.name || user?.username || "Usuario"
-  const displayEmail = user?.email || ""
+  const user = getUser();
+  const displayName = user?.name || user?.username || "Usuario";
+  const displayEmail = user?.email || "";
 
   return (
     <div className="h-dvh bg-background text-foreground">
@@ -71,7 +77,9 @@ function AppLayout() {
               </Avatar>
               <div>
                 <div className="font-medium leading-tight">{displayName}</div>
-                <div className="text-xs text-muted-foreground">{displayEmail}</div>
+                <div className="text-xs text-muted-foreground">
+                  {displayEmail}
+                </div>
               </div>
             </div>
           </div>
@@ -89,7 +97,7 @@ function AppLayout() {
                       "flex items-center gap-3 rounded-md px-3 py-2 text-sm",
                       isActive
                         ? "bg-muted font-semibold text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )
                   }
                 >
@@ -130,7 +138,6 @@ function AppLayout() {
                         <SheetTitle>Menú principal</SheetTitle>
                       </VisuallyHidden>
                     </SheetHeader>
-
                   </SheetContent>
                 </Sheet>
 
@@ -146,7 +153,7 @@ function AppLayout() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 export default function AppRoot() {
@@ -156,15 +163,22 @@ export default function AppRoot() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="espacios" element={<SpacePage />} />
+          <Route path="cotizaciones/nueva" element={<QuoteCreatePage />} />
           <Route path="rentas" element={<RouteStub title="Rentas" />} />
           <Route path="usuarios" element={<UsersPage />} />
           <Route path="pagos" element={<RouteStub title="Pagos" />} />
           <Route path="prospectos" element={<RouteStub title="Prospectos" />} />
           <Route path="clientes" element={<RouteStub title="Clientes" />} />
-          <Route path="proveedores" element={<RouteStub title="Proveedores" />} />
+          <Route
+            path="proveedores"
+            element={<RouteStub title="Proveedores" />}
+          />
           <Route path="caseros" element={<RouteStub title="Caseros" />} />
           <Route path="servicios" element={<RouteStub title="Servicios" />} />
-          <Route path="colaboradores" element={<RouteStub title="Colaboradores" />} />
+          <Route
+            path="colaboradores"
+            element={<RouteStub title="Colaboradores" />}
+          />
           <Route path="*" element={<RouteStub title="No encontrado" />} />
         </Route>
       </Route>
@@ -172,5 +186,5 @@ export default function AppRoot() {
       {/* fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-  )
+  );
 }
