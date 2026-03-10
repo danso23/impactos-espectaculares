@@ -22,9 +22,9 @@ type QuoteItem = {
 };
 
 const SERVICES = [
-  { id: "instalacion", label: "Instalación", price: 500 },
-  { id: "diseno", label: "Diseño", price: 800 },
-  { id: "retiro", label: "Retiro de lona", price: 300 },
+  { id: "S001", label: "Instalación", price: 500 },
+  { id: "S002", label: "Diseño", price: 800 },
+  { id: "S003", label: "Retiro de lona", price: 300 },
 ];
 
 export default function QuoteCreatePage() {
@@ -68,7 +68,7 @@ export default function QuoteCreatePage() {
     setItems((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: service.id,
         title: service.label,
         cantidad: 1,
         precio: service.price,
@@ -221,8 +221,44 @@ export default function QuoteCreatePage() {
           </table>
         </CardContent>
       </Card>
-      <div className="flex justify-end mt-6">
-        <Card className="w-80">
+      <div className="flex gap-6 mt-6">
+        {/* CARD IZQUIERDA */}
+        <Card className="w-1/2">
+          <CardContent className="p-4 space-y-3 text-sm">
+            <div className="text-sm font-medium">Agregar servicio</div>
+
+            <select
+              value={selectedService}
+              onChange={(e) => {
+                setSelectedService(e.target.value);
+                addService(e.target.value);
+              }}
+              className="w-full border rounded-md p-2"
+            >
+              <option value="">Selecciona un servicio</option>
+
+              {SERVICES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="text-sm font-medium">¿Incluir IVA?</div>
+
+            <select
+              value={includeIVA ? "si" : "no"}
+              onChange={(e) => setIncludeIVA(e.target.value === "si")}
+              className="w-full border rounded-md p-2"
+            >
+              <option value="si">Sí</option>
+              <option value="no">No</option>
+            </select>
+          </CardContent>
+        </Card>
+
+        {/* CARD DERECHA */}
+        <Card className="w-1/2">
           <CardContent className="p-4 space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Subtotal</span>
@@ -242,38 +278,6 @@ export default function QuoteCreatePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="max-w-sm space-y-3">
-        <div className="text-sm font-medium">Agregar servicio</div>
-
-        <select
-          value={selectedService}
-          onChange={(e) => {
-            setSelectedService(e.target.value);
-            addService(e.target.value);
-          }}
-          className="w-full border rounded-md p-2"
-        >
-          <option value="">Selecciona un servicio</option>
-
-          {SERVICES.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-
-        <div className="text-sm font-medium">¿Incluir IVA?</div>
-
-        <select
-          value={includeIVA ? "si" : "no"}
-          onChange={(e) => setIncludeIVA(e.target.value === "si")}
-          className="w-full border rounded-md p-2"
-        >
-          <option value="si">Sí</option>
-          <option value="no">No</option>
-        </select>
       </div>
     </div>
   );
