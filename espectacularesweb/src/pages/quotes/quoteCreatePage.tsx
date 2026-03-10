@@ -27,6 +27,14 @@ const SERVICES = [
   { id: "S003", label: "Retiro de lona", price: 300 },
 ];
 
+const CLIENTS = [
+  { id: "c001", name: "Carlos Mendoza López" },
+  { id: "c002", name: "Ana Sofía Ramírez Torres" },
+  { id: "c003", name: "Jorge Luis Herrera Castillo" },
+  { id: "c004", name: "Mariana Paredes Gutiérrez" },
+  { id: "c005", name: "Ricardo Alberto Sánchez Vega" },
+];
+
 export default function QuoteCreatePage() {
   const location = useLocation();
   const spaces: Space[] = location.state?.spaces ?? [];
@@ -47,6 +55,14 @@ export default function QuoteCreatePage() {
     0,
   );
 
+  const [clientSearch, setClientSearch] = React.useState("");
+  const [selectedClient, setSelectedClient] = React.useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const [showClientList, setShowClientList] = React.useState(false);
+
   const ivaGeneral = includeIVA ? subtotalGeneral * 0.16 : 0;
 
   const totalGeneral = subtotalGeneral + ivaGeneral;
@@ -56,6 +72,10 @@ export default function QuoteCreatePage() {
       prev.map((item) => (item.id === id ? { ...item, ...changes } : item)),
     );
   };
+
+  const filteredClients = CLIENTS.filter((client) =>
+    client.name.toLowerCase().includes(clientSearch.toLowerCase()),
+  );
 
   const removeItem = (id: number | string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
@@ -84,8 +104,13 @@ export default function QuoteCreatePage() {
     doc.setFontSize(18);
     doc.text("Cotización", 14, 20);
 
+    doc.setFontSize(12);
+    if (selectedClient) {
+      doc.text(`Cliente: ${selectedClient.name}`, 14, 28);
+    }
+
     doc.setFontSize(10);
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 28);
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 34);
 
     const tableData = items.map((item) => {
       const subtotal = item.cantidad * item.precio;
@@ -103,7 +128,7 @@ export default function QuoteCreatePage() {
     });
 
     autoTable(doc, {
-      startY: 35,
+      startY: 40,
       head: [["Producto", "Cantidad", "Precio", "Subtotal", "IVA", "Total"]],
       body: tableData,
     });
@@ -125,7 +150,50 @@ export default function QuoteCreatePage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-end mt-4">
+      <div className="flex justify-between items-start gap-6 mt-4">
+        {/* BUSCADOR DE CLIENTE */}
+        <div className="w-96 relative">
+          <div className="text-sm font-medium mb-1">Cliente</div>
+
+          <Input
+            placeholder="Buscar cliente..."
+            value={selectedClient ? selectedClient.name : clientSearch}
+            onChange={(e) => {
+              setClientSearch(e.target.value);
+              setSelectedClient(null);
+              setShowClientList(true);
+            }}
+            onFocus={() => setShowClientList(true)}
+          />
+
+          {showClientList && !selectedClient && (
+            <Card className="absolute w-full mt-1 max-h-60 overflow-auto z-10">
+              <CardContent className="p-2">
+                {filteredClients.length === 0 && (
+                  <div className="text-sm text-muted-foreground p-2">
+                    No se encontraron clientes
+                  </div>
+                )}
+
+                {filteredClients.map((client) => (
+                  <div
+                    key={client.id}
+                    className="p-2 text-sm hover:bg-muted rounded cursor-pointer"
+                    onClick={() => {
+                      setSelectedClient(client);
+                      setClientSearch(client.name);
+                      setShowClientList(false);
+                    }}
+                  >
+                    {client.name}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* BOTÓN PDF */}
         <Button onClick={downloadPDF}>Descargar cotización PDF</Button>
       </div>
       <Card>
