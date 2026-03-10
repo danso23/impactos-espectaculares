@@ -38,6 +38,8 @@ type DataTableProps<TData> = {
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 
+  getRowId?: (row: TData, index: number) => string;
+
   /** Muestra input de búsqueda (global) */
   enableSearch?: boolean;
   searchPlaceholder?: string;
@@ -84,6 +86,7 @@ export function DataTable<TData>({
   enableSearch = true,
   rowSelection,
   onRowSelectionChange,
+  getRowId,
   searchPlaceholder = "Buscar...",
   searchValue,
   onSearchChange,
@@ -129,7 +132,7 @@ export function DataTable<TData>({
   const table = useReactTable({
     data,
     columns,
-
+    getRowId,
     state: {
       sorting,
       pagination: paginationState,

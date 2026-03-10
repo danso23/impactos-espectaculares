@@ -229,6 +229,7 @@ export default function SpacePage() {
             columns={columns}
             data={data}
             enableSearch
+            getRowId={(row) => String(row.id)}
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
             searchPlaceholder="Buscar..."
