@@ -19,17 +19,167 @@ type Space = {
   socioeconomic_level: string | null;
   latitude: string;
   longitude: string;
-  assigned_id?: string;
 };
 
 const styles = StyleSheet.create({
-  page: {
-    backgroundColor: "#F5F5F5",
-    padding: 20,
-    fontSize: 10,
+  /* ================= PORTADA ================= */
+  coverPage: {
+    backgroundColor: "#EDEDED",
   },
 
-  /* HEADER */
+  coverContainer: {
+    flex: 1,
+    position: "relative",
+    padding: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  /* 🔷 FORMAS */
+  blueTop: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: "65%",
+    height: 180,
+    backgroundColor: "#1D6FA5",
+  },
+
+  blueBottom: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    width: "65%",
+    height: 180,
+    backgroundColor: "#1D6FA5",
+  },
+
+  blueLight: {
+    position: "absolute",
+    bottom: 120,
+    left: 0,
+    width: "55%",
+    height: 120,
+    backgroundColor: "#2CA6D9",
+  },
+
+  /* 🟣 BLOQUES */
+  purpleTop: {
+    position: "absolute",
+    top: 90,
+    right: 60,
+    width: 120,
+    height: 60,
+    backgroundColor: "#2E2A6D",
+  },
+
+  purpleBottom: {
+    position: "absolute",
+    bottom: 60,
+    left: 40,
+    width: 160,
+    height: 70,
+    backgroundColor: "#2E2A6D",
+  },
+
+  /* CONTENIDO */
+
+  title: {
+    fontSize: 44,
+    fontWeight: "bold",
+    color: "#2E2A6D",
+    letterSpacing: 2,
+  },
+
+  subtitle: {
+    fontSize: 16,
+    marginTop: 10,
+    color: "#2E2A6D",
+    letterSpacing: 3,
+  },
+
+  subLogo: {
+    width: 100,
+    marginTop: 20,
+  },
+
+  yearBox: {
+    position: "absolute",
+    bottom: 50,
+    right: 50,
+    border: "2 solid #2E2A6D",
+    padding: 12,
+  },
+
+  yearText: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#2E2A6D",
+    textAlign: "center",
+  },
+
+  /* ================= PÁGINA ESPACIO ================= */
+  page: {
+    backgroundColor: "#FFFFFF",
+    padding: 20,
+  },
+
+  logoBox: {
+    width: 120,
+    height: 40,
+  },
+
+  titleSpace: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 8,
+  },
+
+  subtitleSpace: {
+    fontSize: 10,
+    color: "#555",
+    marginBottom: 6,
+  },
+
+  bottomSection: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 10,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+
+  text: {
+    fontSize: 9,
+  },
+
+  qrSection: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  rightImages: {
+    flex: 1,
+    gap: 6,
+  },
+
+  footer: {
+    position: "absolute",
+    bottom: 10,
+    right: 20,
+    fontSize: 9,
+    color: "#999",
+  },
+
+  catalogPage: {
+    backgroundColor: "#F4F4F4",
+    padding: 20,
+    position: "relative",
+  },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -37,179 +187,205 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  logoBox: {
-    width: 120,
-    height: 40,
-    border: "1 dashed #999", // placeholder para logo
+  logo: {
+    width: 140,
+  },
+
+  sideLabel: {
+    position: "absolute",
+    right: 0,
+    top: 120,
+    width: 40,
+    height: 300,
+    backgroundColor: "#2CA6D9",
     justifyContent: "center",
     alignItems: "center",
   },
 
-  logoText: {
-    fontSize: 8,
-    color: "#999",
+  sideLabelText: {
+    transform: "rotate(-90deg)",
+    fontSize: 12,
+    color: "#FFFFFF",
+    letterSpacing: 2,
   },
 
-  /* MAIN IMAGE */
   mainImage: {
     width: "100%",
     height: 260,
-    borderRadius: 8,
-    marginBottom: 12,
+    objectFit: "cover",
+    marginTop: 10,
   },
 
   contentRow: {
     flexDirection: "row",
-    gap: 12,
+    marginTop: 15,
+    gap: 10,
   },
 
-  /* LEFT SIDE */
-  left: {
-    width: "55%",
-    gap: 6,
+  leftInfo: {
+    flex: 1.2,
   },
 
-  dimension: {
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-
-  locationLabel: {
-    fontSize: 9,
-    marginTop: 4,
-    fontWeight: "bold",
-  },
-
-  locationText: {
-    fontSize: 9,
-    lineHeight: 1.3,
-  },
-
-  availability: {
-    marginTop: 6,
-    color: "red",
-    fontWeight: "bold",
+  iconText: {
     fontSize: 10,
+    marginBottom: 4,
   },
 
-  contact: {
-    marginTop: 10,
-    fontSize: 9,
-    gap: 3,
-  },
-
-  /* RIGHT SIDE */
-  right: {
-    width: "45%",
-    gap: 8,
+  highlight: {
+    color: "red",
+    fontSize: 10,
+    marginTop: 6,
+    fontWeight: "bold",
   },
 
   qr: {
     width: 100,
     height: 100,
+    marginTop: 10,
+  },
+
+  rightColumn: {
+    flex: 1,
+    gap: 6,
   },
 
   smallImage: {
     width: "100%",
     height: 100,
-    borderRadius: 6,
   },
 
-  map: {
+  mapImage: {
     width: "100%",
-    height: 100,
-    borderRadius: 6,
+    height: 120,
   },
 
-  /* FOOTER BAR */
   footerBar: {
     position: "absolute",
     bottom: 0,
     left: 0,
-    right: 0,
-    backgroundColor: "#2E2A72",
-    padding: 10,
+    width: "100%",
+    height: 40,
+    backgroundColor: "#2E2A6D",
+    justifyContent: "center",
     alignItems: "center",
   },
 
   footerText: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "bold",
+    letterSpacing: 3,
   },
 });
 
 export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
   return (
     <Document>
-      {spaces.map((space, index) => (
-        <Page key={space.id} size="A4" style={styles.page}>
-          {/* HEADER LOGOS */}
-          <View style={styles.header}>
-            <View style={styles.logoBox}>
-              <img src="../../img/logo.png" alt="Impactos Espectaculares" />
-            </View>
+      {/* ================= PORTADA ================= */}
+      <Page size="A4" style={styles.coverPage}>
+        <View style={styles.coverContainer}>
+          <View style={styles.blueTop} />
+          <View style={styles.blueBottom} />
+          <View style={styles.blueLight} />
+          <View style={styles.purpleTop} />
+          <View style={styles.purpleBottom} />
 
-            <View style={styles.logoBox}>
-              <Text style={styles.logoText}>LOGO 2</Text>
-            </View>
+          {/* LOGO PRINCIPAL */}
+          <Image
+            src={window.location.origin + "/img/logo.png"}
+            style={styles.logo}
+          />
+
+          <Text style={styles.title}>CATÁLOGO</Text>
+          <Text style={styles.subtitle}>CARTELERAS MÉRIDA</Text>
+
+          {/* LOGO SECUNDARIO */}
+          <Image
+            src={window.location.origin + "/img/logo-secundario.png"}
+            style={styles.subLogo}
+          />
+
+          {/* AÑO */}
+          <View style={styles.yearBox}>
+            <Text style={styles.yearText}>20{"\n"}26</Text>
           </View>
+        </View>
+      </Page>
 
-          {/* IMAGEN PRINCIPAL */}
-          <Image src="https://picsum.photos/800/400" style={styles.mainImage} />
+      {/* ================= ESPACIOS ================= */}
+      {spaces.map((space, index) => {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.google.com/maps?q=${space.latitude},${space.longitude}`;
 
-          <View style={styles.contentRow}>
-            {/* IZQUIERDA */}
-            <View style={styles.left}>
-              <Text style={styles.dimension}>
-                {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
-              </Text>
+        const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
 
-              <Text style={styles.locationLabel}>UBICACIÓN:</Text>
+        return (
+          <Page key={space.id} size="A4" style={styles.catalogPage}>
+            {/* HEADER */}
+            <View style={styles.header}>
+              <Image
+                src={window.location.origin + "/img/logo.png"}
+                style={styles.logo}
+              />
 
-              <Text style={styles.locationText}>
-                {space.latitude}, {space.longitude}
-              </Text>
+              <Image
+                src={window.location.origin + "/img/logo-secundario.png"}
+                style={styles.logo}
+              />
+            </View>
 
-              <Text style={styles.availability}>DISPONIBILIDAD INMEDIATA</Text>
+            {/* ETIQUETA LATERAL */}
+            <View style={styles.sideLabel}>
+              <Text style={styles.sideLabelText}>Carteleras Mérida</Text>
+            </View>
 
-              {/* CONTACTO */}
-              <View style={styles.contact}>
-                <Text>Impactos espectaculares</Text>
-                <Text>www.impactosespectaculares.com.mx</Text>
-                <Text>contacto@email.com</Text>
-                <Text>999 000 0000</Text>
+            {/* IMAGEN PRINCIPAL */}
+            <Image
+              src="https://picsum.photos/800/400"
+              style={styles.mainImage}
+            />
+
+            {/* CONTENIDO */}
+            <View style={styles.contentRow}>
+              {/* IZQUIERDA */}
+              <View style={styles.leftInfo}>
+                <Text style={styles.iconText}>
+                  {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
+                </Text>
+
+                <Text style={styles.iconText}>UBICACIÓN:</Text>
+
+                <Text style={styles.iconText}>
+                  {space.latitude}, {space.longitude}
+                </Text>
+
+                <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
+
+                <Image src={qrUrl} style={styles.qr} />
+              </View>
+
+              {/* DERECHA */}
+              <View style={styles.rightColumn}>
+                <Image
+                  src="https://picsum.photos/200/100"
+                  style={styles.smallImage}
+                />
+
+                <Image
+                  src="https://picsum.photos/200/101"
+                  style={styles.smallImage}
+                />
+
+                {/* MAPA */}
+                <Image src={mapUrl} style={styles.mapImage} />
               </View>
             </View>
 
-            {/* DERECHA */}
-            <View style={styles.right}>
-              {/* QR */}
-              <Image
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://maps.google.com/?q=${space.latitude},${space.longitude}`}
-                style={styles.qr}
-              />
-
-              {/* IMAGEN SECUNDARIA */}
-              <Image
-                src="https://picsum.photos/300/200"
-                style={styles.smallImage}
-              />
-
-              {/* MAPA */}
-              <Image
-                src={`https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=300x200&markers=color:red|${space.latitude},${space.longitude}`}
-                style={styles.map}
-              />
+            {/* FOOTER */}
+            <View style={styles.footerBar}>
+              <Text style={styles.footerText}>MÉRIDA ESPECTACULAR</Text>
             </View>
-          </View>
-
-          {/* FOOTER */}
-          <View style={styles.footerBar}>
-            <Text style={styles.footerText}>MÉRIDA ESPECTACULAR</Text>
-          </View>
-        </Page>
-      ))}
+          </Page>
+        );
+      })}
     </Document>
   );
 }
