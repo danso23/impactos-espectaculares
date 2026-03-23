@@ -1,9 +1,9 @@
-import * as React from "react"
-import type { LatLngLiteral } from "leaflet"
-import type { SpaceFormPayload, SpaceFormValues } from "@/types/Space"
+import * as React from "react";
+import type { LatLngLiteral } from "leaflet";
+import type { SpaceFormPayload, SpaceFormValues } from "@/types/Space";
 
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,52 +11,52 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 
-import { MapPicker } from "@/components/maps/map-picker"
-import { HeatmapLayer } from "@/components/maps/heatmap-layer"
-import { useSpaceCoords } from "@/lib/hooks/spaceHook"
+import { MapPicker } from "@/components/maps/map-picker";
+import { HeatmapLayer } from "@/components/maps/heatmap-layer";
+import { useSpaceCoords } from "@/lib/hooks/spaceHook";
 
-export type SpaceType = "Espectacular" | "Muro" | "Parabus"
-export type ViewType = "Vista natural" | "Vista cruzada"
+export type SpaceType = "Espectacular" | "Muro" | "Parabus";
+export type ViewType = "Vista natural" | "Vista cruzada";
 
 type SpaceCoord = {
-  id?: number
-  title?: string
-  latitude: string | number
-  longitude: string | number
-}
+  id?: number;
+  title?: string;
+  latitude: string | number;
+  longitude: string | number;
+};
 
 type Props = {
   /** create | edit */
-  mode?: "create" | "edit"
+  mode?: "create" | "edit";
   /** Dialog title */
-  title?: string
+  title?: string;
   /** Trigger text */
-  triggerText?: string
+  triggerText?: string;
   /** usar propio botón/icono como trigger */
-  trigger?: React.ReactNode
+  trigger?: React.ReactNode;
   /** Valores iniciales para edición */
-  initialValues?: Partial<SpaceFormValues>
+  initialValues?: Partial<SpaceFormValues>;
   /** texto del botón submit */
-  submitText?: string
+  submitText?: string;
   /** loading externo (useCreateSpace / useUpdateSpace del padre) */
-  isSubmitting?: boolean
+  isSubmitting?: boolean;
   /** guardar (create/update) */
-  onSubmit: (payload: SpaceFormPayload) => Promise<void> | void
+  onSubmit: (payload: SpaceFormPayload) => Promise<void> | void;
   /** callback cuando guardó */
-  onSaved?: (payload: SpaceFormPayload) => void
+  onSaved?: (payload: SpaceFormPayload) => void;
   /** callback cuando cancela */
-  onCancel?: () => void
+  onCancel?: () => void;
   /** controlar el open desde fuera (opcional) */
-  open?: boolean
-  onOpenChange?: (v: boolean) => void
-  hideTrigger?: boolean
-}
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  hideTrigger?: boolean;
+};
 
 const baseForm: SpaceFormValues = {
   faces: undefined,
@@ -72,7 +72,7 @@ const baseForm: SpaceFormValues = {
   has_lights: false,
   viewType: undefined,
   comments: "",
-}
+};
 
 export function SpaceForm({
   mode = "create",
@@ -89,71 +89,76 @@ export function SpaceForm({
   onOpenChange: controlledOnOpenChange,
   hideTrigger,
 }: Props) {
-  const isCreate = mode === "create"
+  const isCreate = mode === "create";
 
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false)
-  const open = controlledOpen ?? uncontrolledOpen
-  const setOpen = controlledOnOpenChange ?? setUncontrolledOpen
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = controlledOnOpenChange ?? setUncontrolledOpen;
 
-  const [showHeat, setShowHeat] = React.useState(true)
-  const [selectedExistingId, setSelectedExistingId] = React.useState<number | null>(null)
+  const [showHeat, setShowHeat] = React.useState(true);
+  const [selectedExistingId, setSelectedExistingId] = React.useState<
+    number | null
+  >(null);
 
-  const [images, setImages] = React.useState<File[]>([])
-  const [imagePreviews, setImagePreviews] = React.useState<string[]>([])
+  const [images, setImages] = React.useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = React.useState<string[]>([]);
 
-  const coordsQuery = useSpaceCoords()
+  const coordsQuery = useSpaceCoords();
   const coordsData = React.useMemo<SpaceCoord[]>(
     () => (coordsQuery.data?.data ?? []) as SpaceCoord[],
     [coordsQuery.data],
-  )
+  );
 
   // rehidrata el form
   const [form, setForm] = React.useState<SpaceFormValues>(() => ({
     ...baseForm,
     ...initialValues,
-  }))
+  }));
 
   React.useEffect(() => {
-    setForm({ ...baseForm, ...initialValues })
-    setImages([])
-    setSelectedExistingId(null)
-    setShowHeat(true)
-  }, [initialValues])
+    setForm({ ...baseForm, ...initialValues });
+    setImages([]);
+    setSelectedExistingId(null);
+    setShowHeat(true);
+  }, [initialValues]);
 
   // refetch coords al abrir
   React.useEffect(() => {
-    if (!open) return
-    coordsQuery.refetch()
+    if (!open) return;
+    coordsQuery.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open]);
 
   React.useEffect(() => {
-    const urls = images.map((f) => URL.createObjectURL(f))
-    setImagePreviews(urls)
-    return () => urls.forEach((u) => URL.revokeObjectURL(u))
-  }, [images])
+    const urls = images.map((f) => URL.createObjectURL(f));
+    setImagePreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [images]);
 
   const resetForm = () => {
-    setForm({ ...baseForm, ...initialValues })
-    setShowHeat(true)
-    setImages([])
-    setImagePreviews([])
-    setSelectedExistingId(null)
-  }
+    setForm({ ...baseForm, ...initialValues });
+    setShowHeat(true);
+    setImages([]);
+    setImagePreviews([]);
+    setSelectedExistingId(null);
+  };
 
-  const setField = <K extends keyof SpaceFormValues>(key: K, value: SpaceFormValues[K]) => {
-    setForm((p) => ({ ...p, [key]: value }))
-  }
+  const setField = <K extends keyof SpaceFormValues>(
+    key: K,
+    value: SpaceFormValues[K],
+  ) => {
+    setForm((p) => ({ ...p, [key]: value }));
+  };
 
   const handlePick = (c: LatLngLiteral) => {
-    setField("latitude", c.lat)
-    setField("longitude", c.lng)
-  }
+    setField("latitude", c.lat);
+    setField("longitude", c.lng);
+  };
 
   const coords: LatLngLiteral | undefined =
     form.latitude !== undefined && form.longitude !== undefined
       ? { lat: form.latitude, lng: form.longitude }
-      : undefined
+      : undefined;
 
   const heatPoints = React.useMemo(
     () =>
@@ -163,85 +168,86 @@ export function SpaceForm({
         weight: 1,
       })),
     [coordsData],
-  )
+  );
 
   const existingMarkers = React.useMemo(() => {
     return coordsData.map((p: SpaceCoord, idx: number) => ({
       id: Number(p.id ?? idx + 1),
       title: String(p.title ?? `Espacio ${p.id ?? idx + 1}`),
       position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-    }))
-  }, [coordsData])
+    }));
+  }, [coordsData]);
 
   const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
-    if (!files.length) return
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
 
-    const onlyImages = files.filter((f) => f.type.startsWith("image/"))
-    setImages((prev) => [...prev, ...onlyImages].slice(0, 5))
+    const onlyImages = files.filter((f) => f.type.startsWith("image/"));
+    setImages((prev) => [...prev, ...onlyImages].slice(0, 5));
 
-    e.target.value = ""
-  }
+    e.target.value = "";
+  };
 
   const removeImage = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx))
-  }
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const validate = () => {
-    if (!form.faces || form.faces <= 0) return "Falta el número de caras"
-    if (!form.price || form.price <= 0) return "Falta el precio"
-    if (!form.type) return "Falta el tipo"
-    if (!form.width_m || form.width_m <= 0) return "Falta el ancho"
-    if (!form.height_m || form.height_m <= 0) return "Falta el alto"
-    if (!form.viewType) return "Falta el tipo de vista"
-    if (!form.title.trim()) return "Falta el título"
-    if (form.latitude === undefined || form.longitude === undefined) return "Falta la ubicación"
-    return null
-  }
+    if (!form.faces || form.faces <= 0) return "Falta el número de caras";
+    if (!form.price || form.price <= 0) return "Falta el precio";
+    if (!form.type) return "Falta el tipo";
+    if (!form.width_m || form.width_m <= 0) return "Falta el ancho";
+    if (!form.height_m || form.height_m <= 0) return "Falta el alto";
+    if (!form.viewType) return "Falta el tipo de vista";
+    if (!form.title.trim()) return "Falta el título";
+    if (form.latitude === undefined || form.longitude === undefined)
+      return "Falta la ubicación";
+    return null;
+  };
 
   const handleSubmit = async () => {
-    const msg = validate()
+    const msg = validate();
     if (msg) {
-      toast.error(msg)
-      return
+      toast.error(msg);
+      return;
     }
 
     try {
-      const payload: SpaceFormPayload = { ...form, images }
-      await onSubmit(payload)
+      const payload: SpaceFormPayload = { ...form, images };
+      await onSubmit(payload);
 
       toast.success(isCreate ? "Espacio creado" : "Espacio actualizado", {
         description: "Se guardó correctamente.",
-      })
+      });
 
-      onSaved?.(payload)
+      onSaved?.(payload);
 
-      resetForm()
-      setOpen(false)
+      resetForm();
+      setOpen(false);
     } catch (err: unknown) {
       toast.error("No se pudo guardar", {
         description: err instanceof Error ? err.message : "Intenta nuevamente.",
-      })
+      });
     }
-  }
+  };
 
   const handleCancel = () => {
-    resetForm()
-    setOpen(false)
-    onCancel?.()
-  }
+    resetForm();
+    setOpen(false);
+    onCancel?.();
+  };
 
-  const finalTitle = title ?? (isCreate ? "Nuevo espacio" : "Editar espacio")
-  const finalSubmitText = submitText ?? (isCreate ? "Guardar" : "Actualizar")
-  const finalTriggerText = triggerText ?? (isCreate ? "Agregar" : "Editar")
+  const finalTitle = title ?? (isCreate ? "Nuevo espacio" : "Editar espacio");
+  const finalSubmitText = submitText ?? (isCreate ? "Guardar" : "Actualizar");
+  const finalTriggerText = triggerText ?? (isCreate ? "Agregar" : "Editar");
 
   return (
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (isSubmitting) return
-        setOpen(v)
-        if (!v) resetForm()
+        if (isSubmitting) return;
+        setOpen(v);
+        if (!v) resetForm();
       }}
     >
       {/* Trigger opcional */}
@@ -255,7 +261,10 @@ export function SpaceForm({
         )
       ) : null}
 
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto pr-1" style={{ padding: "30px" }}>
+      <DialogContent
+        className="sm:max-w-3xl max-h-[85vh] overflow-y-auto pr-1"
+        style={{ padding: "30px" }}
+      >
         <DialogHeader>
           <DialogTitle>{finalTitle}</DialogTitle>
         </DialogHeader>
@@ -282,7 +291,7 @@ export function SpaceForm({
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[320px_1fr]">
               <div className="h-[320px] overflow-auto rounded-md border bg-background">
                 {existingMarkers.map((m) => {
-                  const active = m.id === selectedExistingId
+                  const active = m.id === selectedExistingId;
                   return (
                     <button
                       key={m.id}
@@ -290,7 +299,9 @@ export function SpaceForm({
                       onClick={() => setSelectedExistingId(m.id)}
                       className={[
                         "w-full text-left px-3 py-2 border-b",
-                        active ? "bg-green-50 border-l-4 border-l-green-600" : "hover:bg-muted",
+                        active
+                          ? "bg-green-50 border-l-4 border-l-green-600"
+                          : "hover:bg-muted",
                       ].join(" ")}
                     >
                       <div className="text-sm font-medium">{m.title}</div>
@@ -298,7 +309,7 @@ export function SpaceForm({
                         {m.position.lat.toFixed(5)}, {m.position.lng.toFixed(5)}
                       </div>
                     </button>
-                  )
+                  );
                 })}
               </div>
 
@@ -313,7 +324,13 @@ export function SpaceForm({
                 pickOnMarkerClick={false}
               >
                 {showHeat && heatPoints.length > 0 ? (
-                  <HeatmapLayer points={heatPoints} radius={28} blur={18} maxZoom={17} minOpacity={0.35} />
+                  <HeatmapLayer
+                    points={heatPoints}
+                    radius={28}
+                    blur={18}
+                    maxZoom={17}
+                    minOpacity={0.35}
+                  />
                 ) : null}
               </MapPicker>
             </div>
@@ -331,17 +348,27 @@ export function SpaceForm({
 
           <div className="space-y-2 sm:col-span-2">
             <Label>ID</Label>
-            <Input value={form.assigned_id ?? ""} onChange={(e) => setField("assigned_id", e.target.value)} />
+            <Input
+              value={form.assigned_id ?? ""}
+              onChange={(e) => setField("assigned_id", e.target.value)}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Título</Label>
-            <Input value={form.title} onChange={(e) => setField("title", e.target.value)} />
+            <Input
+              value={form.title}
+              onChange={(e) => setField("title", e.target.value)}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Precio</Label>
-            <Input type="number" value={form.price ?? ""} onChange={(e) => setField("price", Number(e.target.value))} />
+            <Input
+              type="number"
+              value={form.price ?? ""}
+              onChange={(e) => setField("price", Number(e.target.value))}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
@@ -360,24 +387,40 @@ export function SpaceForm({
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Ancho (m)</Label>
-            <Input type="number" value={form.width_m ?? ""} onChange={(e) => setField("width_m", Number(e.target.value))} />
+            <Input
+              type="number"
+              value={form.width_m ?? ""}
+              onChange={(e) => setField("width_m", Number(e.target.value))}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Alto (m)</Label>
-            <Input type="number" value={form.height_m ?? ""} onChange={(e) => setField("height_m", Number(e.target.value))} />
+            <Input
+              type="number"
+              value={form.height_m ?? ""}
+              onChange={(e) => setField("height_m", Number(e.target.value))}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Descripción</Label>
-            <Textarea value={form.description ?? ""} onChange={(e) => setField("description", e.target.value)} />
+            <Textarea
+              value={form.description ?? ""}
+              onChange={(e) => setField("description", e.target.value)}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Tiene luces</Label>
             <div className="flex w-full items-center justify-between rounded-md border px-4 py-3">
-              <span className="text-sm text-muted-foreground">{form.has_lights ? "Sí" : "No"}</span>
-              <Switch checked={form.has_lights} onCheckedChange={(v) => setField("has_lights", v)} />
+              <span className="text-sm text-muted-foreground">
+                {form.has_lights ? "Sí" : "No"}
+              </span>
+              <Switch
+                checked={form.has_lights}
+                onCheckedChange={(v) => setField("has_lights", v)}
+              />
             </div>
           </div>
 
@@ -391,6 +434,7 @@ export function SpaceForm({
               <option value="">Seleccionar</option>
               <option value="Vista natural">Vista natural</option>
               <option value="Vista cruzada">Vista cruzada</option>
+              <option value="Natural/Cruzada">Ambas vistas</option>
             </select>
           </div>
 
@@ -414,7 +458,10 @@ export function SpaceForm({
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Comentarios</Label>
-            <Textarea value={form.comments ?? ""} onChange={(e) => setField("comments", e.target.value)} />
+            <Textarea
+              value={form.comments ?? ""}
+              onChange={(e) => setField("comments", e.target.value)}
+            />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
@@ -430,8 +477,15 @@ export function SpaceForm({
             {imagePreviews.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {imagePreviews.map((src, idx) => (
-                  <div key={src} className="relative overflow-hidden rounded-md border">
-                    <img src={src} alt={`Imagen ${idx + 1}`} className="h-28 w-full object-cover" />
+                  <div
+                    key={src}
+                    className="relative overflow-hidden rounded-md border"
+                  >
+                    <img
+                      src={src}
+                      alt={`Imagen ${idx + 1}`}
+                      className="h-28 w-full object-cover"
+                    />
                     <button
                       type="button"
                       onClick={() => removeImage(idx)}
@@ -447,7 +501,11 @@ export function SpaceForm({
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+          <Button
+            variant="outline"
+            onClick={handleCancel}
+            disabled={isSubmitting}
+          >
             Cancelar
           </Button>
 
@@ -457,5 +515,5 @@ export function SpaceForm({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

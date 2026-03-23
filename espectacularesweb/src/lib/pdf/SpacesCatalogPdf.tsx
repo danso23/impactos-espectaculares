@@ -19,120 +19,123 @@ type Space = {
   socioeconomic_level: string | null;
   latitude: string;
   longitude: string;
+  assigned_id?: string;
 };
 
 const styles = StyleSheet.create({
   page: {
-    backgroundColor: "#0B0F1A",
-    padding: 5,
-    fontSize: 11,
-    color: "#FFFFFF",
+    backgroundColor: "#F5F5F5",
+    padding: 20,
+    fontSize: 10,
   },
 
-  image: {
-    position: "absolute",
-    top: 0,
-    left: 0,
+  /* HEADER */
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  logoBox: {
+    width: 120,
+    height: 40,
+    border: "1 dashed #999", // placeholder para logo
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  logoText: {
+    fontSize: 8,
+    color: "#999",
+  },
+
+  /* MAIN IMAGE */
+  mainImage: {
     width: "100%",
-    height: "100%",
+    height: 260,
+    borderRadius: 8,
+    marginBottom: 12,
   },
 
-  content: {
-    flex: 1,
-  },
-
-  /* ================= IMÁGENES ================= */
-  imagesSection: {
-    height: "70%", // 70% del alto de la página
-    gap: 10,
-  },
-
-  imagesRow: {
-    height: "50%", // mitad del bloque de imágenes
+  contentRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
 
-  imageBox: {
-    width: "50%",
-    height: "100%",
-    backgroundColor: "#1A1F36",
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-
-  /* ================= INFO ================= */
-  infoSection: {
-    height: "30%", // 30%
-    marginTop: 5,
-    padding: 3,
-    backgroundColor: "#121735",
-    borderRadius: 16,
-    flexDirection: "row",
-    gap: 24,
-    border: "1 solid #1E245A",
-  },
-
-  infoColumnMain: {
-    flex: 1.5,
-    justifyContent: "flex-start",
-    gap: 8,
-  },
-
-  infoColumn: {
-    flex: 1,
-    justifyContent: "flex-start",
+  /* LEFT SIDE */
+  left: {
+    width: "55%",
     gap: 6,
   },
 
-  title: {
-    fontSize: 20,
+  dimension: {
+    fontSize: 12,
     fontWeight: "bold",
   },
 
-  subtitle: {
-    fontSize: 11,
-    color: "#9AA0C3",
+  locationLabel: {
+    fontSize: 9,
     marginTop: 4,
-  },
-
-  price: {
-    fontSize: 18,
     fontWeight: "bold",
-    color: "#6EE7FF",
-    marginTop: 3,
   },
 
-  badge: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    backgroundColor: "#22C55E",
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-    borderRadius: 20,
+  locationText: {
     fontSize: 9,
+    lineHeight: 1.3,
+  },
+
+  availability: {
+    marginTop: 6,
+    color: "red",
     fontWeight: "bold",
-    color: "#022C22",
+    fontSize: 10,
   },
 
-  label: {
+  contact: {
+    marginTop: 10,
     fontSize: 9,
-    color: "#8E93B8",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
+    gap: 3,
   },
 
-  value: {
-    fontSize: 13,
+  /* RIGHT SIDE */
+  right: {
+    width: "45%",
+    gap: 8,
+  },
+
+  qr: {
+    width: 100,
+    height: 100,
+  },
+
+  smallImage: {
+    width: "100%",
+    height: 100,
+    borderRadius: 6,
+  },
+
+  map: {
+    width: "100%",
+    height: 100,
+    borderRadius: 6,
+  },
+
+  /* FOOTER BAR */
+  footerBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#2E2A72",
+    padding: 10,
+    alignItems: "center",
+  },
+
+  footerText: {
+    color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "bold",
-    marginBottom: 3,
-  },
-
-  footer: {
-    marginTop: 3,
-    fontSize: 9,
-    color: "#6C7199",
-    textAlign: "right",
   },
 });
 
@@ -140,109 +143,70 @@ export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
   return (
     <Document>
       {spaces.map((space, index) => (
-        <Page
-          key={space.id}
-          size="A4"
-          orientation="landscape"
-          style={styles.page}
-        >
-          <View style={styles.content}>
-            {/* ================= IMÁGENES ================= */}
-            <View style={styles.imagesSection}>
-              <View style={styles.imagesRow}>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.imagesRow}>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
-              </View>
+        <Page key={space.id} size="A4" style={styles.page}>
+          {/* HEADER LOGOS */}
+          <View style={styles.header}>
+            <View style={styles.logoBox}>
+              <img src="../../img/logo.png" alt="Impactos Espectaculares" />
             </View>
 
-            {/* ================= INFO ================= */}
-            <View style={styles.infoSection}>
-              <View style={styles.infoColumnMain}>
-                <View>
-                  <Text style={styles.title}>{space.title}</Text>
-                  <Text style={styles.subtitle}>
-                    ID #{space.id} · {space.type ?? "Espacio Publicitario"}
-                  </Text>
-
-                  <Text style={styles.price}>
-                    {space.price
-                      ? `$${Number(space.price).toLocaleString("es-MX")}`
-                      : "Precio a consultar"}
-                  </Text>
-
-                  <Text style={styles.badge}>DISPONIBLE</Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Ubicación</Text>
-                  <Text style={styles.value}>
-                    {space.latitude}, {space.longitude}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.infoColumn}>
-                <View>
-                  <Text style={styles.label}>Dimensiones</Text>
-                  <Text style={styles.value}>
-                    {space.width_m ?? "-"} × {space.height_m ?? "-"} m
-                  </Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Caras</Text>
-                  <Text style={styles.value}>{space.faces}</Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Iluminación</Text>
-                  <Text style={styles.value}>
-                    {space.has_lights ? "Sí" : "No"}
-                  </Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Nivel Socioeconómico</Text>
-                  <Text style={styles.value}>
-                    {space.socioeconomic_level ?? "N/A"}
-                  </Text>
-                </View>
-              </View>
+            <View style={styles.logoBox}>
+              <Text style={styles.logoText}>LOGO 2</Text>
             </View>
           </View>
 
-          {/* ================= FOOTER ================= */}
-          <View style={styles.footer}>
-            <Text>Catálogo de Espacios · Página {index + 1}</Text>
+          {/* IMAGEN PRINCIPAL */}
+          <Image src="https://picsum.photos/800/400" style={styles.mainImage} />
+
+          <View style={styles.contentRow}>
+            {/* IZQUIERDA */}
+            <View style={styles.left}>
+              <Text style={styles.dimension}>
+                {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
+              </Text>
+
+              <Text style={styles.locationLabel}>UBICACIÓN:</Text>
+
+              <Text style={styles.locationText}>
+                {space.latitude}, {space.longitude}
+              </Text>
+
+              <Text style={styles.availability}>DISPONIBILIDAD INMEDIATA</Text>
+
+              {/* CONTACTO */}
+              <View style={styles.contact}>
+                <Text>Impactos espectaculares</Text>
+                <Text>www.impactosespectaculares.com.mx</Text>
+                <Text>contacto@email.com</Text>
+                <Text>999 000 0000</Text>
+              </View>
+            </View>
+
+            {/* DERECHA */}
+            <View style={styles.right}>
+              {/* QR */}
+              <Image
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://maps.google.com/?q=${space.latitude},${space.longitude}`}
+                style={styles.qr}
+              />
+
+              {/* IMAGEN SECUNDARIA */}
+              <Image
+                src="https://picsum.photos/300/200"
+                style={styles.smallImage}
+              />
+
+              {/* MAPA */}
+              <Image
+                src={`https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=300x200&markers=color:red|${space.latitude},${space.longitude}`}
+                style={styles.map}
+              />
+            </View>
+          </View>
+
+          {/* FOOTER */}
+          <View style={styles.footerBar}>
+            <Text style={styles.footerText}>MÉRIDA ESPECTACULAR</Text>
           </View>
         </Page>
       ))}
