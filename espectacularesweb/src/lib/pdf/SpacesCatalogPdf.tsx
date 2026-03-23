@@ -6,20 +6,7 @@ import {
   StyleSheet,
   Image,
 } from "@react-pdf/renderer";
-
-type Space = {
-  id: number;
-  title: string;
-  price: string | null;
-  type: string | null;
-  has_lights: boolean;
-  faces: number;
-  width_m: string | null;
-  height_m: string | null;
-  socioeconomic_level: string | null;
-  latitude: string;
-  longitude: string;
-};
+import type { SpaceApi } from "@/types/Space";
 
 const styles = StyleSheet.create({
   page: {
@@ -136,7 +123,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
+export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
   return (
     <Document>
       {spaces.map((space, index) => (

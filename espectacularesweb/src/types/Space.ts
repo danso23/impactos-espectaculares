@@ -17,6 +17,9 @@ export type Space = {
   height_m?: number;
   description?: string | null;
   comments?: string | null;
+  active?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 export type SpaceFormValues = {

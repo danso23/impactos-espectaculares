@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { LoginPage } from "@/pages/auth/login"
 import UsersPage from "@/pages/userPage"
 import SpacePage from "@/pages/space/spacePage"
-import CotizationPage from "@/pages/cotization/cotizationPage"
 import { ProtectedRoute } from "@/routes/ProtectedRoute"
 import AppLayout from "@/layouts/AppLayout"
 
@@ -30,7 +29,6 @@ export default function AppRoutes() {
                     <Route path="espacios" element={<SpacePage />} />
                     <Route path="rentas" element={<RouteStub title="Rentas" />} />
                     <Route path="usuarios" element={<UsersPage />} />
-                    <Route path="cotizaciones" element={<CotizationPage />} />
                     <Route path="pagos" element={<RouteStub title="Pagos" />} />
                     <Route path="prospectos" element={<RouteStub title="Prospectos" />} />
                     <Route path="clientes" element={<RouteStub title="Clientes" />} />
