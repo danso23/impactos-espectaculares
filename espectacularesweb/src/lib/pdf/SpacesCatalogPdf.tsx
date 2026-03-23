@@ -22,230 +22,370 @@ type Space = {
 };
 
 const styles = StyleSheet.create({
-  page: {
-    backgroundColor: "#0B0F1A",
-    padding: 5,
-    fontSize: 11,
-    color: "#FFFFFF",
+  /* ================= PORTADA ================= */
+  coverPage: {
+    backgroundColor: "#EDEDED",
   },
 
-  image: {
+  coverContainer: {
+    flex: 1,
+    position: "relative",
+    padding: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  /* 🔷 FORMAS */
+  blueTop: {
     position: "absolute",
     top: 0,
+    right: 0,
+    width: "65%",
+    height: 180,
+    backgroundColor: "#1D6FA5",
+  },
+
+  blueBottom: {
+    position: "absolute",
+    bottom: 0,
     left: 0,
-    width: "100%",
-    height: "100%",
+    width: "65%",
+    height: 180,
+    backgroundColor: "#1D6FA5",
   },
 
-  content: {
-    flex: 1,
+  blueLight: {
+    position: "absolute",
+    bottom: 120,
+    left: 0,
+    width: "55%",
+    height: 120,
+    backgroundColor: "#2CA6D9",
   },
 
-  /* ================= IMÁGENES ================= */
-  imagesSection: {
-    height: "70%", // 70% del alto de la página
-    gap: 10,
+  /* 🟣 BLOQUES */
+  purpleTop: {
+    position: "absolute",
+    top: 90,
+    right: 60,
+    width: 120,
+    height: 60,
+    backgroundColor: "#2E2A6D",
   },
 
-  imagesRow: {
-    height: "50%", // mitad del bloque de imágenes
-    flexDirection: "row",
-    gap: 10,
+  purpleBottom: {
+    position: "absolute",
+    bottom: 60,
+    left: 40,
+    width: 160,
+    height: 70,
+    backgroundColor: "#2E2A6D",
   },
 
-  imageBox: {
-    width: "50%",
-    height: "100%",
-    backgroundColor: "#1A1F36",
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-
-  /* ================= INFO ================= */
-  infoSection: {
-    height: "30%", // 30%
-    marginTop: 5,
-    padding: 3,
-    backgroundColor: "#121735",
-    borderRadius: 16,
-    flexDirection: "row",
-    gap: 24,
-    border: "1 solid #1E245A",
-  },
-
-  infoColumnMain: {
-    flex: 1.5,
-    justifyContent: "flex-start",
-    gap: 8,
-  },
-
-  infoColumn: {
-    flex: 1,
-    justifyContent: "flex-start",
-    gap: 6,
-  },
+  /* CONTENIDO */
 
   title: {
-    fontSize: 20,
+    fontSize: 44,
     fontWeight: "bold",
+    color: "#2E2A6D",
+    letterSpacing: 2,
   },
 
   subtitle: {
-    fontSize: 11,
-    color: "#9AA0C3",
-    marginTop: 4,
+    fontSize: 16,
+    marginTop: 10,
+    color: "#2E2A6D",
+    letterSpacing: 3,
   },
 
-  price: {
-    fontSize: 18,
+  subLogo: {
+    width: 100,
+    marginTop: 20,
+  },
+
+  yearBox: {
+    position: "absolute",
+    bottom: 50,
+    right: 50,
+    border: "2 solid #2E2A6D",
+    padding: 12,
+  },
+
+  yearText: {
+    fontSize: 26,
     fontWeight: "bold",
-    color: "#6EE7FF",
-    marginTop: 3,
+    color: "#2E2A6D",
+    textAlign: "center",
   },
 
-  badge: {
-    marginTop: 4,
-    alignSelf: "flex-start",
-    backgroundColor: "#22C55E",
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-    borderRadius: 20,
-    fontSize: 9,
+  /* ================= PÁGINA ESPACIO ================= */
+  page: {
+    backgroundColor: "#FFFFFF",
+    padding: 20,
+  },
+
+  logoBox: {
+    width: 120,
+    height: 40,
+  },
+
+  titleSpace: {
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#022C22",
+    marginTop: 8,
   },
 
+  subtitleSpace: {
+    fontSize: 10,
+    color: "#555",
+    marginBottom: 6,
+  },
+
+  bottomSection: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 10,
+  },
   label: {
-    fontSize: 9,
-    color: "#8E93B8",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
+    fontSize: 10,
+    fontWeight: "bold",
   },
 
-  value: {
-    fontSize: 13,
-    fontWeight: "bold",
-    marginBottom: 3,
+  text: {
+    fontSize: 9,
+  },
+
+  qrSection: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  rightImages: {
+    flex: 1,
+    gap: 6,
   },
 
   footer: {
-    marginTop: 3,
+    position: "absolute",
+    bottom: 10,
+    right: 20,
     fontSize: 9,
-    color: "#6C7199",
-    textAlign: "right",
+    color: "#999",
+  },
+
+  catalogPage: {
+    backgroundColor: "#F4F4F4",
+    padding: 20,
+    position: "relative",
+  },
+
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  logo: {
+    width: 140,
+  },
+
+  sideLabel: {
+    position: "absolute",
+    right: 0,
+    top: 120,
+    width: 40,
+    height: 300,
+    backgroundColor: "#2CA6D9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  sideLabelText: {
+    transform: "rotate(-90deg)",
+    fontSize: 12,
+    color: "#FFFFFF",
+    letterSpacing: 2,
+  },
+
+  mainImage: {
+    width: "100%",
+    height: 260,
+    objectFit: "cover",
+    marginTop: 10,
+  },
+
+  contentRow: {
+    flexDirection: "row",
+    marginTop: 15,
+    gap: 10,
+  },
+
+  leftInfo: {
+    flex: 1.2,
+  },
+
+  iconText: {
+    fontSize: 10,
+    marginBottom: 4,
+  },
+
+  highlight: {
+    color: "red",
+    fontSize: 10,
+    marginTop: 6,
+    fontWeight: "bold",
+  },
+
+  qr: {
+    width: 100,
+    height: 100,
+    marginTop: 10,
+  },
+
+  rightColumn: {
+    flex: 1,
+    gap: 6,
+  },
+
+  smallImage: {
+    width: "100%",
+    height: 100,
+  },
+
+  mapImage: {
+    width: "100%",
+    height: 120,
+  },
+
+  footerBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    width: "100%",
+    height: 40,
+    backgroundColor: "#2E2A6D",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  footerText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    letterSpacing: 3,
   },
 });
 
 export function SpacesCatalogDocument({ spaces }: { spaces: Space[] }) {
   return (
     <Document>
-      {spaces.map((space, index) => (
-        <Page
-          key={space.id}
-          size="A4"
-          orientation="landscape"
-          style={styles.page}
-        >
-          <View style={styles.content}>
-            {/* ================= IMÁGENES ================= */}
-            <View style={styles.imagesSection}>
-              <View style={styles.imagesRow}>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
+      {/* ================= PORTADA ================= */}
+      <Page size="A4" style={styles.coverPage}>
+        <View style={styles.coverContainer}>
+          <View style={styles.blueTop} />
+          <View style={styles.blueBottom} />
+          <View style={styles.blueLight} />
+          <View style={styles.purpleTop} />
+          <View style={styles.purpleBottom} />
+
+          {/* LOGO PRINCIPAL */}
+          <Image
+            src={window.location.origin + "/img/logo.png"}
+            style={styles.logo}
+          />
+
+          <Text style={styles.title}>CATÁLOGO</Text>
+          <Text style={styles.subtitle}>CARTELERAS MÉRIDA</Text>
+
+          {/* LOGO SECUNDARIO */}
+          <Image
+            src={window.location.origin + "/img/logo-secundario.png"}
+            style={styles.subLogo}
+          />
+
+          {/* AÑO */}
+          <View style={styles.yearBox}>
+            <Text style={styles.yearText}>20{"\n"}26</Text>
+          </View>
+        </View>
+      </Page>
+
+      {/* ================= ESPACIOS ================= */}
+      {spaces.map((space, index) => {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.google.com/maps?q=${space.latitude},${space.longitude}`;
+
+        const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
+
+        return (
+          <Page key={space.id} size="A4" style={styles.catalogPage}>
+            {/* HEADER */}
+            <View style={styles.header}>
+              <Image
+                src={window.location.origin + "/img/logo.png"}
+                style={styles.logo}
+              />
+
+              <Image
+                src={window.location.origin + "/img/logo-secundario.png"}
+                style={styles.logo}
+              />
+            </View>
+
+            {/* ETIQUETA LATERAL */}
+            <View style={styles.sideLabel}>
+              <Text style={styles.sideLabelText}>Carteleras Mérida</Text>
+            </View>
+
+            {/* IMAGEN PRINCIPAL */}
+            <Image
+              src="https://picsum.photos/800/400"
+              style={styles.mainImage}
+            />
+
+            {/* CONTENIDO */}
+            <View style={styles.contentRow}>
+              {/* IZQUIERDA */}
+              <View style={styles.leftInfo}>
+                <Text style={styles.iconText}>
+                  {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
+                </Text>
+
+                <Text style={styles.iconText}>UBICACIÓN:</Text>
+
+                <Text style={styles.iconText}>
+                  {space.latitude}, {space.longitude}
+                </Text>
+
+                <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
+
+                <Image src={qrUrl} style={styles.qr} />
               </View>
 
-              <View style={styles.imagesRow}>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
-                <View style={styles.imageBox}>
-                  <Image
-                    src="https://picsum.photos/seed/picsum/200/300
-"
-                    style={styles.image}
-                  />
-                </View>
+              {/* DERECHA */}
+              <View style={styles.rightColumn}>
+                <Image
+                  src="https://picsum.photos/200/100"
+                  style={styles.smallImage}
+                />
+
+                <Image
+                  src="https://picsum.photos/200/101"
+                  style={styles.smallImage}
+                />
+
+                {/* MAPA */}
+                <Image src={mapUrl} style={styles.mapImage} />
               </View>
             </View>
 
-            {/* ================= INFO ================= */}
-            <View style={styles.infoSection}>
-              <View style={styles.infoColumnMain}>
-                <View>
-                  <Text style={styles.title}>{space.title}</Text>
-                  <Text style={styles.subtitle}>
-                    ID #{space.id} · {space.type ?? "Espacio Publicitario"}
-                  </Text>
-
-                  <Text style={styles.price}>
-                    {space.price
-                      ? `$${Number(space.price).toLocaleString("es-MX")}`
-                      : "Precio a consultar"}
-                  </Text>
-
-                  <Text style={styles.badge}>DISPONIBLE</Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Ubicación</Text>
-                  <Text style={styles.value}>
-                    {space.latitude}, {space.longitude}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.infoColumn}>
-                <View>
-                  <Text style={styles.label}>Dimensiones</Text>
-                  <Text style={styles.value}>
-                    {space.width_m ?? "-"} × {space.height_m ?? "-"} m
-                  </Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Caras</Text>
-                  <Text style={styles.value}>{space.faces}</Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Iluminación</Text>
-                  <Text style={styles.value}>
-                    {space.has_lights ? "Sí" : "No"}
-                  </Text>
-                </View>
-
-                <View>
-                  <Text style={styles.label}>Nivel Socioeconómico</Text>
-                  <Text style={styles.value}>
-                    {space.socioeconomic_level ?? "N/A"}
-                  </Text>
-                </View>
-              </View>
+            {/* FOOTER */}
+            <View style={styles.footerBar}>
+              <Text style={styles.footerText}>MÉRIDA ESPECTACULAR</Text>
             </View>
-          </View>
-
-          {/* ================= FOOTER ================= */}
-          <View style={styles.footer}>
-            <Text>Catálogo de Espacios · Página {index + 1}</Text>
-          </View>
-        </Page>
-      ))}
+          </Page>
+        );
+      })}
     </Document>
   );
 }
