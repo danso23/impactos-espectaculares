@@ -4,18 +4,24 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class QuoteStatusSeeder extends Seeder
 {
     public function run()
     {
-        DB::table('quote_status')->insert([
+        $now = Carbon::now();
+
+        DB::table('quote_status')->upsert([
             [
                 'key' => 'draft',
                 'name' => 'Borrador',
                 'description' => 'Cotización en edición',
                 'color' => 'gray',
                 'is_final' => false,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
             [
                 'key' => 'sent',
@@ -23,6 +29,9 @@ class QuoteStatusSeeder extends Seeder
                 'description' => 'Cotización enviada al cliente',
                 'color' => 'blue',
                 'is_final' => false,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
             [
                 'key' => 'accepted',
@@ -30,6 +39,9 @@ class QuoteStatusSeeder extends Seeder
                 'description' => 'Cotización aceptada por el cliente',
                 'color' => 'green',
                 'is_final' => true,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
             [
                 'key' => 'rejected',
@@ -37,6 +49,9 @@ class QuoteStatusSeeder extends Seeder
                 'description' => 'Cliente rechazó la cotización',
                 'color' => 'red',
                 'is_final' => true,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
             [
                 'key' => 'expired',
@@ -44,6 +59,9 @@ class QuoteStatusSeeder extends Seeder
                 'description' => 'Cotización vencida',
                 'color' => 'orange',
                 'is_final' => true,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
             [
                 'key' => 'cancelled',
@@ -51,7 +69,10 @@ class QuoteStatusSeeder extends Seeder
                 'description' => 'Cancelada manualmente',
                 'color' => 'dark',
                 'is_final' => true,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
             ],
-        ]);
+        ], ['key'], ['name', 'description', 'color', 'is_final', 'is_active', 'updated_at']);
     }
 }
