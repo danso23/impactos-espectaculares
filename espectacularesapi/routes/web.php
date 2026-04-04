@@ -35,6 +35,7 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->post('spaces', ['uses' => 'SpaceController@store']);
         $router->get('spaces', ['uses' => 'SpaceController@index']);
         $router->get('spaces/coords', ['uses' => 'SpaceController@coords']);
+        $router->get('spaces/{spaceId}/images/{imageId}', ['uses' => 'SpaceController@image']);
 
         $router->put('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);

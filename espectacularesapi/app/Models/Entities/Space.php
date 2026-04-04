@@ -39,6 +39,9 @@ class Space extends Model
     
     public function images()
     {
-        return $this->hasMany(SpaceImage::class);
+        return $this->hasMany(SpaceImage::class)
+            ->orderByDesc('is_cover')
+            ->orderBy('position')
+            ->orderBy('id');
     }
 }
