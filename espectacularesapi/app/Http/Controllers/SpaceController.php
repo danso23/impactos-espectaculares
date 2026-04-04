@@ -66,6 +66,29 @@ class SpaceController extends BaseCrudController
     }
 
     // --- override store ---
+    public function index(Request $request)
+    {
+        $q = Space::query()->with('images');
+
+        $q = $this->applyIndexQuery($q, $request);
+        $q = $this->indexOrder($q, $request);
+
+        $perPage = (int) $request->get('perPage', $request->get('per_page', 10));
+        $page = (int) $request->get('page', 1);
+
+        $items = $q->select($this->indexSelect())->paginate($perPage, ['*'], 'page', $page);
+
+        return response()->json([
+            'data' => $items->items(),
+            'meta' => [
+                'page' => $items->currentPage(),
+                'perPage' => $items->perPage(),
+                'total' => $items->total(),
+                'totalPages' => $items->lastPage(),
+            ],
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), $this->rulesStore($request));
@@ -86,7 +109,7 @@ class SpaceController extends BaseCrudController
 
         return response()->json([
             'message' => 'Creado correctamente',
-            'data' => $space->fresh(),
+            'data' => $space->fresh('images'),
         ], 201);
     }
 
@@ -113,7 +136,7 @@ class SpaceController extends BaseCrudController
 
         return response()->json([
             'message' => 'Actualizado correctamente',
-            'data' => $space->fresh(),
+            'data' => $space->fresh('images'),
         ]);
     }
 
@@ -128,6 +151,7 @@ class SpaceController extends BaseCrudController
 
 
         $position = $space->images()->max('position') ?? 0;
+        $hasCover = $space->images()->exists();
 
 
         foreach ($files as $file) {
@@ -139,7 +163,7 @@ class SpaceController extends BaseCrudController
                 'path' => $path,
                 'filename' => $name,
                 'position' => ++$position,
-                'is_cover' => false,
+                'is_cover' => !$hasCover && $position === 1,
             ]);
         }
     }
@@ -168,6 +192,28 @@ class SpaceController extends BaseCrudController
 
         return response()->json([
             'data' => $data,
+        ]);
+    }
+
+    public function image($spaceId, $imageId)
+    {
+        /** @var Space $space */
+        $space = Space::findOrFail($spaceId);
+        $image = $space->images()->where('space_images.id', $imageId)->firstOrFail();
+
+        $absolutePath = storage_path('app/public/' . ltrim($image->path, '/'));
+        if (!is_file($absolutePath)) {
+            return response()->json([
+                'message' => 'Imagen no encontrada',
+            ], 404);
+        }
+
+        $mimeType = mime_content_type($absolutePath) ?: 'application/octet-stream';
+
+        return response(file_get_contents($absolutePath), 200, [
+            'Content-Type' => $mimeType,
+            'Content-Length' => (string) filesize($absolutePath),
+            'Cache-Control' => 'private, max-age=300',
         ]);
     }
 }
