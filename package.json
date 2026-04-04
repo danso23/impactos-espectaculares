@@ -7,10 +7,19 @@
     "frontend": "cd espectacularesweb && npm run vite:devlocal",
     "install:all": "npm install && cd espectacularesweb && npm install",
     "build:frontend": "cd espectacularesweb && npm run build",
-    "preview:frontend": "cd espectacularesweb && npm run preview"
+    "preview:frontend": "cd espectacularesweb && npm run preview",
+    "prepare": "husky",
+    "lint": "eslint ."
+  },
+  "lint-staged": {
+    "espectacularesweb/**/*.{ts,tsx,js,jsx}": [
+      "npm --prefix espectacularesweb run lint"
+    ]
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",

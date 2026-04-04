@@ -75,9 +75,35 @@ function LeafletGeocoderControl({
   const map = useMap()
 
   React.useEffect(() => {
-    const AnyL = L as any
+    type LeafletGeocoderNS = typeof L & {
+      Control: typeof L.Control & {
+        Geocoder?: {
+          nominatim: (opts?: {
+            geocodingQueryParams?: Record<string, string>
+          }) => unknown
+        }
+        geocoder?: (opts: {
+          geocoder: unknown
+          placeholder?: string
+          defaultMarkGeocode?: boolean
+        }) => L.Control & {
+          on: (
+            event: "markgeocode",
+            handler: (e: {
+              geocode: {
+                center: L.LatLng
+                name: string
+                bbox?: L.LatLngBoundsExpression
+              }
+            }) => void
+          ) => L.Control
+        }
+      }
+    }
 
-    if (!AnyL.Control?.Geocoder || !AnyL.Control?.geocoder) {
+    const LG = L as unknown as LeafletGeocoderNS
+
+    if (!LG.Control?.Geocoder || !LG.Control?.geocoder) {
       console.error(
         "leaflet-control-geocoder NO se cargó (L.Control.Geocoder / L.Control.geocoder undefined). " +
           "Si usas Vite + pnpm, agrega optimizeDeps.include en vite.config.ts."
@@ -85,13 +111,13 @@ function LeafletGeocoderControl({
       return
     }
 
-    const ctrl = AnyL.Control.geocoder({
-      geocoder: AnyL.Control.Geocoder.nominatim({
+    const ctrl = LG.Control.geocoder({
+      geocoder: LG.Control.Geocoder.nominatim({
         geocodingQueryParams: { countrycodes: "mx" },
       }),
       placeholder: "Buscar dirección…",
       defaultMarkGeocode: false,
-    }).on("markgeocode", (e: any) => {
+    }).on("markgeocode", (e) => {
       const { center, name, bbox } = e.geocode
       map.fitBounds(bbox || L.latLngBounds([center, center]).pad(0.5))
       onSelect({ lat: center.lat, lng: center.lng }, name)
@@ -208,7 +234,7 @@ export function MapPicker({
             draggable={markerDraggable}
             eventHandlers={{
               dragend: (e) => {
-                const latlng = (e.target as any).getLatLng()
+                  const latlng = (e.target as L.Marker).getLatLng()
                 onChange({ lat: latlng.lat, lng: latlng.lng })
               },
             }}

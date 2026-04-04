@@ -19,24 +19,41 @@ $router->post('/setuser1','UserController@Register');
 $router->post('/password/email', 'AuthController@sendResetLink');
 $router->post('/password/reset', 'AuthController@resetPassword');
 
-$router->post('/api/login', ['uses' => 'AuthController@login']);
 $router->post('/auth/refresh', 'AuthController@refresh');
 
+$router->group(['prefix' => 'api'], function () use ($router) {
 
-$router->group(['middleware' => 'authToken'], function () use ($router) {
-    $router->get('/api/me', function (\Illuminate\Http\Request $request) {
-        return response()->json($request->attributes->get('auth_user'));
+    $router->post('login', ['uses' => 'AuthController@login']);
+    $router->post('logout', ['uses' => 'AuthController@logout']);
+
+    $router->group(['middleware' => 'authToken'], function () use ($router) {
+
+        $router->get('me', function (\Illuminate\Http\Request $request) {
+            return response()->json($request->attributes->get('auth_user'));
+        });
+
+        $router->post('spaces', ['uses' => 'SpaceController@store']);
+        $router->get('spaces', ['uses' => 'SpaceController@index']);
+        $router->get('spaces/coords', ['uses' => 'SpaceController@coords']);
+        $router->get('spaces/{spaceId}/images/{imageId}', ['uses' => 'SpaceController@image']);
+
+        $router->put('spaces/{id}', ['uses' => 'SpaceController@update']);
+        $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);
+        $router->delete('spaces/{id}', ['uses' => 'SpaceController@delete']);
+
+        $router->get('quote-catalogs', ['uses' => 'QuoteController@catalogs']);
+        $router->get('lead-catalogs', ['uses' => 'LeadController@catalogs']);
+        $router->get('leads', ['uses' => 'LeadController@index']);
+        $router->post('leads', ['uses' => 'LeadController@store']);
+        $router->post('leads/{id}/convert-to-client', ['uses' => 'LeadController@convertToClient']);
+        $router->get('clientes', ['uses' => 'ClientController@index']);
+        $router->post('clientes', ['uses' => 'ClientController@store']);
+        $router->get('customers/search', ['uses' => 'QuoteController@searchCustomers']);
+        $router->get('quotes', ['uses' => 'QuoteController@index']);
+        $router->post('quotes/preview', ['uses' => 'QuoteController@preview']);
+        $router->post('quotes', ['uses' => 'QuoteController@store']);
+        $router->get('quotes/{id}', ['uses' => 'QuoteController@show']);
+        $router->get('quotes/{id}/history', ['uses' => 'QuoteController@history']);
+        $router->post('quotes/{id}/status', ['uses' => 'QuoteController@changeStatus']);
     });
-
-
-    $router->post('/api/spaces', ['uses' => 'SpaceController@store']);
-    $router->get('/api/spaces', ['uses' => 'SpaceController@index']);
-    $router->put('/spaces/{space}', [SpaceController::class, 'update']);
-    $router->patch('/spaces/{space}', [SpaceController::class, 'update']);
-    $router->delete('/spaces/{space}', [SpaceController::class, 'destroy']);
-
-    // Obtener solo coordenadas (mapa / heatmap)
-    $router->get('/api/spaces/coords', ['uses' => 'SpaceController@coords']);
-
-    $router->post('/api/logout', ['uses' => 'AuthController@logout']);
 });

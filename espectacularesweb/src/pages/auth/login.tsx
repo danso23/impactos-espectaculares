@@ -10,12 +10,12 @@ import type { LoginResponse } from "@/types/Login"
 
 
 export function LoginPage() {
-    if (isAuthenticated()) {
-        return <Navigate to="/" replace />;
-    }
     const navigate = useNavigate()
     const [loading, setLoading] = React.useState(false)
     const [error, setError] = React.useState<string | null>(null)
+    if (isAuthenticated()) {
+        return <Navigate to="/" replace />
+    }
 
     async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault()
@@ -48,8 +48,10 @@ export function LoginPage() {
 
             // redirige
             navigate("/")
-        } catch (err: any) {
-            setError(err.message ?? "Error inesperado")
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Error inesperado"
+            setError(message)
         } finally {
             setLoading(false)
         }

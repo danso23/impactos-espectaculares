@@ -1,4 +1,4 @@
-import * as React from "react"
+import * as React from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -6,16 +6,19 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from "@tanstack/react-table"
+} from "@tanstack/react-table";
 
 import type {
   ColumnDef,
   SortingState,
   Table as TanstackTable,
-} from "@tanstack/react-table"
+  PaginationState,
+  RowSelectionState,
+  OnChangeFn,
+} from "@tanstack/react-table";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -23,31 +26,57 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 type DataTableProps<TData> = {
-  columns: ColumnDef<TData, any>[]
-  data: TData[]
-  title?: string
-  description?: string
+  columns: ColumnDef<TData, unknown>[];
+  data: TData[];
+  title?: string;
+  description?: string;
+
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+
+  getRowId?: (row: TData, index: number) => string;
 
   /** Muestra input de búsqueda (global) */
-  enableSearch?: boolean
-  searchPlaceholder?: string
+  enableSearch?: boolean;
+  searchPlaceholder?: string;
+
+  /**
+   * ✅ Search controlado (para server-side)
+   * Si se manda searchValue + onSearchChange, el DataTable NO filtra local,
+   * solo refleja el valor y dispara el callback.
+   */
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
 
   /** Paginación */
-  pageSize?: number
-  enablePagination?: boolean
+  pageSize?: number;
+  enablePagination?: boolean;
+
+  /**
+   * Server-side pagination
+   * Cuando está activo, el DataTable NO pagina localmente
+   * y usa pageIndex/pageCount/onPageChange para navegar.
+   */
+  manualPagination?: boolean;
+  pageIndex?: number; // 0-based
+  pageCount?: number; // total pages
+  onPageChange?: (pageIndex: number) => void;
+
+  /** (opcional) para deshabilitar botones mientras carga */
+  isLoading?: boolean;
 
   /** Fila clickeable */
-  onRowClick?: (row: TData) => void
+  onRowClick?: (row: TData) => void;
 
   /** Toolbar extra (botones, etc.) */
-  renderToolbar?: (table: TanstackTable<TData>) => React.ReactNode
+  renderToolbar?: (table: TanstackTable<TData>) => React.ReactNode;
 
-  className?: string
-}
+  className?: string;
+};
 
 export function DataTable<TData>({
   columns,
@@ -55,31 +84,116 @@ export function DataTable<TData>({
   title,
   description,
   enableSearch = true,
+  rowSelection,
+  onRowSelectionChange,
+  getRowId,
   searchPlaceholder = "Buscar...",
+  searchValue,
+  onSearchChange,
   pageSize = 10,
   enablePagination = true,
+
+  manualPagination = false,
+  pageIndex,
+  pageCount,
+  onPageChange,
+  isLoading = false,
+
   onRowClick,
   renderToolbar,
   className,
 }: DataTableProps<TData>) {
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [globalFilter, setGlobalFilter] = React.useState("")
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+
+  // Si se pasan estas props, el search es server-side (controlado)
+  const isControlledSearch =
+    typeof searchValue === "string" && typeof onSearchChange === "function";
+
+  // Solo usado cuando el search NO es controlado (client-side)
+  const [globalFilter, setGlobalFilter] = React.useState("");
+
+  const searchText = isControlledSearch
+    ? (searchValue ?? "")
+    : (globalFilter ?? "");
+
+  const handleSearch = (value: string) => {
+    if (isControlledSearch) onSearchChange?.(value);
+    else setGlobalFilter(value);
+  };
+
+  // Pagination state:
+  // - client-side: interno (si manualPagination=false)
+  // - server-side: viene de props (pageIndex) y se notifica con onPageChange
+  const paginationState: PaginationState = {
+    pageIndex: manualPagination ? (pageIndex ?? 0) : 0,
+    pageSize,
+  };
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter },
+    getRowId,
+    state: {
+      sorting,
+      pagination: paginationState,
+      rowSelection: rowSelection ?? {},
+
+      ...(isControlledSearch ? {} : { globalFilter }),
+    },
+
+    onRowSelectionChange: onRowSelectionChange,
+    enableRowSelection: true,
+
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: "includesString",
+
+    ...(isControlledSearch
+      ? {}
+      : {
+          onGlobalFilterChange: setGlobalFilter,
+          globalFilterFn: "includesString",
+        }),
+
+    // server-side pagination
+    manualPagination,
+    pageCount: manualPagination ? (pageCount ?? 1) : undefined,
+
+    onPaginationChange: (updater) => {
+      if (!manualPagination) return;
+
+      const next =
+        typeof updater === "function" ? updater(paginationState) : updater;
+
+      onPageChange?.(next.pageIndex);
+    },
+
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: { pageIndex: 0, pageSize },
-    },
-  })
+
+    ...(isControlledSearch
+      ? {}
+      : { getFilteredRowModel: getFilteredRowModel() }),
+
+    getPaginationRowModel: manualPagination
+      ? undefined
+      : getPaginationRowModel(),
+
+    initialState: manualPagination
+      ? undefined
+      : {
+          pagination: { pageIndex: 0, pageSize },
+        },
+  });
+
+  const currentPage = table.getState().pagination.pageIndex + 1;
+  const totalPages = manualPagination ? (pageCount ?? 1) : table.getPageCount();
+
+  const canPrev = manualPagination
+    ? (pageIndex ?? 0) > 0
+    : table.getCanPreviousPage();
+
+  const canNext = manualPagination
+    ? (pageIndex ?? 0) < totalPages - 1
+    : table.getCanNextPage();
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -97,8 +211,8 @@ export function DataTable<TData>({
 
             {enableSearch && (
               <Input
-                value={globalFilter ?? ""}
-                onChange={(e) => setGlobalFilter(e.target.value)}
+                value={searchText}
+                onChange={(e) => handleSearch(e.target.value)}
                 placeholder={searchPlaceholder}
                 className="sm:w-64"
               />
@@ -150,7 +264,10 @@ export function DataTable<TData>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   Sin resultados.
                 </TableCell>
               </TableRow>
@@ -162,24 +279,32 @@ export function DataTable<TData>({
       {enablePagination && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
-            Página {table.getState().pagination.pageIndex + 1} de{" "}
-            {table.getPageCount()}
+            Página {currentPage} de {totalPages}
           </div>
 
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() =>
+                manualPagination
+                  ? onPageChange?.((pageIndex ?? 0) - 1)
+                  : table.previousPage()
+              }
+              disabled={!canPrev || isLoading}
             >
               Anterior
             </Button>
+
             <Button
               variant="outline"
               size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() =>
+                manualPagination
+                  ? onPageChange?.((pageIndex ?? 0) + 1)
+                  : table.nextPage()
+              }
+              disabled={!canNext || isLoading}
             >
               Siguiente
             </Button>
@@ -187,5 +312,5 @@ export function DataTable<TData>({
         </div>
       )}
     </div>
-  )
+  );
 }

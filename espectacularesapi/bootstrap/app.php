@@ -32,6 +32,7 @@ $app->alias('app', Illuminate\Contracts\Foundation\Application::class);
 
 $app->withFacades();
 $app->withEloquent();
+$app->configure('filesystems');
 
 // Polyfills para paquetes de Laravel full (Sanctum) en Lumen
 if (!function_exists('config_path')) {
@@ -135,13 +136,12 @@ $app->alias('cache', Illuminate\Contracts\Cache\Factory::class);
 
 $app->register(App\Providers\AppServiceProvider::class);
 $app->register(App\Providers\AuthServiceProvider::class);
-// $app->register(App\Providers\EventServiceProvider::class);
 $app->register(Illuminate\Mail\MailServiceProvider::class);
 $app->register(Tymon\JWTAuth\Providers\LumenServiceProvider::class);
 $app->register(Illuminate\Database\MigrationServiceProvider::class);
-// $app->register(Laravel\Sanctum\SanctumServiceProvider::class);
 $app->register(Illuminate\Cache\CacheServiceProvider::class);
 $app->register(Spatie\Permission\PermissionServiceProvider::class);
+$app->register(Illuminate\Filesystem\FilesystemServiceProvider::class);
 
 
 // $app->configure('sanctum');

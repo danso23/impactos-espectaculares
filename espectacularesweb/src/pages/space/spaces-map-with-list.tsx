@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { Space } from "@/types/Space"
-import { SpacesList } from "./spaces-list"
+import { SpacesList } from "./spaces-map-list"
 import { SpacesMap } from "./spaces-map"
 
 export function SpacesMapWithList({ spaces }: { spaces: Space[] }) {

@@ -89,15 +89,18 @@ export function Filter({
         buildInitialState({ dropdowns, checkboxes, initialValues }),
     )
 
+    const depsKey = React.useMemo(() => {
+        return JSON.stringify({
+        enableDateRange,
+        initialValues,
+        dropdowns,
+        checkboxes,
+        })
+    }, [enableDateRange, initialValues, dropdowns, checkboxes])
+
     React.useEffect(() => {
         setValues(buildInitialState({ dropdowns, checkboxes, initialValues }))
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        enableDateRange,
-        JSON.stringify(initialValues),
-        JSON.stringify(dropdowns),
-        JSON.stringify(checkboxes),
-    ])
+    }, [depsKey, dropdowns, checkboxes, initialValues])
 
     const setSelect = (key: string, val?: string) => {
         setValues((prev) => ({

@@ -17,6 +17,8 @@ type Props = {
   minOpacity?: number
 }
 
+type HeatLatLngTuple = [number, number, number]
+
 export function HeatmapLayer({
   points,
   radius = 25,
@@ -31,9 +33,25 @@ export function HeatmapLayer({
     if (!points?.length) return
 
     // leaflet.heat acepta: [lat, lng, intensity]
-    const heatPoints = points.map((p) => [p.lat, p.lng, p.weight ?? 1] as any)
-
-    const heatLayer = (L as any).heatLayer(heatPoints, {
+    const heatPoints: HeatLatLngTuple[] = points.map((p) => [
+      p.lat,
+      p.lng,
+      p.weight ?? 1,
+    ])
+    
+    const heatLayer = (
+      L as unknown as {
+        heatLayer: (
+          points: HeatLatLngTuple[],
+          options: {
+            radius?: number
+            blur?: number
+            maxZoom?: number
+            minOpacity?: number
+          }
+        ) => L.Layer
+      }
+    ).heatLayer(heatPoints, {
       radius,
       blur,
       maxZoom,

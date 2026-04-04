@@ -1,4 +1,4 @@
-export type AuthUser = any
+import type { AuthUser } from "../types/AuthUser"
 
 // --- Tokens  ---
 export const tokenStore = {
@@ -37,10 +37,10 @@ export function setToken(accessToken: string) {
 }
 
 export function getUser(): AuthUser | null {
-  const raw = localStorage.getItem("user")
-  if (!raw) return null
   try {
-    return JSON.parse(raw)
+    const raw = localStorage.getItem("user")
+    if (!raw) return null
+    return JSON.parse(raw) as AuthUser
   } catch {
     return null
   }
