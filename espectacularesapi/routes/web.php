@@ -39,5 +39,20 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->put('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->delete('spaces/{id}', ['uses' => 'SpaceController@delete']);
+
+        $router->get('quote-catalogs', ['uses' => 'QuoteController@catalogs']);
+        $router->get('lead-catalogs', ['uses' => 'LeadController@catalogs']);
+        $router->get('leads', ['uses' => 'LeadController@index']);
+        $router->post('leads', ['uses' => 'LeadController@store']);
+        $router->post('leads/{id}/convert-to-client', ['uses' => 'LeadController@convertToClient']);
+        $router->get('clientes', ['uses' => 'ClientController@index']);
+        $router->post('clientes', ['uses' => 'ClientController@store']);
+        $router->get('customers/search', ['uses' => 'QuoteController@searchCustomers']);
+        $router->get('quotes', ['uses' => 'QuoteController@index']);
+        $router->post('quotes/preview', ['uses' => 'QuoteController@preview']);
+        $router->post('quotes', ['uses' => 'QuoteController@store']);
+        $router->get('quotes/{id}', ['uses' => 'QuoteController@show']);
+        $router->get('quotes/{id}/history', ['uses' => 'QuoteController@history']);
+        $router->post('quotes/{id}/status', ['uses' => 'QuoteController@changeStatus']);
     });
 });
