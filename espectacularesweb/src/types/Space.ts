@@ -20,6 +20,19 @@ export type Space = {
   active?: boolean | null;
   latitude?: number | null;
   longitude?: number | null;
+  images?: SpaceImageApi[];
+  coverImageUrl?: string | null;
+};
+
+export type SpaceImageApi = {
+  id: number;
+  filename?: string | null;
+  path: string;
+  is_cover?: boolean;
+  position?: number;
+  order_index?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type SpaceFormValues = {
@@ -80,6 +93,7 @@ export type SpaceApi = {
   height_m?: number | string | null;
   description?: string | null;
   comments?: string | null;
+  images?: SpaceImageApi[];
 };
 
 export type SpaceFormPayload = SpaceFormValues & { images: File[] };

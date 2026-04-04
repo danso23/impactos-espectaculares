@@ -1,7 +1,18 @@
 import type { FilterValues } from "@/types/Filter"
 import type { Space, SpaceApi } from "@/types/Space"
 import type { QueryParams } from "@/types/QueryParam"
+import { env } from "@/config/env"
 import { asViewType } from "../helpers/viewTypeHelper"
+
+function resolveSpaceImageUrl(path?: string | null) {
+  if (!path) return null
+  if (/^https?:\/\//i.test(path)) return path
+
+  const apiBase = env.apiUrl?.replace(/\/+$/, "") ?? ""
+  const cleanPath = path.replace(/^\/+/, "")
+
+  return apiBase ? `${apiBase}/storage/${cleanPath}` : `/storage/${cleanPath}`
+}
 
 export function apiToUiStatus(active?: boolean | number | string | null): Space["status"] {
   const isActive = active === true || active === 1 || active === "1" || active === "true"
@@ -9,6 +20,9 @@ export function apiToUiStatus(active?: boolean | number | string | null): Space[
 }
 
 export function apiToUiSpace(r: SpaceApi): Space {
+  const images = Array.isArray(r.images) ? r.images : []
+  const coverImage = images.find((image) => image.is_cover) ?? images[0] ?? null
+
   return {
     id: r.id,
     title: r.title,
@@ -38,6 +52,8 @@ export function apiToUiSpace(r: SpaceApi): Space {
       r.has_lights === "1",
 
     viewType: asViewType(r.view_type),
+    images,
+    coverImageUrl: resolveSpaceImageUrl(coverImage?.path),
   }
 }
 

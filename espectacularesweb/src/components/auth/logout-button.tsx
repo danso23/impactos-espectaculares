@@ -22,6 +22,7 @@ type LogoutButtonProps = {
   className?: string
   variant?: React.ComponentProps<typeof Button>["variant"]
   fullWidth?: boolean
+  compact?: boolean
 }
 
 function forceLocalLogout(navigate: ReturnType<typeof useNavigate>) {
@@ -47,6 +48,7 @@ export function LogoutButton({
   className,
   variant = "ghost",
   fullWidth = true,
+  compact = false,
 }: LogoutButtonProps) {
   const navigate = useNavigate()
   const [loading, setLoading] = React.useState(false)
@@ -73,11 +75,17 @@ export function LogoutButton({
       <AlertDialogTrigger asChild>
         <Button
           variant={variant}
-          className={[fullWidth ? "w-full justify-start" : "", className ?? ""].join(" ")}
+          className={[
+            fullWidth ? "w-full justify-start" : "",
+            compact ? "justify-center px-2" : "",
+            className ?? "",
+          ].join(" ")}
           disabled={loading}
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
         >
-          <LogOut className="mr-2 h-4 w-4" />
-          {loading ? "Cerrando..." : "Cerrar sesión"}
+          <LogOut className={compact ? "h-4 w-4" : "mr-2 h-4 w-4"} />
+          {compact ? null : loading ? "Cerrando..." : "Cerrar sesión"}
         </Button>
       </AlertDialogTrigger>
 

@@ -5,8 +5,10 @@ import {
   View,
   StyleSheet,
   Image,
+  Link,
 } from "@react-pdf/renderer";
 import type { SpaceApi } from "@/types/Space";
+import { env } from "@/config/env";
 
 const styles = StyleSheet.create({
   /* ================= PORTADA ================= */
@@ -231,6 +233,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
+  mapLink: {
+    marginTop: 8,
+    fontSize: 9,
+    color: "#1D6FA5",
+    textDecoration: "none",
+  },
+
   rightColumn: {
     flex: 1,
     gap: 6,
@@ -263,6 +272,39 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
   },
 });
+
+function getStorageBaseUrl() {
+  const apiUrl = env.apiUrl?.replace(/\/+$/, "") ?? ""
+  return apiUrl ? `${apiUrl}/storage` : `${window.location.origin}/storage`
+}
+
+function resolveSpaceImageUrl(path?: string | null) {
+  if (!path) return null
+  if (/^(https?:\/\/|data:)/i.test(path)) return path
+
+  const cleanPath = path.replace(/^\/+/, "")
+  return `${getStorageBaseUrl()}/${cleanPath}`
+}
+
+function getCatalogImages(space: SpaceApi) {
+  const urls = (space.images ?? [])
+    .map((image) => resolveSpaceImageUrl(image.path))
+    .filter((value): value is string => Boolean(value))
+
+  const fallbackMain = `${window.location.origin}/img/img1.png`
+  const fallbackAlt1 = `${window.location.origin}/img/img2.png`
+  const fallbackAlt2 = `${window.location.origin}/img/img3.png`
+
+  return {
+    main: urls[0] ?? fallbackMain,
+    secondary: urls[1] ?? urls[0] ?? fallbackAlt1,
+    tertiary: urls[2] ?? urls[1] ?? urls[0] ?? fallbackAlt2,
+  }
+}
+
+function getGoogleMapsUrl(space: SpaceApi) {
+  return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`
+}
 
 export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
   return (
@@ -299,8 +341,10 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
       </Page>
 
       {/* ================= ESPACIOS ================= */}
-      {spaces.map((space, index) => {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.google.com/maps?q=${space.latitude},${space.longitude}`;
+      {spaces.map((space) => {
+        const catalogImages = getCatalogImages(space)
+        const googleMapsUrl = getGoogleMapsUrl(space)
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(googleMapsUrl)}`;
 
         const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
 
@@ -325,10 +369,7 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
             </View>
 
             {/* IMAGEN PRINCIPAL */}
-            <Image
-              src="https://picsum.photos/800/400"
-              style={styles.mainImage}
-            />
+            <Image src={catalogImages.main} style={styles.mainImage} />
 
             {/* CONTENIDO */}
             <View style={styles.contentRow}>
@@ -346,20 +387,20 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
                 <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
 
-                <Image src={qrUrl} style={styles.qr} />
+                <Link src={googleMapsUrl}>
+                  <Image src={qrUrl} style={styles.qr} />
+                </Link>
+
+                <Link src={googleMapsUrl} style={styles.mapLink}>
+                  Ver ubicacion en Google Maps
+                </Link>
               </View>
 
               {/* DERECHA */}
               <View style={styles.rightColumn}>
-                <Image
-                  src="https://picsum.photos/200/100"
-                  style={styles.smallImage}
-                />
+                <Image src={catalogImages.secondary} style={styles.smallImage} />
 
-                <Image
-                  src="https://picsum.photos/200/101"
-                  style={styles.smallImage}
-                />
+                <Image src={catalogImages.tertiary} style={styles.smallImage} />
 
                 {/* MAPA */}
                 <Image src={mapUrl} style={styles.mapImage} />
