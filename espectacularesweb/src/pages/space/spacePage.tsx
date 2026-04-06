@@ -113,6 +113,7 @@ export default function SpacePage() {
         title="Filtros de espacios"
         enableDateRange
         initialValues={filters}
+        defaultOpen={false}
         dropdowns={[
           {
             key: "estatus",
@@ -147,80 +148,86 @@ export default function SpacePage() {
         onApply={handleApplyFilters}
         onReset={handleResetFilters}
         applyOnReset={true}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              className="flex gap-2"
+              disabled={selectedSpaces.length === 0}
+              onClick={() => downloadSpacesCatalog(selectedSpaces)}
+            >
+              <FileDown className="h-4 w-4" />
+              Descargar catálogo PDF
+            </Button>
+
+            <Button
+              disabled={selectedSpaces.length === 0}
+              onClick={() => {
+                navigate("/cotizaciones/nueva", {
+                  state: { spaces: selectedSpaces },
+                });
+              }}
+            >
+              Crear cotización
+            </Button>
+
+            <SpaceForm
+              mode="create"
+              trigger={
+                <Button className="shrink-0">
+                  Agregar
+                </Button>
+              }
+              onSubmit={async (payload) => {
+                await createMutation.mutateAsync(payload);
+              }}
+              isSubmitting={createMutation.isPending}
+              onSaved={() => spacesQuery.refetch()}
+            />
+          </>
+        }
       />
-      <div className="flex gap-3 items-center">
-        <Button
-          variant="outline"
-          className="flex gap-2"
-          disabled={selectedSpaces.length === 0}
-          onClick={() => downloadSpacesCatalog(selectedSpaces)}
-        >
-          <FileDown className="h-4 w-4" />
-          Descargar catálogo PDF
-        </Button>
-
-        <Button
-          onClick={() => {
-            navigate("/cotizaciones/nueva", {
-              state: { spaces: selectedSpaces },
-            });
-          }}
-        >
-          Crear cotización
-        </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
+      {editingSpace ? (
         <SpaceForm
-          mode="create"
-          onSubmit={async (payload) => {
-            await createMutation.mutateAsync(payload);
+          mode="edit"
+          title="Editar espacio"
+          hideTrigger
+          open={editOpen}
+          onOpenChange={(v) => {
+            setEditOpen(v);
+            if (!v) setEditingSpace(null);
           }}
-          isSubmitting={createMutation.isPending}
-          onSaved={() => spacesQuery.refetch()}
-        />
-        {editingSpace ? (
-          <SpaceForm
-            mode="edit"
-            title="Editar espacio"
-            hideTrigger
-            open={editOpen}
-            onOpenChange={(v) => {
-              setEditOpen(v);
-              if (!v) setEditingSpace(null);
-            }}
-            initialValues={{
-              faces: editingSpace.faces,
-              assigned_id: editingSpace.assigned_id ?? "",
-              title: editingSpace.title ?? "",
-              price: editingSpace.price,
-              type: asSpaceType(editingSpace.type),
-              width_m: editingSpace.width_m
-                ? parseFloat(editingSpace.width_m.toString())
-                : undefined,
-              height_m: editingSpace.height_m
-                ? parseFloat(editingSpace.height_m.toString())
-                : undefined,
-              has_lights: editingSpace.has_lights ?? false,
-              viewType: asViewType(editingSpace.viewType),
+          initialValues={{
+            faces: editingSpace.faces,
+            assigned_id: editingSpace.assigned_id ?? "",
+            title: editingSpace.title ?? "",
+            price: editingSpace.price,
+            type: asSpaceType(editingSpace.type),
+            width_m: editingSpace.width_m
+              ? parseFloat(editingSpace.width_m.toString())
+              : undefined,
+            height_m: editingSpace.height_m
+              ? parseFloat(editingSpace.height_m.toString())
+              : undefined,
+            has_lights: editingSpace.has_lights ?? false,
+            viewType: asViewType(editingSpace.viewType),
 
-              latitude: editingSpace.coords?.lat,
-              longitude: editingSpace.coords?.lng,
-              socioeconomic_level: editingSpace.socioeconomic_level ?? "",
-              description: editingSpace.description ?? "",
-              comments: editingSpace.comments ?? "",
-            }}
-            isSubmitting={updateMutation.isPending}
-            onSubmit={async (payload) => {
-              await updateMutation.mutateAsync({
-                id: editingSpace.id,
-                payload,
-              });
-              await spacesQuery.refetch();
-            }}
-          />
-        ) : null}
-      </div>
+            latitude: editingSpace.coords?.lat,
+            longitude: editingSpace.coords?.lng,
+            socioeconomic_level: editingSpace.socioeconomic_level ?? "",
+            description: editingSpace.description ?? "",
+            comments: editingSpace.comments ?? "",
+          }}
+          isSubmitting={updateMutation.isPending}
+          onSubmit={async (payload) => {
+            await updateMutation.mutateAsync({
+              id: editingSpace.id,
+              payload,
+            });
+            await spacesQuery.refetch();
+          }}
+        />
+      ) : null}
 
       <Card>
         <CardContent className="py-2">
