@@ -16,7 +16,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, SlidersHorizontal } from "lucide-react"
 import {
     Collapsible,
     CollapsibleContent,
@@ -42,6 +42,7 @@ type Props = {
     className?: string
     applyOnReset?: boolean
     defaultOpen?: boolean
+    actions?: React.ReactNode
 }
 
 const ALL_VALUE = "__FILTER_ALL__"
@@ -84,6 +85,7 @@ export function Filter({
     className,
     applyOnReset = true,
     defaultOpen = false,
+    actions,
 }: Props) {
     const [values, setValues] = React.useState<FilterValues>(() =>
         buildInitialState({ dropdowns, checkboxes, initialValues }),
@@ -154,21 +156,31 @@ export function Filter({
         <Card className={className}>
             <Collapsible open={open} onOpenChange={setOpen}>
                 <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                        <CardTitle className="text-base">{title}</CardTitle>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-3">
+                            <CardTitle className="text-base">{title}</CardTitle>
 
-                        <div className="flex items-center gap-2">
                             {activeCount > 0 && (
                                 <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
                                     {activeCount} activo{activeCount === 1 ? "" : "s"}
                                 </span>
                             )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {actions}
 
                             <CollapsibleTrigger asChild>
-                                <Button variant="outline" size="sm" className="gap-2">
-                                    {open ? "Ocultar" : "Mostrar"}
+                                <Button
+                                    variant={open ? "secondary" : "outline"}
+                                    size="icon"
+                                    className="relative"
+                                    aria-label={open ? "Ocultar filtros" : "Mostrar filtros"}
+                                    title={open ? "Ocultar filtros" : "Mostrar filtros"}
+                                >
+                                    <SlidersHorizontal className="h-4 w-4" />
                                     <ChevronDown
-                                        className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+                                        className={`absolute h-3 w-3 translate-x-2 translate-y-2 rounded-full bg-background p-[1px] text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
                                     />
                                 </Button>
                             </CollapsibleTrigger>
