@@ -274,36 +274,36 @@ const styles = StyleSheet.create({
 });
 
 function getStorageBaseUrl() {
-  const apiUrl = env.apiUrl?.replace(/\/+$/, "") ?? ""
-  return apiUrl ? `${apiUrl}/storage` : `${window.location.origin}/storage`
+  const apiUrl = env.apiUrl?.replace(/\/+$/, "") ?? "";
+  return apiUrl ? `${apiUrl}/storage` : `${window.location.origin}/storage`;
 }
 
 function resolveSpaceImageUrl(path?: string | null) {
-  if (!path) return null
-  if (/^(https?:\/\/|data:)/i.test(path)) return path
+  if (!path) return null;
+  if (/^(https?:\/\/|data:)/i.test(path)) return path;
 
-  const cleanPath = path.replace(/^\/+/, "")
-  return `${getStorageBaseUrl()}/${cleanPath}`
+  const cleanPath = path.replace(/^\/+/, "");
+  return `${getStorageBaseUrl()}/${cleanPath}`;
 }
 
 function getCatalogImages(space: SpaceApi) {
   const urls = (space.images ?? [])
     .map((image) => resolveSpaceImageUrl(image.path))
-    .filter((value): value is string => Boolean(value))
+    .filter((value): value is string => Boolean(value));
 
-  const fallbackMain = `${window.location.origin}/img/img1.png`
-  const fallbackAlt1 = `${window.location.origin}/img/img2.png`
-  const fallbackAlt2 = `${window.location.origin}/img/img3.png`
+  const fallbackMain = `${window.location.origin}/img/img1.png`;
+  const fallbackAlt1 = `${window.location.origin}/img/img2.png`;
+  const fallbackAlt2 = `${window.location.origin}/img/img3.png`;
 
   return {
     main: urls[0] ?? fallbackMain,
     secondary: urls[1] ?? urls[0] ?? fallbackAlt1,
     tertiary: urls[2] ?? urls[1] ?? urls[0] ?? fallbackAlt2,
-  }
+  };
 }
 
 function getGoogleMapsUrl(space: SpaceApi) {
-  return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`
+  return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`;
 }
 
 export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
@@ -342,8 +342,8 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
       {/* ================= ESPACIOS ================= */}
       {spaces.map((space) => {
-        const catalogImages = getCatalogImages(space)
-        const googleMapsUrl = getGoogleMapsUrl(space)
+        const catalogImages = getCatalogImages(space);
+        const googleMapsUrl = getGoogleMapsUrl(space);
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(googleMapsUrl)}`;
 
         const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
@@ -385,6 +385,12 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
                   {space.latitude}, {space.longitude}
                 </Text>
 
+                <Text style={styles.iconText}>DESCRIPCIÓN:</Text>
+
+                <Text style={styles.iconText}>
+                  {space.description ?? "No disponible"}
+                </Text>
+
                 <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
 
                 <Link src={googleMapsUrl}>
@@ -398,7 +404,10 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
               {/* DERECHA */}
               <View style={styles.rightColumn}>
-                <Image src={catalogImages.secondary} style={styles.smallImage} />
+                <Image
+                  src={catalogImages.secondary}
+                  style={styles.smallImage}
+                />
 
                 <Image src={catalogImages.tertiary} style={styles.smallImage} />
 
