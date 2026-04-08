@@ -271,6 +271,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
   },
+  featuresContainer: {
+    position: "absolute",
+    bottom: 50, // arriba del footer
+    left: 20,
+    width: "90%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  featureColumn: {
+    flex: 1,
+    gap: 6,
+  },
+
+  featureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  featureIcon: {
+    width: 14,
+    height: 14,
+  },
+
+  featureText: {
+    fontSize: 9,
+    color: "#2E2A6D",
+  },
 });
 
 function getStorageBaseUrl() {
@@ -365,7 +394,7 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
             {/* ETIQUETA LATERAL */}
             <View style={styles.sideLabel}>
-              <Text style={styles.sideLabelText}>Carteleras Mérida</Text>
+              {/*<Text style={styles.sideLabelText}>Carteleras Mérida</Text>*/}
             </View>
 
             {/* IMAGEN PRINCIPAL */}
@@ -378,25 +407,21 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
                 <Text style={styles.iconText}>
                   {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
                 </Text>
-
+                &nbsp;
                 <Text style={styles.iconText}>UBICACIÓN:</Text>
-
                 <Text style={styles.iconText}>
                   {space.latitude}, {space.longitude}
                 </Text>
-
+                &nbsp;
                 <Text style={styles.iconText}>DESCRIPCIÓN:</Text>
-
                 <Text style={styles.iconText}>
                   {space.description ?? "No disponible"}
                 </Text>
-
+                &nbsp;
                 <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
-
                 <Link src={googleMapsUrl}>
                   <Image src={qrUrl} style={styles.qr} />
                 </Link>
-
                 <Link src={googleMapsUrl} style={styles.mapLink}>
                   Ver ubicacion en Google Maps
                 </Link>
@@ -413,6 +438,65 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
                 {/* MAPA */}
                 <Image src={mapUrl} style={styles.mapImage} />
+              </View>
+            </View>
+
+            {/* FEATURES (ICONOS + TEXTO) */}
+            <View style={styles.featuresContainer}>
+              {/* COLUMNA IZQUIERDA */}
+              <View style={styles.featureColumn}>
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/facebook.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    Impactos Espectaculares
+                  </Text>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/web.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    www.impactosespectaculares.com.mx
+                  </Text>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/email.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    gguendulainf@hotmail.com
+                  </Text>
+                </View>
+              </View>
+
+              {/* COLUMNA DERECHA */}
+              <View style={styles.featureColumn}>
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/phone.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    999 285 92 53 // 999 317 00 98
+                  </Text>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/mobile.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    999 1 27 68 65 // 999 1 27 31 56
+                  </Text>
+                </View>
               </View>
             </View>
 
