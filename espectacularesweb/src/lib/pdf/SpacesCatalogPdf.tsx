@@ -404,6 +404,8 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
             <View style={styles.contentRow}>
               {/* IZQUIERDA */}
               <View style={styles.leftInfo}>
+                <Text style={styles.iconText}>{space.assigned_id ?? "-"}</Text>
+                &nbsp;
                 <Text style={styles.iconText}>
                   {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
                 </Text>
