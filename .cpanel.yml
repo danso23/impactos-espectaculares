@@ -1,4 +1,4 @@
 ---
 deployment:
   tasks:
-    - /usr/bin/touch /home2/enticonfiamos/public_html/deploy_test_ok.txt
+    - /bin/sh -c 'command -v php > /home2/enticonfiamos/public_html/php_path.txt 2>&1'
