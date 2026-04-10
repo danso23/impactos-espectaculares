@@ -1,4 +1,7 @@
 ---
 deployment:
   tasks:
-    - /bin/sh -c 'command -v php > /home2/enticonfiamos/public_html/php_path.txt 2>&1'
+    - /bin/mkdir -p /home2/enticonfiamos/public_html/espectacularesapi
+    - /bin/mkdir -p /home2/enticonfiamos/app.enticonfiamos.com.mx
+    - /bin/cp -R espectacularesapi/* /home2/enticonfiamos/public_html/espectacularesapi
+    - /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan migrate --force > /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1
