@@ -1,0 +1,14 @@
+---
+deployment:
+  tasks:
+    - export API_PATH=/home2/enticonfiamos/public_html/espectacularesapi
+    - export APP_PATH=/home2/enticonfiamos/app.enticonfiamos.com.mx
+
+    - /bin/mkdir -p $API_PATH
+    - /bin/mkdir -p $APP_PATH
+
+    # Backend
+    - /bin/cp -R espectacularesapi/* $API_PATH
+
+    # Frontend compilado
+    - /bin/cp -R espectacularesweb/dist/* $APP_PATH

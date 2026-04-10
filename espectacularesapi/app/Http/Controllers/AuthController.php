@@ -31,7 +31,7 @@ class AuthController extends Controller
         }
 
         $user->api_token = Str::random(60);
-        $user->create_token = date('Y-m-d H:i:s');
+        $user->create_token = Carbon::now();
         // $user->save();
         $user->update([
             'api_token' => $user->api_token,
@@ -41,6 +41,7 @@ class AuthController extends Controller
         return response()->json([
             'message' => 'Inicio de sesión exitoso',
             'access_token' => $user->api_token,
+            'expires_in' => max(1, (int) env('ACCESS_TTL_MINUTES', 30)) * 60,
             'token_type' => 'Bearer',
             //'user' => $user,
         ],200);
