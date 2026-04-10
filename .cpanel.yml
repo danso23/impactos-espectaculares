@@ -1,10 +1,4 @@
 ---
 deployment:
   tasks:
-    - /bin/mkdir -p /home2/enticonfiamos/public_html/espectacularesapi
-    - /bin/mkdir -p /home2/enticonfiamos/app.enticonfiamos.com.mx
-    - /bin/cp -R espectacularesapi/* /home2/enticonfiamos/public_html/espectacularesapi
-    - /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan migrate --force > /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1
-    - /bin/sh -c 'RUN_SEEDERS=false; if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan db:seed --class=Database\\Seeders\\QuoteStatusSeeder --force >> /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1; fi'
-    - /bin/sh -c 'RUN_SEEDERS=false; if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan db:seed --class=Database\\Seeders\\QuoteCatalogSeeder --force >> /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1; fi'
-    - /bin/cp -R espectacularesweb/dist/* /home2/enticonfiamos/app.enticonfiamos.com.mx
+    - /bin/sh -c 'set -x; LOG=/home2/enticonfiamos/public_html/deploy_full.log; echo "=== DEPLOY START ===" >> "$LOG" 2>&1; /bin/date >> "$LOG" 2>&1; /bin/mkdir -p /home2/enticonfiamos/public_html/espectacularesapi >> "$LOG" 2>&1; /bin/mkdir -p /home2/enticonfiamos/app.enticonfiamos.com.mx >> "$LOG" 2>&1; /bin/cp -R espectacularesapi/* /home2/enticonfiamos/public_html/espectacularesapi >> "$LOG" 2>&1; /bin/ls -1 /home2/enticonfiamos/public_html/espectacularesapi/database/migrations | /usr/bin/tail -n 5 >> "$LOG" 2>&1; /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan migrate --force >> "$LOG" 2>&1; echo "=== DEPLOY END ===" >> "$LOG" 2>&1'
