@@ -5,3 +5,6 @@ deployment:
     - /bin/mkdir -p /home2/enticonfiamos/app.enticonfiamos.com.mx
     - /bin/cp -R espectacularesapi/* /home2/enticonfiamos/public_html/espectacularesapi
     - /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan migrate --force > /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1
+    - /bin/sh -c 'RUN_SEEDERS=false; if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan db:seed --class=Database\\Seeders\\QuoteStatusSeeder --force >> /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1; fi'
+    - /bin/sh -c 'RUN_SEEDERS=false; if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan db:seed --class=Database\\Seeders\\QuoteCatalogSeeder --force >> /home2/enticonfiamos/public_html/deploy_migrate.log 2>&1; fi'
+    - /bin/cp -R espectacularesweb/dist/* /home2/enticonfiamos/app.enticonfiamos.com.mx
