@@ -10,10 +10,9 @@ deployment:
 
     # Backend
     - /bin/cp -R espectacularesapi/* $API_PATH
-    - cd $API_PATH
-    - php artisan migrate --force
-    - if [ "$RUN_SEEDERS" = "true" ]; then php artisan db:seed --class=Database\\Seeders\\QuoteStatusSeeder --force; fi
-    - if [ "$RUN_SEEDERS" = "true" ]; then php artisan db:seed --class=Database\\Seeders\\QuoteCatalogSeeder --force; fi
+    - /usr/local/bin/php $API_PATH/artisan migrate --force
+    - if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php $API_PATH/artisan db:seed --class=Database\\Seeders\\QuoteStatusSeeder --force; fi
+    - if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php $API_PATH/artisan db:seed --class=Database\\Seeders\\QuoteCatalogSeeder --force; fi
 
     # Frontend compilado
     - /bin/cp -R espectacularesweb/dist/* $APP_PATH
