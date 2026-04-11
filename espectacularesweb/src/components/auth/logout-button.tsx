@@ -31,8 +31,13 @@ function forceLocalLogout(navigate: ReturnType<typeof useNavigate>) {
 }
 
 async function logoutRequest() {
+  const refreshToken = localStorage.getItem("refresh_token")
   const res = await apiFetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      refresh_token: refreshToken || null,
+    }),
   })
 
   if (res.status === 204) return null
