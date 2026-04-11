@@ -29,6 +29,7 @@ import type {
   QuotePayload,
   QuotePreviewData,
   QuoteRecord,
+  SearchableCustomerType,
 } from "@/types/Quote"
 
 type QuoteLocationState = {
@@ -128,8 +129,10 @@ export default function QuoteCreatePage() {
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(false)
   const [savedQuote, setSavedQuote] = React.useState<QuoteRecord | null>(null)
   const previewRequestId = React.useRef(0)
+  const isWithoutCustomer = customerType === "sin_cliente"
+  const customerSearchType: SearchableCustomerType = customerType === "cliente" ? "cliente" : "lead"
 
-  const customerQuery = useQuoteCustomerSearch(customerSearch, customerType)
+  const customerQuery = useQuoteCustomerSearch(customerSearch, customerSearchType, !isWithoutCustomer)
 
   const catalogs = catalogsQuery.data?.data
   const companies = catalogs?.companies ?? []
@@ -172,14 +175,18 @@ export default function QuoteCreatePage() {
   }, [companyLetterheads, letterheadId, selectedCompany])
 
   const filteredCustomerResults = customerQuery.data?.data ?? []
+  const customerDisplayName = isWithoutCustomer
+    ? "Sin cliente"
+    : selectedCustomer?.display_name ?? "Pendiente"
 
   const payload = React.useMemo<QuotePayload | null>(() => {
-    if (!selectedCustomer || !companyId || items.length === 0) return null
+    if (!companyId || items.length === 0) return null
+    if (!isWithoutCustomer && !selectedCustomer) return null
 
     return {
       customer: {
         type: customerType,
-        id: selectedCustomer.id,
+        id: isWithoutCustomer ? null : selectedCustomer?.id ?? null,
       },
       issuer_company_id: companyId,
       letterhead_id: letterheadId,
@@ -214,6 +221,7 @@ export default function QuoteCreatePage() {
     discountType,
     discountValue,
     includeTax,
+    isWithoutCustomer,
     items,
     letterheadId,
     notes,
@@ -346,7 +354,7 @@ export default function QuoteCreatePage() {
 
   const handleSave = async () => {
     if (!payload) {
-      toast.error("Completa cliente, empresa e items antes de guardar.")
+      toast.error("Completa empresa e items antes de guardar.")
       return
     }
 
@@ -425,55 +433,64 @@ export default function QuoteCreatePage() {
                   <SelectContent>
                     <SelectItem value="lead">Lead / Prospecto</SelectItem>
                     <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="sin_cliente">Sin cliente</SelectItem>
                   </SelectContent>
                 </Select>
               </QuoteField>
 
-              <div className="relative space-y-2">
-                <Label>Cliente</Label>
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={selectedCustomer ? selectedCustomer.display_name : customerSearch}
-                  onChange={(event) => {
-                    setCustomerSearch(event.target.value)
-                    setSelectedCustomer(null)
-                    setShowCustomerList(true)
-                  }}
-                  onFocus={() => setShowCustomerList(true)}
-                />
+              {isWithoutCustomer ? (
+                <QuoteField label="Cliente">
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    La cotización se guardará sin cliente asignado.
+                  </div>
+                </QuoteField>
+              ) : (
+                <div className="relative space-y-2">
+                  <Label>Cliente</Label>
+                  <Input
+                    placeholder="Buscar cliente..."
+                    value={selectedCustomer ? selectedCustomer.display_name : customerSearch}
+                    onChange={(event) => {
+                      setCustomerSearch(event.target.value)
+                      setSelectedCustomer(null)
+                      setShowCustomerList(true)
+                    }}
+                    onFocus={() => setShowCustomerList(true)}
+                  />
 
-                {showCustomerList && !selectedCustomer && customerSearch.trim().length >= 2 ? (
-                  <Card className="absolute z-20 mt-1 max-h-60 w-full overflow-auto">
-                    <CardContent className="space-y-1 p-2">
-                      {customerQuery.isFetching ? (
-                        <div className="p-2 text-sm text-muted-foreground">Buscando...</div>
-                      ) : null}
+                  {showCustomerList && !selectedCustomer && customerSearch.trim().length >= 2 ? (
+                    <Card className="absolute z-20 mt-1 max-h-60 w-full overflow-auto">
+                      <CardContent className="space-y-1 p-2">
+                        {customerQuery.isFetching ? (
+                          <div className="p-2 text-sm text-muted-foreground">Buscando...</div>
+                        ) : null}
 
-                      {!customerQuery.isFetching && filteredCustomerResults.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground">Sin resultados.</div>
-                      ) : null}
+                        {!customerQuery.isFetching && filteredCustomerResults.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">Sin resultados.</div>
+                        ) : null}
 
-                      {filteredCustomerResults.map((customer) => (
-                        <button
-                          key={`${customer.type}-${customer.id}`}
-                          type="button"
-                          className="flex w-full flex-col rounded-md px-3 py-2 text-left hover:bg-muted"
-                          onClick={() => {
-                            setSelectedCustomer(customer)
-                            setCustomerSearch(customer.display_name)
-                            setShowCustomerList(false)
-                          }}
-                        >
-                          <span className="text-sm font-medium">{customer.display_name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {customer.contact_name || customer.email || customer.phone || "Sin datos extra"}
-                          </span>
-                        </button>
-                      ))}
-                    </CardContent>
-                  </Card>
-                ) : null}
-              </div>
+                        {filteredCustomerResults.map((customer) => (
+                          <button
+                            key={`${customer.type}-${customer.id}`}
+                            type="button"
+                            className="flex w-full flex-col rounded-md px-3 py-2 text-left hover:bg-muted"
+                            onClick={() => {
+                              setSelectedCustomer(customer)
+                              setCustomerSearch(customer.display_name)
+                              setShowCustomerList(false)
+                            }}
+                          >
+                            <span className="text-sm font-medium">{customer.display_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {customer.contact_name || customer.email || customer.phone || "Sin datos extra"}
+                            </span>
+                          </button>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                </div>
+              )}
 
               <QuoteField label="Empresa emisora">
                 <Select
@@ -562,7 +579,11 @@ export default function QuoteCreatePage() {
                   <Select
                     value={discountType}
                     onValueChange={(value) => {
-                      if (isQuoteAmountType(value)) setDiscountType(value)
+                      if (!isQuoteAmountType(value)) return
+                      setDiscountType(value)
+                      if (value === "none") {
+                        setDiscountValue(0)
+                      }
                     }}
                   >
                     <SelectTrigger>
@@ -578,6 +599,7 @@ export default function QuoteCreatePage() {
                     type="number"
                     min="0"
                     step="0.01"
+                    disabled={discountType === "none"}
                     value={discountValue}
                     onChange={(event) => setDiscountValue(toNumber(event.target.value))}
                   />
@@ -589,7 +611,11 @@ export default function QuoteCreatePage() {
                   <Select
                     value={commissionType}
                     onValueChange={(value) => {
-                      if (isQuoteAmountType(value)) setCommissionType(value)
+                      if (!isQuoteAmountType(value)) return
+                      setCommissionType(value)
+                      if (value === "none") {
+                        setCommissionValue(0)
+                      }
                     }}
                   >
                     <SelectTrigger>
@@ -605,6 +631,7 @@ export default function QuoteCreatePage() {
                     type="number"
                     min="0"
                     step="0.01"
+                    disabled={commissionType === "none"}
                     value={commissionValue}
                     onChange={(event) => setCommissionValue(toNumber(event.target.value))}
                   />
@@ -655,7 +682,6 @@ export default function QuoteCreatePage() {
                       <th className="text-left">Hasta</th>
                       <th className="text-center">Cant.</th>
                       <th className="text-left">Precio</th>
-                      <th className="text-center">Desc.</th>
                       <th className="text-right">Subtotal</th>
                       <th className="text-right">Acciones</th>
                     </tr>
@@ -741,17 +767,6 @@ export default function QuoteCreatePage() {
                               }
                             />
                           </td>
-                          <td className="py-4">
-                            <div className="flex justify-center">
-                              <Checkbox
-                                checked={item.discount_applies ?? item.item_type === "rental"}
-                                disabled={item.item_type === "service"}
-                                onCheckedChange={(checked) =>
-                                  updateItem(index, { discount_applies: Boolean(checked) })
-                                }
-                              />
-                            </div>
-                          </td>
                           <td className="py-4 text-right font-medium">{formatCurrency(subtotal)}</td>
                           <td className="py-4 text-right">
                             <Button
@@ -801,12 +816,12 @@ export default function QuoteCreatePage() {
             <CardHeader>
               <CardTitle className="text-lg">Resumen</CardTitle>
               <CardDescription>
-                {isPreviewLoading ? "Calculando vista previa..." : "Totales calculados por backend."}
+                {isPreviewLoading ? "Calculando vista previa..." : "Totales calculados"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span>Subtotal local</span>
+                <span>Subtotal</span>
                 <span>{formatCurrency(localSubtotal)}</span>
               </div>
               <div className="flex justify-between">
@@ -841,7 +856,7 @@ export default function QuoteCreatePage() {
               ) : null}
 
               <div className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
-                <div>Cliente: {selectedCustomer?.display_name ?? "Pendiente"}</div>
+                <div>Cliente: {customerDisplayName}</div>
                 <div>Empresa: {selectedCompany?.name ?? "Pendiente"}</div>
                 <div>Agencia: {selectedAgency?.name ?? "Sin agencia"}</div>
               </div>

@@ -65,10 +65,14 @@ class QuoteController extends Controller
         $type = $request->query('type', 'lead');
         $q = trim((string)$request->query('q', ''));
 
-        if (!in_array($type, ['lead', 'cliente'], true)) {
+        if (!in_array($type, ['lead', 'cliente', 'sin_cliente'], true)) {
             return response()->json([
                 'message' => 'Tipo de cliente inválido',
             ], 422);
+        }
+
+        if ($type === 'sin_cliente') {
+            return response()->json(['data' => []]);
         }
 
         if ($type === 'lead') {
@@ -265,7 +269,7 @@ class QuoteController extends Controller
             $quote = Quote::create([
                 'lead_id' => $validated['customer']['type'] === 'lead' ? $validated['customer']['id'] : null,
                 'customer_type' => $validated['customer']['type'],
-                'customer_id' => $validated['customer']['id'],
+                'customer_id' => $validated['customer']['id'] ?? null,
                 'user_id' => $this->authUserId($request),
                 'quote_status_id' => $draftStatus->id,
                 'agency_id' => $agency?->id,
@@ -420,8 +424,8 @@ class QuoteController extends Controller
     private function validateAndResolvePayload(Request $request): array
     {
         $validator = Validator::make($request->all(), [
-            'customer.type' => ['required', 'in:lead,cliente'],
-            'customer.id' => ['required', 'integer', 'min:1'],
+            'customer.type' => ['required', 'in:lead,cliente,sin_cliente'],
+            'customer.id' => ['nullable', 'integer', 'min:1'],
             'issuer_company_id' => ['required', 'integer', 'exists:companies,id'],
             'letterhead_id' => ['nullable', 'integer', 'exists:company_letterheads,id'],
             'agency_id' => ['nullable', 'integer', 'exists:agencies,id'],
@@ -454,12 +458,19 @@ class QuoteController extends Controller
 
         $validator->after(function ($validator) use ($request) {
             $customer = $request->input('customer', []);
-            if (($customer['type'] ?? null) === 'lead' && !Lead::query()->whereKey($customer['id'] ?? null)->exists()) {
+            $customerType = $customer['type'] ?? null;
+            $customerId = $customer['id'] ?? null;
+
+            if ($customerType !== 'sin_cliente' && empty($customerId)) {
+                $validator->errors()->add('customer.id', 'Debes seleccionar un cliente o prospecto.');
+            }
+
+            if ($customerType === 'lead' && !empty($customerId) && !Lead::query()->whereKey($customerId)->exists()) {
                 $validator->errors()->add('customer.id', 'El lead seleccionado no existe.');
             }
 
-            if (($customer['type'] ?? null) === 'cliente' && Schema::hasTable('clientes')) {
-                $exists = DB::table('clientes')->where('id', $customer['id'] ?? null)->exists();
+            if ($customerType === 'cliente' && !empty($customerId) && Schema::hasTable('clientes')) {
+                $exists = DB::table('clientes')->where('id', $customerId)->exists();
                 if (!$exists) {
                     $validator->errors()->add('customer.id', 'El cliente seleccionado no existe.');
                 }
@@ -513,7 +524,10 @@ class QuoteController extends Controller
         }
 
         $validated['items'] = $this->normalizeItems($validated['items'] ?? []);
-        $customerSummary = $this->resolveCustomerSummary($validated['customer']['type'], (int)$validated['customer']['id']);
+        $customerSummary = $this->resolveCustomerSummary(
+            $validated['customer']['type'],
+            isset($validated['customer']['id']) ? (int)$validated['customer']['id'] : null
+        );
 
         return [$validated, $company, $letterhead, $agency, $customerSummary];
     }
@@ -571,8 +585,20 @@ class QuoteController extends Controller
         })->all();
     }
 
-    private function resolveCustomerSummary(string $type, int $id): array
+    private function resolveCustomerSummary(string $type, ?int $id): array
     {
+        if ($type === 'sin_cliente') {
+            return [
+                'type' => 'sin_cliente',
+                'id' => null,
+                'display_name' => 'Sin cliente',
+                'contact_name' => null,
+                'email' => null,
+                'phone' => null,
+                'rfc' => null,
+            ];
+        }
+
         if ($type === 'lead') {
             $lead = Lead::query()->find($id);
             if ($lead) {
@@ -590,7 +616,7 @@ class QuoteController extends Controller
         return [
             'type' => $type,
             'id' => $id,
-            'display_name' => "{$type} #{$id}",
+            'display_name' => $id ? "{$type} #{$id}" : 'Sin cliente',
             'contact_name' => null,
             'email' => null,
             'phone' => null,
@@ -641,8 +667,8 @@ class QuoteController extends Controller
         $snapshot = is_array($quote->snapshot_json) ? $quote->snapshot_json : [];
         $customerType = $quote->customer_type ?: ($quote->lead_id ? 'lead' : null);
         $customerId = $quote->customer_id ?: $quote->lead_id;
-        $resolvedCustomer = ($customerType && $customerId)
-            ? $this->resolveCustomerSummary($customerType, (int)$customerId)
+        $resolvedCustomer = ($customerType && ($customerId || $customerType === 'sin_cliente'))
+            ? $this->resolveCustomerSummary($customerType, $customerId ? (int)$customerId : null)
             : null;
 
         return [

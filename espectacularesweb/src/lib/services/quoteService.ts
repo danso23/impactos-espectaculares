@@ -7,6 +7,7 @@ import type {
   QuotePayload,
   QuotePreviewResponse,
   QuoteResponse,
+  SearchableCustomerType,
 } from "@/types/Quote"
 
 export function getQuoteCatalogs() {
@@ -34,7 +35,7 @@ export function getQuote(id: number | string) {
 
 export function searchQuoteCustomers(params: {
   q: string
-  type: "lead" | "cliente"
+  type: SearchableCustomerType
 }) {
   const qs = new URLSearchParams({
     q: params.q,

@@ -8,7 +8,7 @@ import {
   previewQuote,
   searchQuoteCustomers,
 } from "@/lib/services/quoteService"
-import type { QuoteListParams, QuotePayload } from "@/types/Quote"
+import type { QuoteListParams, QuotePayload, SearchableCustomerType } from "@/types/Quote"
 
 export function useQuoteCatalogs() {
   const access = tokenStore.getAccess()
@@ -32,14 +32,18 @@ export function useQuotes(params: QuoteListParams) {
   })
 }
 
-export function useQuoteCustomerSearch(query: string, type: "lead" | "cliente") {
+export function useQuoteCustomerSearch(
+  query: string,
+  type: SearchableCustomerType,
+  enabled = true
+) {
   const access = tokenStore.getAccess()
   const deferredQuery = React.useDeferredValue(query.trim())
 
   return useQuery({
     queryKey: ["quotes", "customers", type, deferredQuery],
     queryFn: () => searchQuoteCustomers({ q: deferredQuery, type }),
-    enabled: !!access && deferredQuery.length >= 2,
+    enabled: enabled && !!access && deferredQuery.length >= 2,
     staleTime: 15_000,
   })
 }

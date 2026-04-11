@@ -1,6 +1,7 @@
 import type { ApiListResponse, ApiResponse } from "@/types/Api"
 
-export type CustomerType = "lead" | "cliente"
+export type CustomerType = "lead" | "cliente" | "sin_cliente"
+export type SearchableCustomerType = Exclude<CustomerType, "sin_cliente">
 export type QuoteItemType = "rental" | "service"
 export type QuoteAmountType = "none" | "percent" | "fixed"
 
@@ -59,7 +60,7 @@ export type QuoteCatalogsResponse = ApiResponse<QuoteCatalogs>
 
 export type QuoteCustomer = {
   type: CustomerType
-  id: number
+  id: number | null
   display_name: string
   contact_name?: string | null
   email?: string | null
@@ -92,7 +93,7 @@ export type QuoteItemInput = {
 export type QuotePayload = {
   customer: {
     type: CustomerType
-    id: number
+    id?: number | null
   }
   issuer_company_id: number
   letterhead_id?: number | null
