@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@/components/generic/data-table";
 import { Filter } from "@/components/generic/filter";
-import { Card, CardContent } from "@/components/ui/card";
 import { SpaceForm } from "./spaceForm";
 
 import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
@@ -17,11 +16,16 @@ import {
   useCreateSpace,
   useSpaces,
   useUpdateSpace,
+  useDeleteSpace,
 } from "@/lib/hooks/spaceHook";
 import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper";
 import { useSpaceTable } from "./spaceTable";
 import { asViewType } from "@/lib/helpers/viewTypeHelper";
 import { asSpaceType } from "@/lib/helpers/spaceTypeHelper";
+
+import { Can } from "@/components/auth/Can";
+import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog";
+import { toast } from "sonner";
 
 const initialFilters: FilterValues = {
   dateFrom: undefined,
@@ -46,8 +50,13 @@ export default function SpacePage() {
   const [editOpen, setEditOpen] = React.useState(false);
   const [editingSpace, setEditingSpace] = React.useState<Space | null>(null);
 
+  // Deletion state
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [spaceToDelete, setSpaceToDelete] = React.useState<Space | null>(null);
+
   const createMutation = useCreateSpace();
   const updateMutation = useUpdateSpace();
+  const deleteMutation = useDeleteSpace();
 
   React.useEffect(() => {
     const t = window.setTimeout(() => {
@@ -84,7 +93,6 @@ export default function SpacePage() {
 
   const meta = spacesQuery.data?.meta;
   const totalPages = meta?.totalPages ?? 1;
-  const total = meta?.total ?? rowsApi.length;
 
   const data: Space[] = React.useMemo(
     () => rowsApi.map(apiToUiSpace),
@@ -96,21 +104,58 @@ export default function SpacePage() {
       setEditingSpace(row);
       setEditOpen(true);
     },
-    onDelete: async (row) => {
-      const ok = confirm(`¿Eliminar "${row.title}"?`);
-      if (!ok) return;
-      console.log("Eliminar", row.id);
+    onDelete: (row) => {
+      setSpaceToDelete(row);
+      setDeleteDialogOpen(true);
     },
   });
 
+  const handleConfirmDelete = async () => {
+    if (!spaceToDelete) return;
+    try {
+      await deleteMutation.mutateAsync(spaceToDelete.id);
+      toast.success("Espacio eliminado correctamente.");
+      setDeleteDialogOpen(false);
+    } catch {
+      toast.error("No se pudo eliminar el espacio.");
+    } finally {
+      setSpaceToDelete(null);
+    }
+  };
+
   const selectedSpaces = React.useMemo(() => {
-    return rowsApi.filter((space) => rowSelection[String(space.id)]);
-  }, [rowSelection, rowsApi]);
+    return data.filter((space) => rowSelection[String(space.id)]);
+  }, [rowSelection, data]);
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Espacios</h1>
+          <p className="text-gray-600">Gestiona los espacios publicitarios disponibles.</p>
+        </div>
+        
+        <div className="flex gap-3">
+          <Can role="admin">
+            <SpaceForm
+              mode="create"
+              trigger={
+                <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-6 py-6 shadow-lg transform hover:-translate-y-0.5 transition-all border-none">
+                  Agregar espacio
+                </Button>
+              }
+              onSubmit={async (payload) => {
+                await createMutation.mutateAsync(payload);
+              }}
+              isSubmitting={createMutation.isPending}
+              onSaved={() => spacesQuery.refetch()}
+            />
+          </Can>
+        </div>
+      </div>
+
       <Filter
-        title="Filtros de espacios"
+        title="Filtros de búsqueda"
         enableDateRange
         initialValues={filters}
         defaultOpen={false}
@@ -152,7 +197,7 @@ export default function SpacePage() {
           <>
             <Button
               variant="outline"
-              className="flex gap-2"
+              className="flex gap-2 rounded-lg border-gray-300 hover:bg-purple-50 hover:text-purple-600"
               disabled={selectedSpaces.length === 0}
               onClick={() => downloadSpacesCatalog(selectedSpaces)}
             >
@@ -162,6 +207,7 @@ export default function SpacePage() {
 
             <Button
               disabled={selectedSpaces.length === 0}
+              className="rounded-lg bg-gray-500 hover:bg-gray-600 text-white shadow-md transition-all disabled:opacity-50"
               onClick={() => {
                 navigate("/cotizaciones/nueva", {
                   state: { spaces: selectedSpaces },
@@ -170,23 +216,10 @@ export default function SpacePage() {
             >
               Crear cotización
             </Button>
-
-            <SpaceForm
-              mode="create"
-              trigger={
-                <Button className="shrink-0">
-                  Agregar
-                </Button>
-              }
-              onSubmit={async (payload) => {
-                await createMutation.mutateAsync(payload);
-              }}
-              isSubmitting={createMutation.isPending}
-              onSaved={() => spacesQuery.refetch()}
-            />
           </>
         }
       />
+
       {editingSpace ? (
         <SpaceForm
           mode="edit"
@@ -229,32 +262,35 @@ export default function SpacePage() {
         />
       ) : null}
 
-      <Card>
-        <CardContent className="py-2">
-          <DataTable
-            title={`Espacios (${total})`}
-            columns={columns}
-            data={data}
-            enableSearch
-            getRowId={(row) => String(row.id)}
-            rowSelection={rowSelection}
-            onRowSelectionChange={setRowSelection}
-            searchPlaceholder="Buscar..."
-            searchValue={searchInput}
-            onSearchChange={(v) => {
-              setSearchInput(v);
-              setPage(1);
-            }}
-            pageSize={perPage}
-            enablePagination
-            manualPagination
-            pageIndex={(meta?.page ?? page) - 1}
-            pageCount={totalPages}
-            onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
-            isLoading={spacesQuery.isFetching}
-          />
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={columns}
+        data={data}
+        enableSearch
+        getRowId={(row) => String(row.id)}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
+        searchPlaceholder="Buscar..."
+        searchValue={searchInput}
+        onSearchChange={(v) => {
+          setSearchInput(v);
+          setPage(1);
+        }}
+        pageSize={perPage}
+        enablePagination
+        manualPagination
+        pageIndex={(meta?.page ?? page) - 1}
+        pageCount={totalPages}
+        onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
+        isLoading={spacesQuery.isFetching}
+      />
+
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleConfirmDelete}
+        itemName={spaceToDelete?.title}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -4,47 +4,124 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Entities\User;
-use Tymon\JWTAuth\Facades\JWTAuth;
+use App\Models\Entities\RefreshToken;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
 
 class AuthController extends Controller
 {
+    private function issueAccessToken(User $user): array
+    {
+        $user->api_token = Str::random(60);
+        $user->create_token = Carbon::now();
+        $user->save();
+
+        return [
+            'access_token' => $user->api_token,
+            'expires_in' => max(1, (int) env('ACCESS_TTL_MINUTES', 30)) * 60,
+        ];
+    }
+
+    private function issueRefreshToken(User $user): array
+    {
+        $days = max(1, (int) env('REFRESH_TTL_DAYS', 30));
+        $plain = Str::random(64);
+
+        RefreshToken::create([
+            'user_id' => $user->id,
+            'token_hash' => hash('sha256', $plain),
+            'expires_at' => Carbon::now()->addDays($days),
+        ]);
+
+        return [
+            'refresh_token' => $plain,
+            'refresh_expires_in' => Carbon::now()->addDays($days)->timestamp,
+        ];
+    }
+
+    private function userPayload(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'username' => $user->username,
+            'role' => $user->role,
+            'roles' => $user->getRoleNames(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+        ];
+    }
+
     public function login(Request $request)
     {
-        // Validar los datos
         $this->validate($request, [
             'username' => 'required|string',
             'password' => 'required|string',
         ]);
 
-        // Buscar al usuario por nombre de usuario
         $user = User::where('username', $request->username)->first();
-        // Verificar la contraseña
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Credenciales incorrectas'], 401);
         }
 
-        $user->api_token = Str::random(60);
-        $user->create_token = Carbon::now();
-        // $user->save();
-        $user->update([
-            'api_token' => $user->api_token,
-            'create_token' => $user->create_token,
-        ]);
+        $access = $this->issueAccessToken($user);
+        $refresh = $this->issueRefreshToken($user);
 
         return response()->json([
             'message' => 'Inicio de sesión exitoso',
-            'access_token' => $user->api_token,
-            'expires_in' => max(1, (int) env('ACCESS_TTL_MINUTES', 30)) * 60,
+            ...$access,
+            ...$refresh,
             'token_type' => 'Bearer',
-            //'user' => $user,
+            'user' => $this->userPayload($user),
         ],200);
+    }
+
+    public function refresh(Request $request)
+    {
+        $this->validate($request, [
+            'refresh_token' => 'required|string',
+        ]);
+
+        $plain = $request->input('refresh_token');
+        $stored = RefreshToken::query()
+            ->where('token_hash', hash('sha256', $plain))
+            ->first();
+
+        if (!$stored) {
+            return response()->json(['message' => 'Refresh token inválido'], 401);
+        }
+
+        if ($stored->revoked_at !== null) {
+            return response()->json(['message' => 'Refresh token revocado'], 401);
+        }
+
+        if (Carbon::parse($stored->expires_at)->isPast()) {
+            return response()->json(['message' => 'Refresh token expirado'], 401);
+        }
+
+        $user = User::query()->find($stored->user_id);
+        if (!$user) {
+            return response()->json(['message' => 'Usuario no encontrado'], 401);
+        }
+
+        $access = $this->issueAccessToken($user);
+        $refresh = $this->issueRefreshToken($user);
+
+        $stored->revoked_at = Carbon::now();
+        $stored->replaced_by_hash = hash('sha256', $refresh['refresh_token']);
+        $stored->save();
+
+        return response()->json([
+            'message' => 'Token actualizado correctamente',
+            ...$access,
+            ...$refresh,
+            'token_type' => 'Bearer',
+            'user' => $this->userPayload($user),
+        ]);
     }
 
     public function sendResetLink(Request $request)
@@ -201,6 +278,19 @@ class AuthController extends Controller
 
         if (!$user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $refreshToken = $request->input('refresh_token');
+        if (!empty($refreshToken)) {
+            $stored = RefreshToken::query()
+                ->where('token_hash', hash('sha256', $refreshToken))
+                ->whereNull('revoked_at')
+                ->first();
+
+            if ($stored) {
+                $stored->revoked_at = Carbon::now();
+                $stored->save();
+            }
         }
 
         $user->api_token = null;

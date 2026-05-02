@@ -14,22 +14,15 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ReceiptText,
+  Shield,
+  UserCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { LogoutButton } from "./components/auth/logout-button";
 import { LoginPage } from "./pages/auth/login";
+import { Can } from "@/components/auth/Can";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -39,12 +32,21 @@ import QuoteCreatePage from "@/pages/quotes/quoteCreatePage";
 import QuotesPage from "@/pages/quotes/quotesPage";
 import LeadsPage from "@/pages/crm/leadsPage";
 import ClientsPage from "@/pages/crm/clientsPage";
+import RolePage from "./pages/rolePage";
 
-const NAV = [
+type NavItem = {
+  to: string;
+  label: string;
+  icon: React.ElementType;
+  roles?: string[];
+};
+
+const NAV: readonly NavItem[] = [
   { to: "/espacios", label: "Espacios", icon: PanelsTopLeft },
   { to: "/cotizaciones", label: "Cotizaciones", icon: ReceiptText },
   { to: "/rentas", label: "Rentas", icon: BadgeDollarSign },
-  { to: "/usuarios", label: "Usuarios", icon: UserCog },
+  { to: "/usuarios", label: "Usuarios", icon: UserCog, roles: ["admin"] },
+  { to: "/roles", label: "Roles", icon: Shield, roles: ["admin"] },
   { to: "/pagos", label: "Pagos", icon: HandCoins },
   { to: "/prospectos", label: "Prospectos", icon: Users },
   { to: "/clientes", label: "Clientes", icon: Contact2 },
@@ -91,20 +93,20 @@ function AppLayout() {
   };
 
   return (
-    <div className="h-dvh bg-background text-foreground">
+    <div className="h-dvh bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 text-foreground overflow-hidden">
       <div className="flex h-full">
         {/* Sidebar */}
         <aside
           className={cn(
-            "hidden shrink-0 border-r border-border transition-[width] duration-200 md:flex md:flex-col",
+            "hidden shrink-0 border-r border-gray-200 bg-white transition-[width] duration-200 md:flex md:flex-col shadow-lg z-50",
             sidebarCollapsed ? "w-20" : "w-64",
           )}
         >
-          {/* Header usuario */}
+          {/* Header usuario con degradado */}
           <div
             className={cn(
-              "border-b border-border",
-              sidebarCollapsed ? "px-3 py-4" : "p-4",
+              "bg-gradient-to-r from-purple-600 to-indigo-600 p-6",
+              sidebarCollapsed ? "px-3 py-6" : "p-6",
             )}
           >
             <div
@@ -113,15 +115,15 @@ function AppLayout() {
                 sidebarCollapsed ? "justify-center" : "gap-3",
               )}
             >
-              <Avatar>
-                <AvatarFallback>U</AvatarFallback>
-              </Avatar>
+              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-purple-600 font-semibold shadow-md shrink-0">
+                {displayName.charAt(0).toUpperCase()}
+              </div>
               {!sidebarCollapsed ? (
                 <div className="min-w-0">
-                  <div className="truncate font-medium leading-tight">
+                  <div className="truncate font-semibold text-white leading-tight">
                     {displayName}
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">
+                  <div className="truncate text-xs text-purple-100">
                     {displayEmail}
                   </div>
                 </div>
@@ -130,136 +132,95 @@ function AppLayout() {
           </div>
 
           {/* Nav scrollable */}
-          <ScrollArea className="flex-1 p-2">
-            <nav className="space-y-1">
-              {NAV.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  title={label}
-                  end={to !== "/cotizaciones"}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center rounded-md py-2 text-sm transition-colors",
-                      sidebarCollapsed
-                        ? "justify-center px-2"
-                        : "gap-3 px-3",
-                      isActive
-                        ? "bg-muted font-semibold text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {!sidebarCollapsed ? <span>{label}</span> : null}
-                </NavLink>
-              ))}
+          <ScrollArea className="flex-1 py-4">
+            <nav className="space-y-0.5">
+              {NAV.map((item) => {
+                const { to, label, icon: Icon, roles } = item;
+                
+                return (
+                  <Can key={to} roles={roles} fallback={null}>
+                    <NavLink
+                      to={to}
+                      title={label}
+                      end={to !== "/cotizaciones"}
+                      className={({ isActive }) =>
+                        cn(
+                          "flex items-center py-3 text-sm transition-all border-l-4",
+                          sidebarCollapsed
+                            ? "justify-center px-2"
+                            : "gap-3 px-6",
+                          isActive
+                            ? "bg-gradient-to-r from-purple-100 to-indigo-100 border-purple-600 text-purple-700 font-medium"
+                            : "border-transparent text-gray-600 hover:bg-purple-50 hover:text-purple-600",
+                        )
+                      }
+                    >
+                      <Icon className="h-5 w-5" />
+                      {!sidebarCollapsed ? <span>{label}</span> : null}
+                    </NavLink>
+                  </Can>
+                );
+              })}
             </nav>
           </ScrollArea>
 
           {/* Footer */}
-          <div className={cn("border-t border-border", sidebarCollapsed ? "p-3" : "p-4")}>
+          <div className={cn("p-4 bg-gray-50 border-t border-gray-200", sidebarCollapsed ? "p-3" : "p-4")}>
             <LogoutButton compact={sidebarCollapsed} fullWidth={!sidebarCollapsed} />
           </div>
         </aside>
 
         {/* Right panel */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Topbar fijo */}
-          <div className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 items-center justify-between px-3 sm:px-4">
-              <div className="flex items-center gap-2">
-                {/* Mobile menu trigger */}
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="md:hidden"
-                      aria-label="Abrir menú"
-                    >
-                      <Menu className="h-5 w-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="w-72 p-0">
-                    <SheetHeader>
-                      <VisuallyHidden>
-                        <SheetTitle>Menú principal</SheetTitle>
-                      </VisuallyHidden>
-                    </SheetHeader>
-                    <div className="flex h-full flex-col">
-                      <div className="border-b border-border p-4 pr-12">
-                        <div className="flex items-center gap-3">
-                          <Avatar>
-                            <AvatarFallback>U</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0">
-                            <div className="truncate font-medium leading-tight">
-                              {displayName}
-                            </div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {displayEmail}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <ScrollArea className="flex-1 p-2">
-                        <nav className="space-y-1">
-                          {NAV.map(({ to, label, icon: Icon }) => (
-                            <SheetClose asChild key={to}>
-                              <NavLink
-                                to={to}
-                                title={label}
-                                end={to !== "/cotizaciones"}
-                                className={({ isActive }) =>
-                                  cn(
-                                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                                    isActive
-                                      ? "bg-muted font-semibold text-foreground"
-                                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                                  )
-                                }
-                              >
-                                <Icon className="h-4 w-4" />
-                                <span>{label}</span>
-                              </NavLink>
-                            </SheetClose>
-                          ))}
-                        </nav>
-                      </ScrollArea>
-
-                      <div className="border-t border-border p-4">
-                        <LogoutButton fullWidth />
-                      </div>
-                    </div>
-                  </SheetContent>
-                </Sheet>
+        <div className="flex min-w-0 flex-1 flex-col relative">
+          {/* Topbar fijo tipo Figma */}
+          <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={() => {}} // Handle mobile menu elsewhere via Sheet
+                >
+                  <Menu className="h-5 w-5 text-gray-600" />
+                </Button>
+                
+                <div className="hidden md:flex items-center gap-3">
+                   <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                    <UserCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                    Espectaculares
+                  </span>
+                </div>
 
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="hidden md:inline-flex"
-                  aria-label={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
-                  title={sidebarCollapsed ? "Expandir menú" : "Colapsar menú"}
+                  className="hidden md:inline-flex ml-4"
                   onClick={toggleSidebar}
                 >
                   {sidebarCollapsed ? (
-                    <PanelLeftOpen className="h-5 w-5" />
+                    <PanelLeftOpen className="h-5 w-5 text-gray-500" />
                   ) : (
-                    <PanelLeftClose className="h-5 w-5" />
+                    <PanelLeftClose className="h-5 w-5 text-gray-500" />
                   )}
                 </Button>
-
-                <div className="text-lg font-medium">Espectaculares</div>
               </div>
+
+              {/* Mobile title only */}
+              <span className="md:hidden text-lg font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                Espectaculares
+              </span>
             </div>
           </div>
 
-          {/* Scroll del contenido */}
-          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
-            <Outlet />
-          </div>
+          {/* Contenido principal con scroll */}
+          <main className="flex-1 overflow-y-auto">
+            <div className="p-8 h-full">
+               <Outlet />
+            </div>
+          </main>
         </div>
       </div>
     </div>
@@ -272,11 +233,13 @@ export default function AppRoot() {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
+          <Route path="/" element={<Navigate to="/espacios" replace />} />
           <Route path="espacios" element={<SpacePage />} />
           <Route path="cotizaciones" element={<QuotesPage />} />
           <Route path="cotizaciones/nueva" element={<QuoteCreatePage />} />
           <Route path="rentas" element={<RouteStub title="Rentas" />} />
           <Route path="usuarios" element={<UsersPage />} />
+          <Route path="roles" element={<RolePage />} />
           <Route path="pagos" element={<RouteStub title="Pagos" />} />
           <Route path="prospectos" element={<LeadsPage />} />
           <Route path="clientes" element={<ClientsPage />} />

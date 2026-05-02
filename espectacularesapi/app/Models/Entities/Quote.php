@@ -25,6 +25,8 @@ class Quote extends Model
         'commission_value' => 'decimal:2',
         'commission_amount' => 'decimal:2',
         'snapshot_json' => 'array',
+        'accepted_at' => 'datetime',
+        'converted_to_rental_at' => 'datetime',
         'valid_until' => 'date:Y-m-d',
         'pdf_generated_at' => 'datetime',
     ];
@@ -57,5 +59,20 @@ class Quote extends Model
     public function agency()
     {
         return $this->belongsTo(Agency::class, 'agency_id');
+    }
+
+    public function acceptedByUser()
+    {
+        return $this->belongsTo(User::class, 'accepted_by');
+    }
+
+    public function convertedToRentalByUser()
+    {
+        return $this->belongsTo(User::class, 'converted_to_rental_by');
+    }
+
+    public function rental()
+    {
+        return $this->hasOne(Rental::class, 'quote_id');
     }
 }

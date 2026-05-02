@@ -1,6 +1,7 @@
 import type { ApiListResponse, ApiResponse } from "@/types/Api"
 
-export type CustomerType = "lead" | "cliente"
+export type CustomerType = "lead" | "cliente" | "sin_cliente"
+export type SearchableCustomerType = Exclude<CustomerType, "sin_cliente">
 export type QuoteItemType = "rental" | "service"
 export type QuoteAmountType = "none" | "percent" | "fixed"
 
@@ -47,6 +48,21 @@ export type QuoteStatus = {
   color?: string | null
 }
 
+export type QuoteStatusActor = {
+  id: number
+  name?: string | null
+  username?: string | null
+  email?: string | null
+}
+
+export type QuoteRentalSummary = {
+  id: number
+  status: string
+  starts_at?: string | null
+  ends_at?: string | null
+  total: number
+}
+
 export type QuoteCatalogs = {
   companies: QuoteCatalogCompany[]
   letterheads: QuoteCatalogLetterhead[]
@@ -59,7 +75,7 @@ export type QuoteCatalogsResponse = ApiResponse<QuoteCatalogs>
 
 export type QuoteCustomer = {
   type: CustomerType
-  id: number
+  id: number | null
   display_name: string
   contact_name?: string | null
   email?: string | null
@@ -92,7 +108,7 @@ export type QuoteItemInput = {
 export type QuotePayload = {
   customer: {
     type: CustomerType
-    id: number
+    id?: number | null
   }
   issuer_company_id: number
   letterhead_id?: number | null
@@ -174,6 +190,11 @@ export type QuoteRecord = {
   includes_tax: boolean
   tax_rate: number
   totals: QuoteTotals
+  accepted_at?: string | null
+  accepted_by?: QuoteStatusActor | null
+  converted_to_rental_at?: string | null
+  converted_to_rental_by?: QuoteStatusActor | null
+  rental?: QuoteRentalSummary | null
   valid_until?: string | null
   notes?: string | null
   terms_html?: string | null
@@ -185,6 +206,34 @@ export type QuoteRecord = {
 }
 
 export type QuoteResponse = ApiResponse<QuoteRecord>
+
+export type QuoteStatusHistoryEntry = {
+  id: number
+  changed_at?: string | null
+  reason?: string | null
+  notes?: string | null
+  from_status?: QuoteStatus | null
+  to_status: QuoteStatus | null
+  changed_by?: QuoteStatusActor | null
+  meta?: Record<string, unknown> | null
+}
+
+export type QuoteStatusHistoryResponse = {
+  data: QuoteStatusHistoryEntry[]
+}
+
+export type QuoteStatusChangePayload = {
+  to_status: string | number
+  reason?: string | null
+  notes?: string | null
+}
+
+export type QuoteConvertToRentalPayload = {
+  customer?: {
+    type: SearchableCustomerType
+    id: number
+  } | null
+}
 
 export type QuoteListParams = {
   page?: number

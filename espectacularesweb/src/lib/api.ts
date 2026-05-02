@@ -25,13 +25,17 @@ async function refreshToken(): Promise<string> {
 
   if (!res.ok) throw new Error(data?.message ?? "Refresh failed")
 
-  if (data?.access_token) localStorage.setItem("token", data.access_token)
+  if (data?.access_token) {
+    localStorage.setItem("token", data.access_token)
+    localStorage.setItem("access_token", data.access_token)
+  }
   if (data?.refresh_token) localStorage.setItem("refresh_token", data.refresh_token)
 
   return data.access_token as string
 }
 
 function forceLogoutToLogin() {
+  localStorage.removeItem("access_token")
   localStorage.removeItem("token")
   localStorage.removeItem("refresh_token")
   localStorage.removeItem("user")
