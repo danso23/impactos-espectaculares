@@ -24,23 +24,35 @@ $router->post('/auth/refresh', 'AuthController@refresh');
 $router->group(['prefix' => 'api'], function () use ($router) {
 
     $router->post('login', ['uses' => 'AuthController@login']);
-    $router->post('logout', ['uses' => 'AuthController@logout']);
 
     $router->group(['middleware' => 'authToken'], function () use ($router) {
 
+        $router->post('logout', ['uses' => 'AuthController@logout']);
         $router->get('me', function (\Illuminate\Http\Request $request) {
             return response()->json($request->attributes->get('auth_user'));
         });
 
+        /** USERS **/
+        $router->get('users', ['uses' => 'UserController@index']);
+        $router->get('users/{id}', ['uses' => 'UserController@show']);
+        $router->post('users', ['uses' => 'UserController@store']);
+        $router->put('users/{id}', ['uses' => 'UserController@update']);
+        $router->patch('users/{id}', ['uses' => 'UserController@update']);
+        $router->delete('users/{id}', ['uses' => 'UserController@destroy']);
+        
+        /** ROLES **/
+        $router->get('roles', ['uses' => 'RoleController@index']);
+
+        /** SPACES **/
         $router->post('spaces', ['uses' => 'SpaceController@store']);
         $router->get('spaces', ['uses' => 'SpaceController@index']);
         $router->get('spaces/coords', ['uses' => 'SpaceController@coords']);
         $router->get('spaces/{spaceId}/images/{imageId}', ['uses' => 'SpaceController@image']);
-
         $router->put('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->delete('spaces/{id}', ['uses' => 'SpaceController@delete']);
 
+        /** QUOTES AND LEADS **/
         $router->get('quote-catalogs', ['uses' => 'QuoteController@catalogs']);
         $router->get('lead-catalogs', ['uses' => 'LeadController@catalogs']);
         $router->get('leads', ['uses' => 'LeadController@index']);
@@ -55,5 +67,6 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->get('quotes/{id}', ['uses' => 'QuoteController@show']);
         $router->get('quotes/{id}/history', ['uses' => 'QuoteController@history']);
         $router->post('quotes/{id}/status', ['uses' => 'QuoteController@changeStatus']);
+        $router->post('quotes/{id}/convert-to-rental', ['uses' => 'QuoteController@convertToRental']);
     });
 });

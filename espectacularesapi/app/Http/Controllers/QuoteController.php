@@ -9,6 +9,8 @@ use App\Models\Entities\CompanyLetterhead;
 use App\Models\Entities\Lead;
 use App\Models\Entities\Quote;
 use App\Models\Entities\QuoteItem;
+use App\Models\Entities\Rental;
+use App\Models\Entities\RentalItem;
 use App\Models\Entities\QuoteStatus;
 use App\Models\Entities\QuoteStatusHistory;
 use App\Models\Entities\ServiceCatalog;
@@ -132,7 +134,7 @@ class QuoteController extends Controller
         $q = trim((string)$request->query('q', ''));
 
         $query = Quote::query()
-            ->with(['status', 'company', 'letterhead', 'agency'])
+            ->with(['status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser'])
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
@@ -192,6 +194,9 @@ class QuoteController extends Controller
                 'company',
                 'letterhead',
                 'agency',
+                'rental',
+                'acceptedByUser',
+                'convertedToRentalByUser',
             ])
             ->findOrFail($id);
 
@@ -205,7 +210,7 @@ class QuoteController extends Controller
         $quote = Quote::query()->findOrFail($id);
 
         $history = QuoteStatusHistory::query()
-            ->with(['fromStatus', 'toStatus'])
+            ->with(['fromStatus', 'toStatus', 'changedByUser'])
             ->where('quote_id', $quote->id)
             ->orderByDesc('changed_at')
             ->orderByDesc('id')
@@ -225,6 +230,12 @@ class QuoteController extends Controller
                         'id' => $entry->toStatus->id,
                         'key' => $entry->toStatus->key,
                         'name' => $entry->toStatus->name,
+                    ] : null,
+                    'changed_by' => $entry->changedByUser ? [
+                        'id' => $entry->changedByUser->id,
+                        'name' => $entry->changedByUser->name,
+                        'username' => $entry->changedByUser->username,
+                        'email' => $entry->changedByUser->email,
                     ] : null,
                     'meta' => $entry->meta,
                 ];
@@ -346,7 +357,7 @@ class QuoteController extends Controller
             return $quote;
         });
 
-        $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency']);
+        $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
 
         return response()->json([
             'message' => 'Cotización creada correctamente',
@@ -390,8 +401,18 @@ class QuoteController extends Controller
             ], 422);
         }
 
+        if (!$this->canTransitionQuoteStatus($quote->status?->key, $toStatus->key)) {
+            return response()->json([
+                'message' => 'La transición de estatus no está permitida.',
+            ], 422);
+        }
+
         $fromStatusId = $quote->quote_status_id;
         $quote->quote_status_id = $toStatus->id;
+        if ($toStatus->key === 'accepted' && !$quote->accepted_at) {
+            $quote->accepted_at = Carbon::now();
+            $quote->accepted_by = $this->authUserId($request);
+        }
         $quote->save();
 
         $this->recordHistory(
@@ -413,10 +434,175 @@ class QuoteController extends Controller
             ],
         );
 
-        $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency']);
+        $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
 
         return response()->json([
             'message' => 'Estatus actualizado correctamente',
+            'data' => $this->serializeQuote($quote, true),
+        ]);
+    }
+
+    public function convertToRental(Request $request, $id)
+    {
+        $quote = Quote::query()
+            ->with(['items', 'status', 'company', 'agency', 'rental'])
+            ->findOrFail($id);
+
+        if (($quote->status?->key ?? null) !== 'accepted') {
+            return response()->json([
+                'message' => 'Solo las cotizaciones aceptadas pueden convertirse a renta.',
+            ], 422);
+        }
+
+        if ($quote->converted_to_rental_at || $quote->rental) {
+            return response()->json([
+                'message' => 'La cotización ya fue convertida a renta.',
+            ], 422);
+        }
+
+        $customerType = $quote->customer_type;
+        $customerId = $quote->customer_id;
+        $customerSummary = $quote->snapshot_json['customer'] ?? null;
+
+        if (($quote->customer_type ?? null) === 'sin_cliente' || empty($quote->customer_id)) {
+            $customerPayload = $request->input('customer', []);
+            $customerType = $customerPayload['type'] ?? null;
+            $customerId = $customerPayload['id'] ?? null;
+
+            if (!in_array($customerType, ['lead', 'cliente'], true) || empty($customerId)) {
+                return response()->json([
+                    'message' => 'Debes asignar un cliente o prospecto antes de convertir a renta.',
+                ], 422);
+            }
+
+            if ($customerType === 'lead' && !Lead::query()->whereKey($customerId)->exists()) {
+                return response()->json([
+                    'message' => 'El lead seleccionado no existe.',
+                ], 422);
+            }
+
+            if ($customerType === 'cliente') {
+                if (!Schema::hasTable('clientes') || !DB::table('clientes')->where('id', $customerId)->exists()) {
+                    return response()->json([
+                        'message' => 'El cliente seleccionado no existe.',
+                    ], 422);
+                }
+            }
+
+            $customerSummary = $this->resolveCustomerSummary($customerType, (int) $customerId);
+        }
+
+        $rentalItems = $quote->items
+            ->where('item_type', 'rental')
+            ->values();
+
+        if ($rentalItems->isEmpty()) {
+            return response()->json([
+                'message' => 'La cotización no contiene rentas para convertir.',
+            ], 422);
+        }
+
+        $userId = $this->authUserId($request);
+
+        $rental = DB::transaction(function () use ($quote, $rentalItems, $userId, $request, $customerType, $customerId, $customerSummary) {
+            $startsAt = $rentalItems->min(fn (QuoteItem $item) => optional($item->start_date)->format('Y-m-d'));
+            $endsAt = $rentalItems->max(fn (QuoteItem $item) => optional($item->end_date)->format('Y-m-d'));
+            $subtotal = round((float) $rentalItems->sum(fn (QuoteItem $item) => (float) $item->subtotal), 2);
+            $tax = round((float) $rentalItems->sum(fn (QuoteItem $item) => (float) $item->tax_amount), 2);
+            $total = round((float) $rentalItems->sum(fn (QuoteItem $item) => (float) $item->total), 2);
+
+            if (($quote->customer_type ?? null) === 'sin_cliente' || empty($quote->customer_id)) {
+                $snapshot = is_array($quote->snapshot_json) ? $quote->snapshot_json : [];
+                $snapshot['customer'] = $customerSummary;
+
+                $quote->customer_type = $customerType;
+                $quote->customer_id = (int) $customerId;
+                $quote->lead_id = $customerType === 'lead' ? (int) $customerId : null;
+                $quote->snapshot_json = $snapshot;
+                $quote->save();
+            }
+
+            $rental = Rental::create([
+                'quote_id' => $quote->id,
+                'customer_type' => $quote->customer_type,
+                'customer_id' => $quote->customer_id,
+                'agency_id' => $quote->agency_id,
+                'issuer_company_id' => $quote->issuer_company_id,
+                'created_by' => $userId,
+                'status' => 'draft',
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'total' => $total,
+                'notes' => $quote->notes,
+                'snapshot_json' => [
+                    'quote' => [
+                        'id' => $quote->id,
+                        'folio' => $quote->folio,
+                        'version' => $quote->version,
+                        'accepted_at' => optional($quote->accepted_at)->toDateTimeString(),
+                    ],
+                    'customer' => $quote->snapshot_json['customer'] ?? null,
+                    'company' => $quote->snapshot_json['company'] ?? null,
+                    'agency' => $quote->snapshot_json['agency'] ?? null,
+                    'items' => $rentalItems->map(function (QuoteItem $item) {
+                        return [
+                            'quote_item_id' => $item->id,
+                            'space_id' => $item->space_id,
+                            'concept' => $item->concept,
+                            'start_date' => optional($item->start_date)->format('Y-m-d'),
+                            'end_date' => optional($item->end_date)->format('Y-m-d'),
+                            'qty' => (int) $item->qty,
+                            'unit_price' => (float) $item->unit_price,
+                            'subtotal' => (float) $item->subtotal,
+                            'tax_amount' => (float) $item->tax_amount,
+                            'total' => (float) $item->total,
+                            'notes' => $item->notes,
+                        ];
+                    })->values()->all(),
+                ],
+            ]);
+
+            foreach ($rentalItems as $item) {
+                RentalItem::create([
+                    'rental_id' => $rental->id,
+                    'quote_item_id' => $item->id,
+                    'space_id' => $item->space_id,
+                    'start_date' => optional($item->start_date)->format('Y-m-d'),
+                    'end_date' => optional($item->end_date)->format('Y-m-d'),
+                    'unit_price' => $item->unit_price,
+                    'qty' => $item->qty,
+                    'subtotal' => $item->subtotal,
+                    'status' => 'active',
+                ]);
+            }
+
+            $quote->converted_to_rental_at = Carbon::now();
+            $quote->converted_to_rental_by = $userId;
+            $quote->save();
+
+            $this->recordHistory(
+                quote: $quote,
+                fromStatusId: $quote->quote_status_id,
+                toStatusId: $quote->quote_status_id,
+                request: $request,
+                reason: 'converted_to_rental',
+                notes: "Renta #{$rental->id} creada desde cotización aceptada.",
+                meta: [
+                    'event' => 'converted_to_rental',
+                    'rental_id' => $rental->id,
+                    'quote_folio' => $quote->folio,
+                ],
+            );
+
+            return $rental;
+        });
+
+        $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
+
+        return response()->json([
+            'message' => "Cotización convertida a renta #{$rental->id}.",
             'data' => $this->serializeQuote($quote, true),
         ]);
     }
@@ -720,6 +906,27 @@ class QuoteController extends Controller
                 'tax' => (float)$quote->tax,
                 'total' => (float)$quote->total,
             ],
+            'accepted_at' => optional($quote->accepted_at)->toDateTimeString(),
+            'accepted_by' => $quote->acceptedByUser ? [
+                'id' => $quote->acceptedByUser->id,
+                'name' => $quote->acceptedByUser->name,
+                'username' => $quote->acceptedByUser->username,
+                'email' => $quote->acceptedByUser->email,
+            ] : null,
+            'converted_to_rental_at' => optional($quote->converted_to_rental_at)->toDateTimeString(),
+            'converted_to_rental_by' => $quote->convertedToRentalByUser ? [
+                'id' => $quote->convertedToRentalByUser->id,
+                'name' => $quote->convertedToRentalByUser->name,
+                'username' => $quote->convertedToRentalByUser->username,
+                'email' => $quote->convertedToRentalByUser->email,
+            ] : null,
+            'rental' => $quote->rental ? [
+                'id' => $quote->rental->id,
+                'status' => $quote->rental->status,
+                'starts_at' => optional($quote->rental->starts_at)->format('Y-m-d'),
+                'ends_at' => optional($quote->rental->ends_at)->format('Y-m-d'),
+                'total' => (float) $quote->rental->total,
+            ] : null,
             'valid_until' => optional($quote->valid_until)->format('Y-m-d'),
             'notes' => $quote->notes,
             'terms_html' => $quote->terms_html,
@@ -796,6 +1003,24 @@ class QuoteController extends Controller
     private function buildFolio(int $id): string
     {
         return sprintf('COT-%s-%05d', date('Y'), $id);
+    }
+
+    private function canTransitionQuoteStatus(?string $fromStatusKey, ?string $toStatusKey): bool
+    {
+        if (!$fromStatusKey || !$toStatusKey || $fromStatusKey === $toStatusKey) {
+            return false;
+        }
+
+        $transitions = [
+            'draft' => ['sent', 'cancelled'],
+            'sent' => ['draft', 'accepted', 'rejected', 'expired', 'cancelled'],
+            'expired' => ['sent', 'cancelled'],
+            'accepted' => [],
+            'rejected' => [],
+            'cancelled' => [],
+        ];
+
+        return in_array($toStatusKey, $transitions[$fromStatusKey] ?? [], true);
     }
 
     private function recordHistory(
