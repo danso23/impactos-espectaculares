@@ -196,17 +196,17 @@ export function DataTable<TData>({
     : table.getCanNextPage();
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-6", className)}>
       {(title || description || enableSearch || renderToolbar) && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            {title && <div className="text-base font-semibold">{title}</div>}
+            {title && <div className="text-2xl font-bold text-gray-800">{title}</div>}
             {description && (
-              <div className="text-sm text-muted-foreground">{description}</div>
+              <div className="text-sm text-gray-600">{description}</div>
             )}
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
             {renderToolbar?.(table)}
 
             {enableSearch && (
@@ -214,20 +214,20 @@ export function DataTable<TData>({
                 value={searchText}
                 onChange={(e) => handleSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="sm:w-64"
+                className="sm:w-72 rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 bg-white"
               />
             )}
           </div>
         </div>
       )}
 
-      <div className="rounded-md">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className="px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -240,7 +240,7 @@ export function DataTable<TData>({
             ))}
           </TableHeader>
 
-          <TableBody>
+          <TableBody className="divide-y divide-gray-100">
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
@@ -249,11 +249,12 @@ export function DataTable<TData>({
                     onRowClick ? () => onRowClick(row.original) : undefined
                   }
                   className={cn(
-                    onRowClick && "cursor-pointer hover:bg-muted/50",
+                    "hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-colors",
+                    onRowClick && "cursor-pointer",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="px-6 py-4 text-gray-700">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),
@@ -266,7 +267,7 @@ export function DataTable<TData>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-32 text-center text-gray-500 italic"
                 >
                   Sin resultados.
                 </TableCell>
@@ -277,15 +278,16 @@ export function DataTable<TData>({
       </div>
 
       {enablePagination && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Página {currentPage} de {totalPages}
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm font-medium text-gray-600">
+            Página <span className="text-purple-600">{currentPage}</span> de <span className="text-purple-600">{totalPages}</span>
           </div>
 
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
+              className="rounded-lg px-4 border-gray-300 hover:bg-purple-50 hover:text-purple-600"
               onClick={() =>
                 manualPagination
                   ? onPageChange?.((pageIndex ?? 0) - 1)
@@ -299,6 +301,7 @@ export function DataTable<TData>({
             <Button
               variant="outline"
               size="sm"
+              className="rounded-lg px-4 border-gray-300 hover:bg-purple-50 hover:text-purple-600"
               onClick={() =>
                 manualPagination
                   ? onPageChange?.((pageIndex ?? 0) + 1)

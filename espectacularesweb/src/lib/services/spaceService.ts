@@ -96,3 +96,10 @@ export function updateSpace(
     body: fd,
   })
 }
+
+/** DELETE */
+export function deleteSpace(id: number) {
+  return apiFetch(`/api/spaces/${id}`, {
+    method: "DELETE",
+  })
+}

@@ -10,5 +10,6 @@ export type LoginResponse = {
         email?: string | null
         username?: string | null
         role?: string | null
+        roles?: string[] | null
     }
 }

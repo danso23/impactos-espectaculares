@@ -135,10 +135,10 @@ export default function QuoteCreatePage() {
   const customerQuery = useQuoteCustomerSearch(customerSearch, customerSearchType, !isWithoutCustomer)
 
   const catalogs = catalogsQuery.data?.data
-  const companies = catalogs?.companies ?? []
-  const agencies = catalogs?.agencies ?? []
-  const services = catalogs?.services ?? []
-  const letterheads = catalogs?.letterheads ?? []
+  const companies = React.useMemo(() => catalogs?.companies ?? [], [catalogs])
+  const agencies = React.useMemo(() => catalogs?.agencies ?? [], [catalogs])
+  const services = React.useMemo(() => catalogs?.services ?? [], [catalogs])
+  const letterheads = React.useMemo(() => catalogs?.letterheads ?? [], [catalogs])
 
   const selectedCompany = React.useMemo(
     () => companies.find((company) => company.id === companyId) ?? null,

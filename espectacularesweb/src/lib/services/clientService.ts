@@ -26,12 +26,21 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const doFetch = async (token?: string) => {
     const access = token ?? tokenStore.getAccess()
 
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string> ?? {}),
+    }
+
+    if (options.body && typeof options.body === "string" && !headers["Content-Type"] && !headers["content-type"]) {
+      headers["Content-Type"] = "application/json"
+    }
+
+    if (access) {
+      headers["Authorization"] = `Bearer ${access}`
+    }
+
     return fetch(url, {
       ...options,
-      headers: {
-        ...(options.headers ?? {}),
-        ...(access ? { Authorization: `Bearer ${access}` } : {}),
-      },
+      headers,
     })
   }
 

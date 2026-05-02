@@ -5,7 +5,7 @@ import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/select"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { useQuoteCatalogs, useQuotes } from "@/lib/hooks/quoteHook"
+import { QuoteConvertToRentalDialog } from "@/pages/quotes/quoteConvertToRentalDialog"
 import { getQuote } from "@/lib/services/quoteService"
+import { QuoteStatusDialog } from "@/pages/quotes/quoteStatusDialog"
 import { useQuoteTable } from "@/pages/quotes/quoteTable"
 import type { QuoteRecord } from "@/types/Quote"
 
@@ -27,6 +29,9 @@ export default function QuotesPage() {
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL)
+  const [selectedQuote, setSelectedQuote] = React.useState<QuoteRecord | null>(null)
+  const [statusDialogOpen, setStatusDialogOpen] = React.useState(false)
+  const [convertDialogOpen, setConvertDialogOpen] = React.useState(false)
   const perPage = 10
 
   React.useEffect(() => {
@@ -62,72 +67,107 @@ export default function QuotesPage() {
       })
     }
   }, [])
+  const handleChangeStatus = React.useCallback((quote: QuoteRecord) => {
+    setSelectedQuote(quote)
+    setStatusDialogOpen(true)
+  }, [])
+  const handleConvertToRental = React.useCallback((quote: QuoteRecord) => {
+    setSelectedQuote(quote)
+    setConvertDialogOpen(true)
+  }, [])
 
-  const columns = useQuoteTable({ onDownload: handleDownload })
+  const columns = useQuoteTable({
+    onDownload: handleDownload,
+    onChangeStatus: handleChangeStatus,
+    onConvertToRental: handleConvertToRental,
+  })
 
   return (
-    <div className="space-y-4 p-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Cotizaciones</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Consulta las cotizaciones registradas y filtra por estatus.
-            </p>
+    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Cotizaciones</h1>
+          <p className="text-gray-600">Consulta las cotizaciones registradas y filtra por estatus.</p>
+        </div>
+
+        <Button asChild className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-6 py-6 shadow-lg transform hover:-translate-y-0.5 transition-all border-none">
+          <Link to="/cotizaciones/nueva">
+            <Plus className="mr-2 h-5 w-5" />
+            <span>Nueva cotización</span>
+          </Link>
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 w-full">
+          <div className="w-full sm:w-72">
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value)
+                setPage(1)
+              }}
+            >
+              <SelectTrigger className="rounded-lg border-gray-300">
+                <SelectValue placeholder="Filtrar por estatus" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value={ALL}>Todos los estatus</SelectItem>
+                {statuses.map((status) => (
+                  <SelectItem key={status.id} value={String(status.id)}>
+                    {status.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <Button asChild>
-            <Link to="/cotizaciones/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva cotización
-            </Link>
-          </Button>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full sm:w-64">
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => {
-                  setStatusFilter(value)
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filtrar por estatus" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Todos los estatus</SelectItem>
-                  {statuses.map((status) => (
-                    <SelectItem key={status.id} value={String(status.id)}>
-                      {status.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex-1">
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Buscar por folio o nota..."
+              className="rounded-lg border-gray-300 focus:ring-purple-500"
+            />
           </div>
+        </div>
+      </div>
 
-          <DataTable
-            title={`Cotizaciones (${meta?.total ?? quotes.length})`}
-            description="Listado de cotizaciones creadas en el sistema."
-            columns={columns}
-            data={quotes}
-            enableSearch
-            searchPlaceholder="Buscar por folio o nota..."
-            searchValue={searchInput}
-            onSearchChange={setSearchInput}
-            pageSize={perPage}
-            enablePagination
-            manualPagination
-            pageIndex={(meta?.page ?? page) - 1}
-            pageCount={meta?.totalPages ?? 1}
-            onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
-            isLoading={quotesQuery.isFetching}
-          />
-        </CardContent>
-      </Card>
+      <DataTable
+        columns={columns}
+        data={quotes}
+        enableSearch={false}
+        pageSize={perPage}
+        enablePagination
+        manualPagination
+        pageIndex={(meta?.page ?? page) - 1}
+        pageCount={meta?.totalPages ?? 1}
+        onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
+        isLoading={quotesQuery.isFetching}
+      />
+
+      <QuoteStatusDialog
+        open={statusDialogOpen}
+        onOpenChange={(open) => {
+          setStatusDialogOpen(open)
+          if (!open) {
+            setSelectedQuote(null)
+          }
+        }}
+        quote={selectedQuote}
+        statuses={statuses}
+      />
+
+      <QuoteConvertToRentalDialog
+        open={convertDialogOpen}
+        onOpenChange={(open) => {
+          setConvertDialogOpen(open)
+          if (!open) {
+            setSelectedQuote(null)
+          }
+        }}
+        quote={selectedQuote}
+      />
     </div>
   )
 }
