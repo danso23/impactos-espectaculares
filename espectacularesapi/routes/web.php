@@ -15,7 +15,7 @@ $router->get('/', function () use ($router) {
     return $router->app->version();
 });
 
-$router->post('/setuser1','UserController@Register');
+$router->post('/setuser1', 'UserController@Register');
 $router->post('/password/email', 'AuthController@sendResetLink');
 $router->post('/password/reset', 'AuthController@resetPassword');
 
@@ -39,9 +39,13 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->put('users/{id}', ['uses' => 'UserController@update']);
         $router->patch('users/{id}', ['uses' => 'UserController@update']);
         $router->delete('users/{id}', ['uses' => 'UserController@destroy']);
-        
+
         /** ROLES **/
         $router->get('roles', ['uses' => 'RoleController@index']);
+        $router->post('roles', ['uses' => 'RoleController@store']);
+        $router->put('roles/{id}', ['uses' => 'RoleController@update']);
+        $router->patch('roles/{id}', ['uses' => 'RoleController@update']);
+        $router->delete('roles/{id}', ['uses' => 'RoleController@destroy']);
 
         /** SPACES **/
         $router->post('spaces', ['uses' => 'SpaceController@store']);
@@ -68,5 +72,13 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->get('quotes/{id}/history', ['uses' => 'QuoteController@history']);
         $router->post('quotes/{id}/status', ['uses' => 'QuoteController@changeStatus']);
         $router->post('quotes/{id}/convert-to-rental', ['uses' => 'QuoteController@convertToRental']);
+
+        /** CASEROS **/
+        $router->get('caseros', ['uses' => 'CaseroController@index']);
+        $router->get('caseros/{id}', ['uses' => 'CaseroController@find']);
+        $router->post('caseros', ['uses' => 'CaseroController@store']);
+        $router->put('caseros/{id}', ['uses' => 'CaseroController@update']);
+        $router->patch('caseros/{id}', ['uses' => 'CaseroController@update']);
+        $router->delete('caseros/{id}', ['uses' => 'CaseroController@delete']);
     });
 });

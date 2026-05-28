@@ -9,6 +9,7 @@ import { SpaceForm } from "./spaceForm";
 
 import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { FileDown } from "lucide-react";
 import type { RowSelectionState } from "@tanstack/react-table";
 
@@ -194,10 +195,17 @@ export default function SpacePage() {
         onReset={handleResetFilters}
         applyOnReset={true}
         actions={
-          <>
+          <div className="flex items-center gap-3">
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Buscar..."
+              className="w-48 sm:w-64 rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 bg-white shadow-sm"
+            />
+
             <Button
               variant="outline"
-              className="flex gap-2 rounded-lg border-gray-300 hover:bg-purple-50 hover:text-purple-600"
+              className="flex gap-2 rounded-lg border-gray-300 hover:bg-purple-50 hover:text-purple-600 shadow-sm"
               disabled={selectedSpaces.length === 0}
               onClick={() => downloadSpacesCatalog(selectedSpaces)}
             >
@@ -216,7 +224,7 @@ export default function SpacePage() {
             >
               Crear cotización
             </Button>
-          </>
+          </div>
         }
       />
 
@@ -265,7 +273,7 @@ export default function SpacePage() {
       <DataTable
         columns={columns}
         data={data}
-        enableSearch
+        enableSearch={false}
         getRowId={(row) => String(row.id)}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}

@@ -275,45 +275,45 @@ export function DataTable<TData>({
             )}
           </TableBody>
         </Table>
+
+        {enablePagination && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+            <div className="text-sm font-medium text-gray-600">
+              Página <span className="text-purple-600">{currentPage}</span> de <span className="text-purple-600">{totalPages}</span>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-lg px-4 border-gray-300 bg-white hover:bg-purple-50 hover:text-purple-600 shadow-sm"
+                onClick={() =>
+                  manualPagination
+                    ? onPageChange?.((pageIndex ?? 0) - 1)
+                    : table.previousPage()
+                }
+                disabled={!canPrev || isLoading}
+              >
+                Anterior
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-lg px-4 border-gray-300 bg-white hover:bg-purple-50 hover:text-purple-600 shadow-sm"
+                onClick={() =>
+                  manualPagination
+                    ? onPageChange?.((pageIndex ?? 0) + 1)
+                    : table.nextPage()
+                }
+                disabled={!canNext || isLoading}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-
-      {enablePagination && (
-        <div className="flex items-center justify-between px-2">
-          <div className="text-sm font-medium text-gray-600">
-            Página <span className="text-purple-600">{currentPage}</span> de <span className="text-purple-600">{totalPages}</span>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-lg px-4 border-gray-300 hover:bg-purple-50 hover:text-purple-600"
-              onClick={() =>
-                manualPagination
-                  ? onPageChange?.((pageIndex ?? 0) - 1)
-                  : table.previousPage()
-              }
-              disabled={!canPrev || isLoading}
-            >
-              Anterior
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-lg px-4 border-gray-300 hover:bg-purple-50 hover:text-purple-600"
-              onClick={() =>
-                manualPagination
-                  ? onPageChange?.((pageIndex ?? 0) + 1)
-                  : table.nextPage()
-              }
-              disabled={!canNext || isLoading}
-            >
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
