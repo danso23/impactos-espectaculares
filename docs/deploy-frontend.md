@@ -7,6 +7,8 @@
 Workflow:
 
 - `.github/workflows/deploy-frontend-ftps.yml` (se ejecuta en cada push a `desarrollo` y también manual con *Run workflow*).
+  - En `pull_request` hacia `desarrollo` solo compila (no despliega).
+  - En `push` a `desarrollo` (incluye merges) compila y despliega por FTPS.
 
 ### 1) Crear secrets en GitHub
 
@@ -28,4 +30,3 @@ Si la ruta no queda bien a la primera, prueba con `/app.enticonfiamos.com.mx/` (
 
 - El deploy usa `protocol: ftps` (FTPS explícito por puerto 21).
 - El workflow excluye `.htaccess` para no borrarlo en el servidor; si quieres versionarlo, agrégalo en `espectacularesweb/public/.htaccess`.
-

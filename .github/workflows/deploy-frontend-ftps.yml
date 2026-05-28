@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - desarrollo
+  pull_request:
+    branches:
+      - desarrollo
   workflow_dispatch: {}
 
 concurrency:
@@ -35,6 +38,7 @@ jobs:
         run: npm run build:prod
 
       - name: Deploy via FTPS
+        if: github.event_name == 'push'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -47,4 +51,3 @@ jobs:
           server-dir: ${{ secrets.FTP_SERVER_DIR }}
           exclude: |
             **/.htaccess
-
