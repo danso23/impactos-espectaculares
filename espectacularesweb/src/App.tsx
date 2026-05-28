@@ -33,6 +33,7 @@ import QuotesPage from "@/pages/quotes/quotesPage";
 import LeadsPage from "@/pages/crm/leadsPage";
 import ClientsPage from "@/pages/crm/clientsPage";
 import RolePage from "./pages/rolePage";
+import CaseroPage from "./pages/caseros/caseroPage";
 
 type NavItem = {
   to: string;
@@ -247,7 +248,7 @@ export default function AppRoot() {
             path="proveedores"
             element={<RouteStub title="Proveedores" />}
           />
-          <Route path="caseros" element={<RouteStub title="Caseros" />} />
+          <Route path="caseros" element={<CaseroPage />} />
           <Route path="servicios" element={<RouteStub title="Servicios" />} />
           <Route
             path="colaboradores"

@@ -72,5 +72,13 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->get('quotes/{id}/history', ['uses' => 'QuoteController@history']);
         $router->post('quotes/{id}/status', ['uses' => 'QuoteController@changeStatus']);
         $router->post('quotes/{id}/convert-to-rental', ['uses' => 'QuoteController@convertToRental']);
+
+        /** CASEROS **/
+        $router->get('caseros', ['uses' => 'CaseroController@index']);
+        $router->get('caseros/{id}', ['uses' => 'CaseroController@find']);
+        $router->post('caseros', ['uses' => 'CaseroController@store']);
+        $router->put('caseros/{id}', ['uses' => 'CaseroController@update']);
+        $router->patch('caseros/{id}', ['uses' => 'CaseroController@update']);
+        $router->delete('caseros/{id}', ['uses' => 'CaseroController@delete']);
     });
 });
