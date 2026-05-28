@@ -30,3 +30,4 @@ Si la ruta no queda bien a la primera, prueba con `/app.enticonfiamos.com.mx/` (
 
 - El deploy usa `protocol: ftps` (FTPS explícito por puerto 21).
 - El workflow excluye `.htaccess` para no borrarlo en el servidor; si quieres versionarlo, agrégalo en `espectacularesweb/public/.htaccess`.
+- Si en algún momento quieres volver a `npm ci` (más estricto/reproducible), primero sincroniza `espectacularesweb/package-lock.json` ejecutando `npm install` localmente y commiteando el lockfile.
