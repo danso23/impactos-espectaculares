@@ -33,6 +33,11 @@ jobs:
         working-directory: espectacularesweb
         run: npm install --no-audit --no-fund
 
+      - name: Create .env.production
+        working-directory: espectacularesweb
+        run: |
+          printf 'VITE_API_URL=%s\nVITE_APP_ENV=production\n' "${{ vars.VITE_API_URL }}" > .env.production
+
       - name: Build
         working-directory: espectacularesweb
         run: npm run build:prod
