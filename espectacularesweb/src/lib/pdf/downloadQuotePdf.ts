@@ -5,6 +5,7 @@ import type {
   QuoteCatalogAgency,
   QuoteCatalogCompany,
   QuoteCustomer,
+  QuoteImage,
   QuotePreviewItem,
   QuoteStatus,
   QuoteTotals,
@@ -19,6 +20,7 @@ type QuotePdfData = {
   agency?: QuoteCatalogAgency | null
   status?: QuoteStatus | null
   items: QuotePreviewItem[]
+  images?: QuoteImage[]
   totals: QuoteTotals
   notes?: string | null
   terms_html?: string | null
@@ -82,6 +84,9 @@ export function downloadQuotePdf(data: QuotePdfData, filename?: string) {
   doc.text(`Empresa: ${data.company?.name || "—"}`, 14, 38)
   doc.text(`Estatus: ${data.status?.name || "Borrador"}`, 14, 44)
   doc.text(`Vigencia: ${formatDate(data.valid_until)}`, 14, 50)
+  if (data.images?.length) {
+    doc.text(`Imágenes adjuntas: ${data.images.length}`, 14, 56)
+  }
 
   if (data.agency?.name) {
     doc.text(`Agencia: ${data.agency.name}`, 110, 32)
@@ -90,7 +95,7 @@ export function downloadQuotePdf(data: QuotePdfData, filename?: string) {
   const tableData = data.items.map((item) => [
     item.concept || item.description || (item.item_type === "rental" ? "Renta" : "Servicio"),
     item.item_type === "rental" ? "Renta" : "Servicio",
-    String(item.qty),
+    item.item_type === "service" ? Number(item.square_meters ?? 1).toFixed(2) : "—",
     formatCurrency(item.unit_price),
     formatCurrency(item.subtotal),
     data.includes_tax ? formatCurrency(item.tax_amount) : "—",
@@ -98,8 +103,8 @@ export function downloadQuotePdf(data: QuotePdfData, filename?: string) {
   ])
 
   autoTable(doc, {
-    startY: 58,
-    head: [["Concepto", "Tipo", "Cant.", "Precio", "Subtotal", "IVA", "Total"]],
+    startY: data.images?.length ? 64 : 58,
+    head: [["Concepto", "Tipo", "M2", "Precio / m2", "Subtotal", "IVA", "Total"]],
     body: tableData,
     styles: {
       fontSize: 9,

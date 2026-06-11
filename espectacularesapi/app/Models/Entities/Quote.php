@@ -36,6 +36,11 @@ class Quote extends Model
         return $this->hasMany(QuoteItem::class, 'quote_id')->orderBy('sort_order')->orderBy('id');
     }
 
+    public function images()
+    {
+        return $this->hasMany(QuoteImage::class, 'quote_id')->orderBy('sort_order')->orderBy('id');
+    }
+
     public function status()
     {
         return $this->belongsTo(QuoteStatus::class, 'quote_status_id');

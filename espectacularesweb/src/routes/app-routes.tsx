@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { LoginPage } from "@/pages/auth/login"
 import UsersPage from "@/pages/userPage"
 import SpacePage from "@/pages/space/spacePage"
+import ProviderPage from "@/pages/providers/providerPage"
+import RentalPage from "@/pages/rentals/rentalPage"
 import { ProtectedRoute } from "@/routes/ProtectedRoute"
 import AppLayout from "@/layouts/AppLayout"
 
@@ -27,12 +29,12 @@ export default function AppRoutes() {
                     <Route index element={<Navigate to="espacios" replace />} />
 
                     <Route path="espacios" element={<SpacePage />} />
-                    <Route path="rentas" element={<RouteStub title="Rentas" />} />
+                    <Route path="rentas" element={<RentalPage />} />
                     <Route path="usuarios" element={<UsersPage />} />
                     <Route path="pagos" element={<RouteStub title="Pagos" />} />
                     <Route path="prospectos" element={<RouteStub title="Prospectos" />} />
                     <Route path="clientes" element={<RouteStub title="Clientes" />} />
-                    <Route path="proveedores" element={<RouteStub title="Proveedores" />} />
+                    <Route path="proveedores" element={<ProviderPage />} />
                     <Route path="caseros" element={<RouteStub title="Caseros" />} />
                     <Route path="servicios" element={<RouteStub title="Servicios" />} />
                     <Route path="colaboradores" element={<RouteStub title="Colaboradores" />} />

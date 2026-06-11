@@ -41,6 +41,17 @@ export type QuoteCatalogService = {
   tax_rate: string | number
 }
 
+export type QuoteCatalogConfiguration = {
+  id?: number | null
+  price_per_square_meter: string | number
+}
+
+export type QuoteConfigurationResponse = ApiResponse<QuoteCatalogConfiguration>
+
+export type QuoteConfigurationUpdatePayload = {
+  price_per_square_meter: number
+}
+
 export type QuoteStatus = {
   id: number
   key: string
@@ -53,6 +64,18 @@ export type QuoteStatusActor = {
   name?: string | null
   username?: string | null
   email?: string | null
+}
+
+export type QuoteImage = {
+  id: number
+  disk?: string | null
+  path: string
+  filename?: string | null
+  original_name?: string | null
+  mime_type?: string | null
+  size?: number | null
+  is_cover?: boolean
+  sort_order?: number
 }
 
 export type QuoteRentalSummary = {
@@ -68,6 +91,7 @@ export type QuoteCatalogs = {
   letterheads: QuoteCatalogLetterhead[]
   agencies: QuoteCatalogAgency[]
   services: QuoteCatalogService[]
+  configuration?: QuoteCatalogConfiguration | null
   statuses: QuoteStatus[]
 }
 
@@ -96,6 +120,7 @@ export type QuoteItemInput = {
   start_date?: string | null
   end_date?: string | null
   qty: number
+  square_meters?: number
   unit_price: number
   faces?: number | null
   production_cost?: number | null
@@ -127,6 +152,11 @@ export type QuotePayload = {
   terms_html?: string | null
   notes?: string | null
   items: QuoteItemInput[]
+}
+
+export type QuoteCreateRequest = {
+  payload: QuotePayload
+  images?: File[]
 }
 
 export type QuotePreviewItem = QuoteItemInput & {
@@ -203,6 +233,7 @@ export type QuoteRecord = {
   created_at?: string | null
   updated_at?: string | null
   items: QuotePreviewItem[]
+  images?: QuoteImage[]
 }
 
 export type QuoteResponse = ApiResponse<QuoteRecord>

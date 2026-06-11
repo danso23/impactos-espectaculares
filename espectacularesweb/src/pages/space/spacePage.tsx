@@ -10,6 +10,13 @@ import { SpaceForm } from "./spaceForm";
 import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FileDown } from "lucide-react";
 import type { RowSelectionState } from "@tanstack/react-table";
 
@@ -50,6 +57,8 @@ export default function SpacePage() {
   const perPage = 10;
   const [editOpen, setEditOpen] = React.useState(false);
   const [editingSpace, setEditingSpace] = React.useState<Space | null>(null);
+  const [viewOpen, setViewOpen] = React.useState(false);
+  const [viewingSpace, setViewingSpace] = React.useState<Space | null>(null);
 
   // Deletion state
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -101,6 +110,24 @@ export default function SpacePage() {
   );
 
   const { columns } = useSpaceTable({
+    onQuote: (row) => {
+      navigate("/cotizaciones/nueva", {
+        state: {
+          spaces: [
+            {
+              id: row.id,
+              title: row.title,
+              price: row.price ?? 0,
+              faces: row.faces ?? null,
+            },
+          ],
+        },
+      });
+    },
+    onView: (row) => {
+      setViewingSpace(row);
+      setViewOpen(true);
+    },
     onEdit: (row) => {
       setEditingSpace(row);
       setEditOpen(true);
@@ -117,8 +144,12 @@ export default function SpacePage() {
       await deleteMutation.mutateAsync(spaceToDelete.id);
       toast.success("Espacio eliminado correctamente.");
       setDeleteDialogOpen(false);
-    } catch {
-      toast.error("No se pudo eliminar el espacio.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar el espacio."
+      );
     } finally {
       setSpaceToDelete(null);
     }
@@ -214,8 +245,7 @@ export default function SpacePage() {
             </Button>
 
             <Button
-              disabled={selectedSpaces.length === 0}
-              className="rounded-lg bg-gray-500 hover:bg-gray-600 text-white shadow-md transition-all disabled:opacity-50"
+              className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-md transition-all"
               onClick={() => {
                 navigate("/cotizaciones/nueva", {
                   state: { spaces: selectedSpaces },
@@ -291,6 +321,104 @@ export default function SpacePage() {
         onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
         isLoading={spacesQuery.isFetching}
       />
+
+      <Dialog
+        open={viewOpen}
+        onOpenChange={(open) => {
+          setViewOpen(open);
+          if (!open) setViewingSpace(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalle del espacio</DialogTitle>
+            <DialogDescription>
+              Información general del espacio seleccionado.
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewingSpace ? (
+            <div className="space-y-4">
+              {viewingSpace.coverImageUrl ? (
+                <img
+                  src={viewingSpace.coverImageUrl}
+                  alt={viewingSpace.title}
+                  className="h-48 w-full rounded-lg border object-cover"
+                />
+              ) : null}
+
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-muted-foreground">Título</p>
+                  <p className="font-medium">{viewingSpace.title}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">ID asignado</p>
+                  <p className="font-medium">{viewingSpace.assigned_id ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Precio</p>
+                  <p className="font-medium">
+                    {new Intl.NumberFormat("es-MX", {
+                      style: "currency",
+                      currency: "MXN",
+                    }).format(Number(viewingSpace.price ?? 0))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Estatus</p>
+                  <p className="font-medium">{viewingSpace.status}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Tipo</p>
+                  <p className="font-medium">{viewingSpace.type ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Tipo de vista</p>
+                  <p className="font-medium">{viewingSpace.viewType ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Nivel socioeconómico</p>
+                  <p className="font-medium">{viewingSpace.socioeconomic_level ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Caras</p>
+                  <p className="font-medium">{viewingSpace.faces ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Ancho</p>
+                  <p className="font-medium">{viewingSpace.width_m ?? "—"} m</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Alto</p>
+                  <p className="font-medium">{viewingSpace.height_m ?? "—"} m</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Coordenadas</p>
+                  <p className="font-medium">
+                    {viewingSpace.coords?.lat ?? viewingSpace.latitude ?? "—"},{" "}
+                    {viewingSpace.coords?.lng ?? viewingSpace.longitude ?? "—"}
+                  </p>
+                </div>
+              </div>
+
+              {viewingSpace.description ? (
+                <div>
+                  <p className="mb-1 text-sm text-muted-foreground">Descripción</p>
+                  <p className="whitespace-pre-wrap text-sm">{viewingSpace.description}</p>
+                </div>
+              ) : null}
+
+              {viewingSpace.comments ? (
+                <div>
+                  <p className="mb-1 text-sm text-muted-foreground">Comentarios</p>
+                  <p className="whitespace-pre-wrap text-sm">{viewingSpace.comments}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       <DeleteConfirmDialog
         open={deleteDialogOpen}

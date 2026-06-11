@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Entities\Agency;
+use App\Models\Entities\Configuration;
 use App\Models\Entities\Cliente;
 use App\Models\Entities\Company;
 use App\Models\Entities\CompanyLetterhead;
 use App\Models\Entities\Lead;
 use App\Models\Entities\Quote;
+use App\Models\Entities\QuoteImage;
 use App\Models\Entities\QuoteItem;
 use App\Models\Entities\Rental;
 use App\Models\Entities\RentalItem;
@@ -22,6 +24,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class QuoteController extends Controller
 {
@@ -54,6 +57,7 @@ class QuoteController extends Controller
                     ->where('is_active', true)
                     ->orderBy('name')
                     ->get(),
+                'configuration' => $this->quoteConfiguration(),
                 'statuses' => QuoteStatus::query()
                     ->where('is_active', true)
                     ->orderBy('id')
@@ -190,6 +194,7 @@ class QuoteController extends Controller
             ->with([
                 'items.space',
                 'items.service',
+                'images',
                 'status',
                 'company',
                 'letterhead',
@@ -328,6 +333,7 @@ class QuoteController extends Controller
                     'end_date' => $item['end_date'],
                     'unit_price' => $item['unit_price'],
                     'qty' => $item['qty'],
+                    'square_meters' => $item['square_meters'],
                     'subtotal' => $item['subtotal'],
                     'faces' => $item['faces'],
                     'production_cost' => $item['production_cost'],
@@ -339,6 +345,8 @@ class QuoteController extends Controller
                     'total' => $item['total'],
                 ]);
             }
+
+            $this->storeQuoteImages($quote, $request);
 
             $this->recordHistory(
                 quote: $quote,
@@ -357,7 +365,7 @@ class QuoteController extends Controller
             return $quote;
         });
 
-        $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
+        $quote->load(['items.space', 'items.service', 'images', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
 
         return response()->json([
             'message' => 'Cotización creada correctamente',
@@ -624,6 +632,8 @@ class QuoteController extends Controller
             'commission.value' => ['nullable', 'numeric', 'min:0'],
             'terms_html' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'images' => ['nullable', 'array', 'max:10'],
+            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_type' => ['required', 'in:rental,service'],
             'items.*.space_id' => ['nullable', 'integer', 'exists:spaces,id'],
@@ -633,6 +643,7 @@ class QuoteController extends Controller
             'items.*.start_date' => ['nullable', 'date'],
             'items.*.end_date' => ['nullable', 'date'],
             'items.*.qty' => ['nullable', 'integer', 'min:1'],
+            'items.*.square_meters' => ['nullable', 'numeric', 'min:0.01'],
             'items.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'items.*.faces' => ['nullable', 'integer', 'min:1'],
             'items.*.production_cost' => ['nullable', 'numeric', 'min:0'],
@@ -709,7 +720,10 @@ class QuoteController extends Controller
             ], 422));
         }
 
-        $validated['items'] = $this->normalizeItems($validated['items'] ?? []);
+        $validated['items'] = $this->normalizeItems(
+            $validated['items'] ?? [],
+            $this->quoteConfigurationPricePerSquareMeter()
+        );
         $customerSummary = $this->resolveCustomerSummary(
             $validated['customer']['type'],
             isset($validated['customer']['id']) ? (int)$validated['customer']['id'] : null
@@ -718,7 +732,7 @@ class QuoteController extends Controller
         return [$validated, $company, $letterhead, $agency, $customerSummary];
     }
 
-    private function normalizeItems(array $items): array
+    private function normalizeItems(array $items, float $defaultSquareMeterPrice): array
     {
         $spaceIds = collect($items)
             ->pluck('space_id')
@@ -758,7 +772,8 @@ class QuoteController extends Controller
                 'start_date' => $type === 'rental' ? ($item['start_date'] ?? null) : null,
                 'end_date' => $type === 'rental' ? ($item['end_date'] ?? null) : null,
                 'qty' => (int)($item['qty'] ?? 1),
-                'unit_price' => $item['unit_price'] ?? ($service?->base_price ?? $space?->price ?? 0),
+                'square_meters' => $item['square_meters'] ?? 1,
+                'unit_price' => $item['unit_price'] ?? ($service ? ($defaultSquareMeterPrice ?: ($service->base_price ?? 0)) : ($space?->price ?? 0)),
                 'faces' => $item['faces'] ?? ($space?->faces ?? null),
                 'production_cost' => $item['production_cost'] ?? null,
                 'notes' => $item['notes'] ?? null,
@@ -946,6 +961,7 @@ class QuoteController extends Controller
                         'start_date' => optional($item->start_date)->format('Y-m-d'),
                         'end_date' => optional($item->end_date)->format('Y-m-d'),
                         'qty' => (int)$item->qty,
+                        'square_meters' => (float)$item->square_meters,
                         'unit_price' => (float)$item->unit_price,
                         'subtotal' => (float)$item->subtotal,
                         'discount_applies' => (bool)$item->discount_applies,
@@ -954,6 +970,21 @@ class QuoteController extends Controller
                         'total' => (float)$item->total,
                         'faces' => $item->faces,
                         'notes' => $item->notes,
+                    ];
+                })->values()
+                : [],
+            'images' => $withItems
+                ? $quote->images->map(function (QuoteImage $image) {
+                    return [
+                        'id' => $image->id,
+                        'disk' => $image->disk,
+                        'path' => $image->path,
+                        'filename' => $image->filename,
+                        'original_name' => $image->original_name,
+                        'mime_type' => $image->mime_type,
+                        'size' => (int) $image->size,
+                        'is_cover' => (bool) $image->is_cover,
+                        'sort_order' => (int) $image->sort_order,
                     ];
                 })->values()
                 : [],
@@ -998,6 +1029,42 @@ class QuoteController extends Controller
             'items' => $calculated['items'],
             'pdf_path' => $quote->pdf_path,
         ];
+    }
+
+    private function storeQuoteImages(Quote $quote, Request $request): void
+    {
+        if (!$request->hasFile('images')) {
+            return;
+        }
+
+        $files = $request->file('images');
+        $files = is_array($files) ? $files : [$files];
+
+        $sortOrder = (int) ($quote->images()->max('sort_order') ?? 0);
+        $hasCover = $quote->images()->exists();
+
+        foreach ($files as $file) {
+            if (!$file) {
+                continue;
+            }
+
+            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
+            $filename = Carbon::now()->format('Ymd_His') . '_' . Str::random(12) . '.' . $extension;
+            $path = $file->storeAs("quotes/{$quote->id}/original", $filename, 'public');
+
+            $quote->images()->create([
+                'disk' => 'public',
+                'path' => $path,
+                'filename' => $filename,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType() ?: null,
+                'size' => (int) $file->getSize(),
+                'is_cover' => !$hasCover && $sortOrder === 0,
+                'sort_order' => ++$sortOrder,
+            ]);
+
+            $hasCover = true;
+        }
     }
 
     private function buildFolio(int $id): string
@@ -1048,5 +1115,27 @@ class QuoteController extends Controller
     {
         $user = $request->attributes->get('auth_user');
         return $user ? (int)$user->id : null;
+    }
+
+    private function quoteConfiguration(): array
+    {
+        if (!Schema::hasTable('configurations')) {
+            return [
+                'id' => null,
+                'price_per_square_meter' => 0,
+            ];
+        }
+
+        $configuration = Configuration::query()->orderBy('id')->first();
+
+        return [
+            'id' => $configuration?->id,
+            'price_per_square_meter' => (float)($configuration?->price_per_square_meter ?? 0),
+        ];
+    }
+
+    private function quoteConfigurationPricePerSquareMeter(): float
+    {
+        return (float)($this->quoteConfiguration()['price_per_square_meter'] ?? 0);
     }
 }
