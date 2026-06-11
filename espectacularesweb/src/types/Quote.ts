@@ -1,6 +1,7 @@
 import type { ApiListResponse, ApiResponse } from "@/types/Api"
 
-export type CustomerType = "lead" | "cliente"
+export type CustomerType = "lead" | "cliente" | "sin_cliente"
+export type SearchableCustomerType = Exclude<CustomerType, "sin_cliente">
 export type QuoteItemType = "rental" | "service"
 export type QuoteAmountType = "none" | "percent" | "fixed"
 
@@ -40,6 +41,17 @@ export type QuoteCatalogService = {
   tax_rate: string | number
 }
 
+export type QuoteCatalogConfiguration = {
+  id?: number | null
+  price_per_square_meter: string | number
+}
+
+export type QuoteConfigurationResponse = ApiResponse<QuoteCatalogConfiguration>
+
+export type QuoteConfigurationUpdatePayload = {
+  price_per_square_meter: number
+}
+
 export type QuoteStatus = {
   id: number
   key: string
@@ -47,11 +59,39 @@ export type QuoteStatus = {
   color?: string | null
 }
 
+export type QuoteStatusActor = {
+  id: number
+  name?: string | null
+  username?: string | null
+  email?: string | null
+}
+
+export type QuoteImage = {
+  id: number
+  disk?: string | null
+  path: string
+  filename?: string | null
+  original_name?: string | null
+  mime_type?: string | null
+  size?: number | null
+  is_cover?: boolean
+  sort_order?: number
+}
+
+export type QuoteRentalSummary = {
+  id: number
+  status: string
+  starts_at?: string | null
+  ends_at?: string | null
+  total: number
+}
+
 export type QuoteCatalogs = {
   companies: QuoteCatalogCompany[]
   letterheads: QuoteCatalogLetterhead[]
   agencies: QuoteCatalogAgency[]
   services: QuoteCatalogService[]
+  configuration?: QuoteCatalogConfiguration | null
   statuses: QuoteStatus[]
 }
 
@@ -59,7 +99,7 @@ export type QuoteCatalogsResponse = ApiResponse<QuoteCatalogs>
 
 export type QuoteCustomer = {
   type: CustomerType
-  id: number
+  id: number | null
   display_name: string
   contact_name?: string | null
   email?: string | null
@@ -80,6 +120,7 @@ export type QuoteItemInput = {
   start_date?: string | null
   end_date?: string | null
   qty: number
+  square_meters?: number
   unit_price: number
   faces?: number | null
   production_cost?: number | null
@@ -92,7 +133,7 @@ export type QuoteItemInput = {
 export type QuotePayload = {
   customer: {
     type: CustomerType
-    id: number
+    id?: number | null
   }
   issuer_company_id: number
   letterhead_id?: number | null
@@ -111,6 +152,11 @@ export type QuotePayload = {
   terms_html?: string | null
   notes?: string | null
   items: QuoteItemInput[]
+}
+
+export type QuoteCreateRequest = {
+  payload: QuotePayload
+  images?: File[]
 }
 
 export type QuotePreviewItem = QuoteItemInput & {
@@ -174,6 +220,11 @@ export type QuoteRecord = {
   includes_tax: boolean
   tax_rate: number
   totals: QuoteTotals
+  accepted_at?: string | null
+  accepted_by?: QuoteStatusActor | null
+  converted_to_rental_at?: string | null
+  converted_to_rental_by?: QuoteStatusActor | null
+  rental?: QuoteRentalSummary | null
   valid_until?: string | null
   notes?: string | null
   terms_html?: string | null
@@ -182,9 +233,38 @@ export type QuoteRecord = {
   created_at?: string | null
   updated_at?: string | null
   items: QuotePreviewItem[]
+  images?: QuoteImage[]
 }
 
 export type QuoteResponse = ApiResponse<QuoteRecord>
+
+export type QuoteStatusHistoryEntry = {
+  id: number
+  changed_at?: string | null
+  reason?: string | null
+  notes?: string | null
+  from_status?: QuoteStatus | null
+  to_status: QuoteStatus | null
+  changed_by?: QuoteStatusActor | null
+  meta?: Record<string, unknown> | null
+}
+
+export type QuoteStatusHistoryResponse = {
+  data: QuoteStatusHistoryEntry[]
+}
+
+export type QuoteStatusChangePayload = {
+  to_status: string | number
+  reason?: string | null
+  notes?: string | null
+}
+
+export type QuoteConvertToRentalPayload = {
+  customer?: {
+    type: SearchableCustomerType
+    id: number
+  } | null
+}
 
 export type QuoteListParams = {
   page?: number

@@ -12,6 +12,7 @@ class QuoteItem extends Model
 
     protected $casts = [
         'unit_price' => 'decimal:2',
+        'square_meters' => 'decimal:2',
         'subtotal' => 'decimal:2',
         'tax_rate' => 'decimal:2',
         'tax_amount' => 'decimal:2',

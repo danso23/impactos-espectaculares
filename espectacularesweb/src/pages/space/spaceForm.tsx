@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { NumericInput } from "@/components/ui/numeric-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -272,11 +273,7 @@ export function SpaceForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label>No. de caras</Label>
-            <Input
-              type="number"
-              value={form.faces ?? ""}
-              onChange={(e) => setField("faces", Number(e.target.value))}
-            />
+            <NumericInput value={form.faces ?? ""} onValueChange={(value) => setField("faces", value)} />
           </div>
 
           <div className="flex items-center justify-between gap-3 sm:col-span-2">
@@ -364,11 +361,7 @@ export function SpaceForm({
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Precio</Label>
-            <Input
-              type="number"
-              value={form.price ?? ""}
-              onChange={(e) => setField("price", Number(e.target.value))}
-            />
+            <NumericInput value={form.price ?? ""} onValueChange={(value) => setField("price", value)} />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
@@ -387,20 +380,12 @@ export function SpaceForm({
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Ancho (m)</Label>
-            <Input
-              type="number"
-              value={form.width_m ?? ""}
-              onChange={(e) => setField("width_m", Number(e.target.value))}
-            />
+            <NumericInput value={form.width_m ?? ""} onValueChange={(value) => setField("width_m", value)} />
           </div>
 
           <div className="space-y-2 sm:col-span-2">
             <Label>Alto (m)</Label>
-            <Input
-              type="number"
-              value={form.height_m ?? ""}
-              onChange={(e) => setField("height_m", Number(e.target.value))}
-            />
+            <NumericInput value={form.height_m ?? ""} onValueChange={(value) => setField("height_m", value)} />
           </div>
 
           <div className="space-y-2 sm:col-span-2">

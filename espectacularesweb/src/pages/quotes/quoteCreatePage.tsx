@@ -1,15 +1,21 @@
 import * as React from "react"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { FileDown, Minus, Plus, RefreshCw, Save, Trash2 } from "lucide-react"
+import { FileDown, RefreshCw, Save, Trash2, ImagePlus, X } from "lucide-react"
 
-import { useCreateQuote, useQuoteCatalogs, useQuoteCustomerSearch } from "@/lib/hooks/quoteHook"
+import {
+  useCreateQuote,
+  useQuoteCatalogs,
+  useQuoteCustomerSearch,
+  useUpdateQuoteConfiguration,
+} from "@/lib/hooks/quoteHook"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { previewQuote } from "@/lib/services/quoteService"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -29,6 +35,7 @@ import type {
   QuotePayload,
   QuotePreviewData,
   QuoteRecord,
+  SearchableCustomerType,
 } from "@/types/Quote"
 
 type QuoteLocationState = {
@@ -67,12 +74,25 @@ function normalizeSpaceSeed(space: QuoteCreatePageSpaceSeed, index: number): Quo
     start_date: todayISO(),
     end_date: plusDaysISO(30),
     qty: 1,
+    square_meters: 1,
     unit_price: toNumber(space.price),
     faces: space.faces ?? null,
     sort_order: index,
     discount_applies: true,
     tax_rate: 16,
   }
+}
+
+function calculateItemSubtotal(item: QuoteItemInput) {
+  const quantity = Math.max(1, item.qty)
+  const squareMeters = Math.max(0.01, toNumber(item.square_meters ?? 1))
+  const unitPrice = toNumber(item.unit_price)
+
+  if (item.item_type === "service") {
+    return quantity * squareMeters * unitPrice
+  }
+
+  return quantity * unitPrice
 }
 
 function isQuoteAmountType(value: string): value is QuoteAmountType {
@@ -96,10 +116,12 @@ function QuoteField({
 
 export default function QuoteCreatePage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const seededSpaces = (location.state as QuoteLocationState | null)?.spaces ?? []
 
   const catalogsQuery = useQuoteCatalogs()
   const createQuoteMutation = useCreateQuote()
+  const updateConfigurationMutation = useUpdateQuoteConfiguration()
 
   const [customerType, setCustomerType] = React.useState<CustomerType>("lead")
   const [customerSearch, setCustomerSearch] = React.useState("")
@@ -119,6 +141,9 @@ export default function QuoteCreatePage() {
   const [termsHtml, setTermsHtml] = React.useState("")
   const [notes, setNotes] = React.useState("")
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>("")
+  const [squareMeterPrice, setSquareMeterPrice] = React.useState(0)
+  const [quoteImages, setQuoteImages] = React.useState<File[]>([])
+  const [quoteImageUrls, setQuoteImageUrls] = React.useState<string[]>([])
 
   const [items, setItems] = React.useState<QuoteItemInput[]>(
     seededSpaces.map((space, index) => normalizeSpaceSeed(space, index))
@@ -128,14 +153,34 @@ export default function QuoteCreatePage() {
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(false)
   const [savedQuote, setSavedQuote] = React.useState<QuoteRecord | null>(null)
   const previewRequestId = React.useRef(0)
+  const customerSearchRef = React.useRef<HTMLDivElement | null>(null)
+  const isWithoutCustomer = customerType === "sin_cliente"
+  const customerSearchType: SearchableCustomerType = customerType === "cliente" ? "cliente" : "lead"
+  const customerListLabel = customerSearchType === "cliente" ? "clientes" : "leads"
+  const customerSearchTerm = customerSearch.trim()
 
-  const customerQuery = useQuoteCustomerSearch(customerSearch, customerType)
+  const customerQuery = useQuoteCustomerSearch(customerSearch, customerSearchType, !isWithoutCustomer)
 
   const catalogs = catalogsQuery.data?.data
-  const companies = catalogs?.companies ?? []
-  const agencies = catalogs?.agencies ?? []
-  const services = catalogs?.services ?? []
-  const letterheads = catalogs?.letterheads ?? []
+  const companies = React.useMemo(() => catalogs?.companies ?? [], [catalogs])
+  const agencies = React.useMemo(() => catalogs?.agencies ?? [], [catalogs])
+  const services = React.useMemo(() => catalogs?.services ?? [], [catalogs])
+  const letterheads = React.useMemo(() => catalogs?.letterheads ?? [], [catalogs])
+  const showRentalDates = React.useMemo(() => items.some((item) => item.item_type === "rental"), [items])
+
+  React.useEffect(() => {
+    if (catalogs?.configuration?.price_per_square_meter === undefined) return
+    setSquareMeterPrice(toNumber(catalogs.configuration.price_per_square_meter))
+  }, [catalogs?.configuration?.price_per_square_meter])
+
+  React.useEffect(() => {
+    const urls = quoteImages.map((file) => URL.createObjectURL(file))
+    setQuoteImageUrls(urls)
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [quoteImages])
 
   const selectedCompany = React.useMemo(
     () => companies.find((company) => company.id === companyId) ?? null,
@@ -171,15 +216,59 @@ export default function QuoteCreatePage() {
     setLetterheadId(defaultLetterhead?.id ?? null)
   }, [companyLetterheads, letterheadId, selectedCompany])
 
+  React.useEffect(() => {
+    if (!showCustomerList) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (!target || customerSearchRef.current?.contains(target)) return
+      setShowCustomerList(false)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowCustomerList(false)
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [showCustomerList])
+
   const filteredCustomerResults = customerQuery.data?.data ?? []
+  const customerSearchHasData = !!customerQuery.data
+  const customerDisplayName = isWithoutCustomer
+    ? "Sin cliente"
+    : selectedCustomer?.display_name ?? "Pendiente"
+  const customerSelectionHint = isWithoutCustomer
+    ? "La cotización se guardará sin cliente asignado."
+    : selectedCustomer
+      ? `Seleccionado: ${selectedCustomer.display_name}.`
+      : customerType === "lead"
+        ? "Selecciona un lead disponible o cambia el tipo a Sin cliente si no deseas asignar uno."
+        : "Selecciona un cliente disponible o cambia el tipo a Sin cliente si no deseas asignar uno."
+  const saveBlockingMessage =
+    !companyId
+      ? "Selecciona una empresa emisora."
+      : items.length === 0
+        ? "Agrega al menos un item."
+        : !isWithoutCustomer && !selectedCustomer
+          ? "Selecciona un cliente, o cambia el tipo a Sin cliente para guardar sin asignarlo."
+          : null
 
   const payload = React.useMemo<QuotePayload | null>(() => {
-    if (!selectedCustomer || !companyId || items.length === 0) return null
+    if (!companyId || items.length === 0) return null
+    if (!isWithoutCustomer && !selectedCustomer) return null
 
     return {
       customer: {
         type: customerType,
-        id: selectedCustomer.id,
+        id: isWithoutCustomer ? null : selectedCustomer?.id ?? null,
       },
       issuer_company_id: companyId,
       letterhead_id: letterheadId,
@@ -200,6 +289,7 @@ export default function QuoteCreatePage() {
       items: items.map((item, index) => ({
         ...item,
         qty: Math.max(1, item.qty),
+        square_meters: Math.max(0.01, toNumber(item.square_meters ?? 1)),
         unit_price: toNumber(item.unit_price),
         tax_rate: toNumber(item.tax_rate ?? taxRate),
         sort_order: index,
@@ -214,6 +304,7 @@ export default function QuoteCreatePage() {
     discountType,
     discountValue,
     includeTax,
+    isWithoutCustomer,
     items,
     letterheadId,
     notes,
@@ -293,7 +384,8 @@ export default function QuoteCreatePage() {
         concept: service.name,
         description: service.description ?? null,
         qty: 1,
-        unit_price: toNumber(service.base_price),
+        square_meters: 1,
+        unit_price: squareMeterPrice,
         sort_order: prev.length,
         discount_applies: false,
         tax_rate: toNumber(service.tax_rate),
@@ -310,12 +402,40 @@ export default function QuoteCreatePage() {
         concept: "",
         description: null,
         qty: 1,
-        unit_price: 0,
+        square_meters: 1,
+        unit_price: squareMeterPrice,
         sort_order: prev.length,
         discount_applies: false,
         tax_rate: taxRate,
       },
     ])
+  }
+
+  const appendQuoteImages = (files: FileList | File[]) => {
+    const nextFiles = Array.from(files)
+
+    setQuoteImages((prev) => {
+      const merged = [...prev]
+
+      nextFiles.forEach((file) => {
+        const alreadyExists = merged.some(
+          (existing) =>
+            existing.name === file.name &&
+            existing.size === file.size &&
+            existing.lastModified === file.lastModified
+        )
+
+        if (!alreadyExists) {
+          merged.push(file)
+        }
+      })
+
+      return merged.slice(0, 10)
+    })
+  }
+
+  const removeQuoteImage = (index: number) => {
+    setQuoteImages((prev) => prev.filter((_, currentIndex) => currentIndex !== index))
   }
 
   const handleCompanyChange = (value: string) => {
@@ -344,17 +464,38 @@ export default function QuoteCreatePage() {
     setCommissionValue(toNumber(nextAgency.commission_value))
   }
 
+  const handleSaveSquareMeterPrice = async () => {
+    try {
+      const response = await updateConfigurationMutation.mutateAsync({
+        price_per_square_meter: squareMeterPrice,
+      })
+      setSquareMeterPrice(toNumber(response.data.price_per_square_meter))
+      toast.success("Precio por m2 actualizado correctamente.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible actualizar la configuración.")
+    }
+  }
+
   const handleSave = async () => {
     if (!payload) {
-      toast.error("Completa cliente, empresa e items antes de guardar.")
+      toast.error("Completa empresa e items antes de guardar.")
       return
     }
 
     try {
-      const response = await createQuoteMutation.mutateAsync(payload)
+      const response = await createQuoteMutation.mutateAsync({
+        payload,
+        images: quoteImages,
+      })
       setSavedQuote(response.data)
       setPreview(null)
+      setQuoteImages([])
       toast.success(`Cotización ${response.data.folio} guardada correctamente.`)
+      if (window.history.length > 1) {
+        navigate(-1)
+      } else {
+        navigate("/cotizaciones", { replace: true })
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible guardar la cotización.")
     }
@@ -388,7 +529,7 @@ export default function QuoteCreatePage() {
   }
 
   const localSubtotal = React.useMemo(
-    () => items.reduce((sum, item) => sum + Math.max(1, item.qty) * toNumber(item.unit_price), 0),
+    () => items.reduce((sum, item) => sum + calculateItemSubtotal(item), 0),
     [items]
   )
 
@@ -410,70 +551,84 @@ export default function QuoteCreatePage() {
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <QuoteField label="Tipo de cliente">
-                <Select
-                  value={customerType}
-                  onValueChange={(value) => {
-                    setCustomerType(value as CustomerType)
-                    setSelectedCustomer(null)
-                    setCustomerSearch("")
-                    setShowCustomerList(false)
-                  }}
-                >
+                    <Select
+                      value={customerType}
+                      onValueChange={(value) => {
+                        setCustomerType(value as CustomerType)
+                        setSelectedCustomer(null)
+                        setCustomerSearch("")
+                        setShowCustomerList(value !== "sin_cliente")
+                      }}
+                    >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecciona" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="lead">Lead / Prospecto</SelectItem>
                     <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="sin_cliente">Sin cliente</SelectItem>
                   </SelectContent>
                 </Select>
               </QuoteField>
 
-              <div className="relative space-y-2">
-                <Label>Cliente</Label>
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={selectedCustomer ? selectedCustomer.display_name : customerSearch}
-                  onChange={(event) => {
-                    setCustomerSearch(event.target.value)
-                    setSelectedCustomer(null)
-                    setShowCustomerList(true)
-                  }}
-                  onFocus={() => setShowCustomerList(true)}
-                />
+              {isWithoutCustomer ? (
+                <QuoteField label="Cliente">
+                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                    La cotización se guardará sin cliente asignado.
+                  </div>
+                </QuoteField>
+              ) : (
+                <div ref={customerSearchRef} className="relative space-y-2">
+                  <Label>Cliente</Label>
+                  <Input
+                    placeholder="Buscar cliente..."
+                    value={selectedCustomer ? selectedCustomer.display_name : customerSearch}
+                    onChange={(event) => {
+                      setCustomerSearch(event.target.value)
+                      setSelectedCustomer(null)
+                      setShowCustomerList(true)
+                    }}
+                    onFocus={() => setShowCustomerList(true)}
+                  />
 
-                {showCustomerList && !selectedCustomer && customerSearch.trim().length >= 2 ? (
-                  <Card className="absolute z-20 mt-1 max-h-60 w-full overflow-auto">
-                    <CardContent className="space-y-1 p-2">
-                      {customerQuery.isFetching ? (
-                        <div className="p-2 text-sm text-muted-foreground">Buscando...</div>
-                      ) : null}
+                  {showCustomerList && !selectedCustomer ? (
+                    <Card className="absolute z-20 mt-1 max-h-60 w-full overflow-auto">
+                      <CardContent className="space-y-1 p-2">
+                        {customerQuery.isFetching && !customerSearchHasData ? (
+                          <div className="p-2 text-sm text-muted-foreground">Buscando...</div>
+                        ) : null}
 
-                      {!customerQuery.isFetching && filteredCustomerResults.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground">Sin resultados.</div>
-                      ) : null}
+                        {customerSearchHasData && filteredCustomerResults.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">
+                            {customerSearchTerm
+                              ? `Sin resultados para "${customerSearchTerm}".`
+                              : `No hay ${customerListLabel} disponibles.`}
+                          </div>
+                        ) : null}
 
-                      {filteredCustomerResults.map((customer) => (
-                        <button
-                          key={`${customer.type}-${customer.id}`}
-                          type="button"
-                          className="flex w-full flex-col rounded-md px-3 py-2 text-left hover:bg-muted"
-                          onClick={() => {
-                            setSelectedCustomer(customer)
-                            setCustomerSearch(customer.display_name)
-                            setShowCustomerList(false)
-                          }}
-                        >
-                          <span className="text-sm font-medium">{customer.display_name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {customer.contact_name || customer.email || customer.phone || "Sin datos extra"}
-                          </span>
-                        </button>
-                      ))}
-                    </CardContent>
-                  </Card>
-                ) : null}
-              </div>
+                        {filteredCustomerResults.map((customer) => (
+                          <button
+                            key={`${customer.type}-${customer.id}`}
+                            type="button"
+                            className="flex w-full flex-col rounded-md px-3 py-2 text-left hover:bg-muted"
+                            onClick={() => {
+                              setSelectedCustomer(customer)
+                              setCustomerSearch(customer.display_name)
+                              setShowCustomerList(false)
+                            }}
+                          >
+                            <span className="text-sm font-medium">{customer.display_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {customer.contact_name || customer.email || customer.phone || "Sin datos extra"}
+                            </span>
+                          </button>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">{customerSelectionHint}</p>
+                </div>
+              )}
 
               <QuoteField label="Empresa emisora">
                 <Select
@@ -546,13 +701,10 @@ export default function QuoteCreatePage() {
                     onCheckedChange={(checked) => setIncludeTax(Boolean(checked))}
                   />
                   <span className="text-sm">Incluir IVA</span>
-                  <Input
+                  <NumericInput
                     className="ml-auto w-24"
-                    type="number"
-                    min="0"
-                    step="0.01"
                     value={taxRate}
-                    onChange={(event) => setTaxRate(toNumber(event.target.value))}
+                    onValueChange={setTaxRate}
                   />
                 </div>
               </QuoteField>
@@ -562,7 +714,11 @@ export default function QuoteCreatePage() {
                   <Select
                     value={discountType}
                     onValueChange={(value) => {
-                      if (isQuoteAmountType(value)) setDiscountType(value)
+                      if (!isQuoteAmountType(value)) return
+                      setDiscountType(value)
+                      if (value === "none") {
+                        setDiscountValue(0)
+                      }
                     }}
                   >
                     <SelectTrigger>
@@ -574,12 +730,10 @@ export default function QuoteCreatePage() {
                       <SelectItem value="fixed">Monto fijo</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <NumericInput
+                    disabled={discountType === "none"}
                     value={discountValue}
-                    onChange={(event) => setDiscountValue(toNumber(event.target.value))}
+                    onValueChange={setDiscountValue}
                   />
                 </div>
               </QuoteField>
@@ -589,7 +743,11 @@ export default function QuoteCreatePage() {
                   <Select
                     value={commissionType}
                     onValueChange={(value) => {
-                      if (isQuoteAmountType(value)) setCommissionType(value)
+                      if (!isQuoteAmountType(value)) return
+                      setCommissionType(value)
+                      if (value === "none") {
+                        setCommissionValue(0)
+                      }
                     }}
                   >
                     <SelectTrigger>
@@ -601,15 +759,41 @@ export default function QuoteCreatePage() {
                       <SelectItem value="fixed">Monto fijo</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <NumericInput
+                    disabled={commissionType === "none"}
                     value={commissionValue}
-                    onChange={(event) => setCommissionValue(toNumber(event.target.value))}
+                    onValueChange={setCommissionValue}
                   />
                 </div>
               </QuoteField>
+
+              <div className="md:col-span-2">
+                <div className="rounded-lg border bg-muted/20 p-4">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold">Configuración de servicios</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Este valor se usa como precio por defecto al agregar servicios por metros cuadrados.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="space-y-2 sm:max-w-xs sm:flex-1">
+                      <Label>Precio por m2</Label>
+                      <NumericInput
+                        value={squareMeterPrice}
+                        onValueChange={setSquareMeterPrice}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSaveSquareMeterPrice}
+                      disabled={updateConfigurationMutation.isPending}
+                    >
+                      {updateConfigurationMutation.isPending ? "Guardando..." : "Guardar precio"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -646,23 +830,22 @@ export default function QuoteCreatePage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[920px] text-sm">
+                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1040px]" : "min-w-[920px]"}`}>
                   <thead className="border-b text-muted-foreground">
                     <tr>
                       <th className="py-3 text-left">Tipo</th>
                       <th className="text-left">Concepto</th>
-                      <th className="text-left">Desde</th>
-                      <th className="text-left">Hasta</th>
-                      <th className="text-center">Cant.</th>
-                      <th className="text-left">Precio</th>
-                      <th className="text-center">Desc.</th>
+                      {showRentalDates ? <th className="text-left">Desde</th> : null}
+                      {showRentalDates ? <th className="text-left">Hasta</th> : null}
+                      <th className="text-left">Metros cuadrados</th>
+                      <th className="text-left">Precio / m2</th>
                       <th className="text-right">Subtotal</th>
                       <th className="text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, index) => {
-                      const subtotal = Math.max(1, item.qty) * toNumber(item.unit_price)
+                      const subtotal = calculateItemSubtotal(item)
 
                       return (
                         <tr key={`${item.item_type}-${item.space_id ?? item.service_id ?? index}`} className="border-b align-top">
@@ -685,72 +868,49 @@ export default function QuoteCreatePage() {
                               />
                             </div>
                           </td>
+                          {showRentalDates ? (
+                            <td className="py-4">
+                              {item.item_type === "rental" ? (
+                                <Input
+                                  type="date"
+                                  value={item.start_date ?? ""}
+                                  onChange={(event) => updateItem(index, { start_date: event.target.value })}
+                                />
+                              ) : (
+                                <div className="py-2 text-center text-muted-foreground">—</div>
+                              )}
+                            </td>
+                          ) : null}
+                          {showRentalDates ? (
+                            <td className="py-4">
+                              {item.item_type === "rental" ? (
+                                <Input
+                                  type="date"
+                                  value={item.end_date ?? ""}
+                                  onChange={(event) => updateItem(index, { end_date: event.target.value })}
+                                />
+                              ) : (
+                                <div className="py-2 text-center text-muted-foreground">—</div>
+                              )}
+                            </td>
+                          ) : null}
                           <td className="py-4">
-                            <Input
-                              type="date"
-                              value={item.start_date ?? ""}
-                              disabled={item.item_type === "service"}
-                              onChange={(event) => updateItem(index, { start_date: event.target.value })}
-                            />
-                          </td>
-                          <td className="py-4">
-                            <Input
-                              type="date"
-                              value={item.end_date ?? ""}
-                              disabled={item.item_type === "service"}
-                              onChange={(event) => updateItem(index, { end_date: event.target.value })}
-                            />
-                          </td>
-                          <td className="py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                onClick={() =>
-                                  updateItem(index, {
-                                    qty: Math.max(1, item.qty - 1),
-                                  })
-                                }
-                              >
-                                <Minus className="h-4 w-4" />
-                              </Button>
-                              <span className="w-6 text-center">{item.qty}</span>
-                              <Button
-                                size="icon"
-                                variant="outline"
-                                onClick={() =>
-                                  updateItem(index, {
-                                    qty: item.qty + 1,
-                                  })
-                                }
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                          <td className="py-4">
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.unit_price}
-                              onChange={(event) =>
-                                updateItem(index, {
-                                  unit_price: toNumber(event.target.value),
-                                })
-                              }
-                            />
-                          </td>
-                          <td className="py-4">
-                            <div className="flex justify-center">
-                              <Checkbox
-                                checked={item.discount_applies ?? item.item_type === "rental"}
-                                disabled={item.item_type === "service"}
-                                onCheckedChange={(checked) =>
-                                  updateItem(index, { discount_applies: Boolean(checked) })
+                            {item.item_type === "service" ? (
+                              <NumericInput
+                                value={item.square_meters ?? 1}
+                                onValueChange={(value) =>
+                                  updateItem(index, { square_meters: Math.max(0.01, value) })
                                 }
                               />
-                            </div>
+                            ) : (
+                              <div className="py-2 text-center text-muted-foreground">—</div>
+                            )}
+                          </td>
+                          <td className="py-4">
+                            <NumericInput
+                              value={item.unit_price}
+                              onValueChange={(value) => updateItem(index, { unit_price: value })}
+                            />
                           </td>
                           <td className="py-4 text-right font-medium">{formatCurrency(subtotal)}</td>
                           <td className="py-4 text-right">
@@ -792,6 +952,65 @@ export default function QuoteCreatePage() {
                   placeholder="Notas para el equipo comercial..."
                 />
               </QuoteField>
+
+              <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Imágenes de la cotización</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Puedes adjuntar varias imágenes para respaldar la cotización.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(event) => {
+                      if (event.target.files?.length) {
+                        appendQuoteImages(event.target.files)
+                      }
+                      event.target.value = ""
+                    }}
+                    className="sm:max-w-md"
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    {quoteImages.length}/10 imágenes seleccionadas
+                  </div>
+                </div>
+
+                {quoteImages.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {quoteImages.map((file, index) => (
+                      <div key={`${file.name}-${file.lastModified}-${index}`} className="overflow-hidden rounded-lg border bg-background">
+                        <div className="relative aspect-video bg-muted">
+                          <img
+                            src={quoteImageUrls[index]}
+                            alt={file.name}
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeQuoteImage(index)}
+                            className="absolute right-2 top-2 rounded-full bg-black/70 p-1 text-white shadow hover:bg-black"
+                            aria-label={`Eliminar ${file.name}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+                          <ImagePlus className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed bg-background px-3 py-6 text-center text-xs text-muted-foreground">
+                    No hay imágenes agregadas todavía.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -801,12 +1020,12 @@ export default function QuoteCreatePage() {
             <CardHeader>
               <CardTitle className="text-lg">Resumen</CardTitle>
               <CardDescription>
-                {isPreviewLoading ? "Calculando vista previa..." : "Totales calculados por backend."}
+                {isPreviewLoading ? "Calculando vista previa..." : "Totales calculados"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between">
-                <span>Subtotal local</span>
+                <span>Subtotal</span>
                 <span>{formatCurrency(localSubtotal)}</span>
               </div>
               <div className="flex justify-between">
@@ -840,8 +1059,14 @@ export default function QuoteCreatePage() {
                 </div>
               ) : null}
 
+              {saveBlockingMessage ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {saveBlockingMessage}
+                </div>
+              ) : null}
+
               <div className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
-                <div>Cliente: {selectedCustomer?.display_name ?? "Pendiente"}</div>
+                <div>Cliente: {customerDisplayName}</div>
                 <div>Empresa: {selectedCompany?.name ?? "Pendiente"}</div>
                 <div>Agencia: {selectedAgency?.name ?? "Sin agencia"}</div>
               </div>

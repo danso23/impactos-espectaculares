@@ -63,7 +63,7 @@ services:
       - /app/node_modules
     command: sh -c "
       corepack enable &&
-      corepack prepare pnpm@latest --activate &&
+      corepack prepare pnpm@9 --activate &&
       pnpm install &&
       pnpm run vite:devlocal"
     ports:

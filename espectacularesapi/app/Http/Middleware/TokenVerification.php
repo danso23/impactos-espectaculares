@@ -9,6 +9,7 @@ class TokenVerification
 {
     public function handle($request, Closure $next, $guard = null)
     {
+        $ttlMinutes = max(1, (int) env('ACCESS_TTL_MINUTES', 30));
         $token = null;
 
         // 1) Prioridad: Authorization: Bearer <token>
@@ -29,7 +30,11 @@ class TokenVerification
             ], 401);
         }
 
-        $user = User::where('api_token', $token)->first();
+        $user = User::query()
+            ->select('users.*')
+            ->selectRaw('TIMESTAMPDIFF(MINUTE, create_token, CURRENT_TIMESTAMP) as token_age_minutes')
+            ->where('api_token', $token)
+            ->first();
 
         if (!$user) {
             return response()->json([
@@ -47,14 +52,11 @@ class TokenVerification
             ], 401);
         }
 
-        // Expiración (30 min)
-        $now = new \DateTime(date('Y-m-d H:i:s'));
-        $created = new \DateTime($user->create_token);
-        $interval = $now->diff($created);
+        // La expiración se calcula en la DB para evitar falsos vencimientos
+        // cuando PHP y MySQL tienen zonas horarias distintas.
+        $tokenAgeMinutes = (int) ($user->token_age_minutes ?? 0);
 
-        $totalMinutos = ($interval->d * 24 * 60) + ($interval->h * 60) + $interval->i;
-
-        if ($totalMinutos > 30) {
+        if ($tokenAgeMinutes > $ttlMinutes) {
             $user->api_token = null;
             $user->create_token = null;
             $user->save();

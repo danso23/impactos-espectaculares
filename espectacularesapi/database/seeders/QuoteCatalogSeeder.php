@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 
 class QuoteCatalogSeeder extends Seeder
@@ -144,6 +145,17 @@ class QuoteCatalogSeeder extends Seeder
             DB::table('services')->updateOrInsert(
                 ['key' => $service['key']],
                 $service
+            );
+        }
+
+        if (Schema::hasTable('configurations')) {
+            DB::table('configurations')->updateOrInsert(
+                ['id' => 1],
+                [
+                    'price_per_square_meter' => 0,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]
             );
         }
     }

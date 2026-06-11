@@ -27,8 +27,10 @@ class QuoteCalculator
         foreach (($payload['items'] ?? []) as $index => $item) {
             $itemType = $item['item_type'] ?? 'rental';
             $qty = max(1, (int)($item['qty'] ?? 1));
+            $squareMeters = max(0.01, $this->toFloat($item['square_meters'] ?? 1));
             $unitPrice = $this->toFloat($item['unit_price'] ?? 0);
-            $subtotal = round($qty * $unitPrice, 2);
+            $lineMultiplier = $itemType === 'service' ? $qty * $squareMeters : $qty;
+            $subtotal = round($lineMultiplier * $unitPrice, 2);
             $discountApplies = array_key_exists('discount_applies', $item)
                 ? filter_var($item['discount_applies'], FILTER_VALIDATE_BOOLEAN)
                 : $itemType === 'rental';
@@ -51,6 +53,7 @@ class QuoteCalculator
                 'sort_order' => isset($item['sort_order']) ? (int)$item['sort_order'] : $index,
                 'discount_applies' => $discountApplies,
                 'tax_rate' => $itemTaxRate,
+                'square_meters' => $squareMeters,
                 'discount_allocated' => 0.0,
                 'tax_amount' => 0.0,
                 'total' => 0.0,

@@ -3,6 +3,7 @@
 namespace App\Models\Entities;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Entities\User;
 
 class QuoteStatusHistory extends Model
 {
@@ -28,5 +29,10 @@ class QuoteStatusHistory extends Model
     public function toStatus()
     {
         return $this->belongsTo(QuoteStatus::class, 'to_status_id');
+    }
+
+    public function changedByUser()
+    {
+        return $this->belongsTo(User::class, 'changed_by');
     }
 }

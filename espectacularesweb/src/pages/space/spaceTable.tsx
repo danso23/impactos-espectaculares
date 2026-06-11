@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { createActionsColumn } from "@/components/generic/create-actions-column";
 import { Pencil, Eye, Trash2, FileText } from "lucide-react";
 
+import { useRoles } from "@/hooks/useRoles";
+
 type BuildSpaceTableOptions = {
   onQuote?: (row: Space) => void;
   onView?: (row: Space) => void;
@@ -16,9 +18,11 @@ type BuildSpaceTableOptions = {
 };
 
 export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
+  const { hasRole } = useRoles();
+
   /** ACCIONES DEL DATATABLE */
   const actions = React.useMemo<TableAction<Space>[]>(() => {
-    return [
+    const baseActions: TableAction<Space>[] = [
       {
         key: "quote",
         label: "Cotizar",
@@ -33,28 +37,33 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         onClick: (row) =>
           opts.onView ? opts.onView(row) : console.log("Ver", row.id),
       },
-      {
-        key: "edit",
-        label: "Editar",
-        icon: <Pencil className="h-4 w-4" />,
-        onClick: (row) =>
-          opts.onEdit ? opts.onEdit(row) : console.log("Editar", row.id),
-      },
-      {
-        key: "delete",
-        label: "Eliminar",
-        variant: "destructive",
-        icon: <Trash2 className="h-4 w-4" />,
-        separatorBefore: true,
-        onClick: async (row) => {
-          if (opts.onDelete) return opts.onDelete(row);
-          const ok = confirm(`¿Eliminar "${row.title}"?`);
-          if (!ok) return;
-          console.log("Eliminar", row.id);
-        },
-      },
     ];
-  }, [opts]);
+
+    if (hasRole("admin")) {
+      baseActions.push(
+        {
+          key: "edit",
+          label: "Editar",
+          icon: <Pencil className="h-4 w-4" />,
+          onClick: (row) =>
+            opts.onEdit ? opts.onEdit(row) : console.log("Editar", row.id),
+        },
+        {
+          key: "delete",
+          label: "Eliminar",
+          variant: "destructive",
+          icon: <Trash2 className="h-4 w-4" />,
+          separatorBefore: true,
+          onClick: async (row) => {
+            if (opts.onDelete) return opts.onDelete(row);
+            console.log("Eliminar", row.id);
+          },
+        }
+      );
+    }
+
+    return baseActions;
+  }, [opts, hasRole]);
 
   const columns = React.useMemo<ColumnDef<Space>[]>(() => {
     return [

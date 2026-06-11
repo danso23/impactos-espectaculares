@@ -16,13 +16,13 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, SlidersHorizontal } from "lucide-react"
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-
+import { cn } from "@/lib/utils"
 import type {
     FilterCheckboxConfig,
     FilterDropdownConfig,
@@ -42,6 +42,7 @@ type Props = {
     className?: string
     applyOnReset?: boolean
     defaultOpen?: boolean
+    actions?: React.ReactNode
 }
 
 const ALL_VALUE = "__FILTER_ALL__"
@@ -84,6 +85,7 @@ export function Filter({
     className,
     applyOnReset = true,
     defaultOpen = false,
+    actions,
 }: Props) {
     const [values, setValues] = React.useState<FilterValues>(() =>
         buildInitialState({ dropdowns, checkboxes, initialValues }),
@@ -151,24 +153,39 @@ export function Filter({
     const [open, setOpen] = React.useState(defaultOpen)
 
     return (
-        <Card className={className}>
+        <Card className={cn("rounded-xl shadow-md border-gray-200 overflow-hidden bg-white/80 backdrop-blur-sm", className)}>
             <Collapsible open={open} onOpenChange={setOpen}>
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between gap-3">
-                        <CardTitle className="text-base">{title}</CardTitle>
+                <CardHeader className="pb-3 px-6 pt-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-3">
+                            <CardTitle className="text-xl font-bold text-gray-800">{title}</CardTitle>
 
-                        <div className="flex items-center gap-2">
                             {activeCount > 0 && (
-                                <span className="rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+                                <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700">
                                     {activeCount} activo{activeCount === 1 ? "" : "s"}
                                 </span>
                             )}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                {actions}
+                            </div>
 
                             <CollapsibleTrigger asChild>
-                                <Button variant="outline" size="sm" className="gap-2">
-                                    {open ? "Ocultar" : "Mostrar"}
+                                <Button
+                                    variant={open ? "secondary" : "outline"}
+                                    size="icon"
+                                    className={cn(
+                                        "relative rounded-lg",
+                                        open ? "bg-purple-100 text-purple-700" : "border-gray-300"
+                                    )}
+                                    aria-label={open ? "Ocultar filtros" : "Mostrar filtros"}
+                                    title={open ? "Ocultar filtros" : "Mostrar filtros"}
+                                >
+                                    <SlidersHorizontal className="h-4 w-4" />
                                     <ChevronDown
-                                        className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+                                        className={`absolute h-3 w-3 translate-x-2 translate-y-2 rounded-full bg-background p-[1px] text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
                                     />
                                 </Button>
                             </CollapsibleTrigger>
@@ -177,12 +194,12 @@ export function Filter({
                 </CardHeader>
 
                 <CollapsibleContent>
-                    <CardContent className="space-y-3">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <CardContent className="space-y-6 px-6 pb-6 pt-2 animate-in slide-in-from-top-2 duration-200">
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                             {/* Dropdowns */}
                             {dropdowns.map((d) => (
                                 <div key={d.key} className="space-y-2">
-                                    <Label>{d.label}</Label>
+                                    <Label className="text-sm font-semibold text-gray-700">{d.label}</Label>
 
                                     <Select
                                         value={values.selects[d.key] ?? ALL_VALUE}
@@ -191,12 +208,12 @@ export function Filter({
                                         }
                                         disabled={d.disabled}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="rounded-lg border-gray-300 bg-white shadow-sm focus:ring-purple-500">
                                             <SelectValue
                                                 placeholder={d.placeholder ?? "Selecciona una opción"}
                                             />
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent className="rounded-xl shadow-xl border-gray-200">
                                             <SelectItem value={ALL_VALUE}>(Todos)</SelectItem>
                                             {d.options.map((opt) => (
                                                 <SelectItem key={opt.value} value={opt.value}>
@@ -212,18 +229,20 @@ export function Filter({
                             {enableDateRange && (
                                 <>
                                     <div className="space-y-2">
-                                        <Label>Fecha inicial</Label>
+                                        <Label className="text-sm font-semibold text-gray-700">Fecha inicial</Label>
                                         <Input
                                             type="date"
+                                            className="rounded-lg border-gray-300 bg-white shadow-sm"
                                             value={values.dateFrom ?? ""}
                                             onChange={(e) => setDateFrom(e.target.value || undefined)}
                                         />
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Fecha final</Label>
+                                        <Label className="text-sm font-semibold text-gray-700">Fecha final</Label>
                                         <Input
                                             type="date"
+                                            className="rounded-lg border-gray-300 bg-white shadow-sm"
                                             value={values.dateTo ?? ""}
                                             onChange={(e) => setDateTo(e.target.value || undefined)}
                                         />
@@ -236,14 +255,14 @@ export function Filter({
                                 const v = values.checks[c.key]
                                 return (
                                     <div key={c.key} className="space-y-2">
-                                        <Label>{c.label}</Label>
+                                        <Label className="text-sm font-semibold text-gray-700">{c.label}</Label>
 
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button
                                                     type="button"
                                                     variant="outline"
-                                                    className="w-full justify-between"
+                                                    className="w-full justify-between rounded-lg border-gray-300 bg-white shadow-sm"
                                                     disabled={c.disabled}
                                                 >
                                                     <span>{triLabel(v)}</span>
@@ -251,7 +270,7 @@ export function Filter({
                                                 </Button>
                                             </DropdownMenuTrigger>
 
-                                            <DropdownMenuContent align="start" className="w-40">
+                                            <DropdownMenuContent align="start" className="w-40 rounded-xl shadow-xl border-gray-200">
                                                 <DropdownMenuItem
                                                     onClick={() => setCheck(c.key, undefined)}
                                                 >
@@ -270,9 +289,18 @@ export function Filter({
                             })}
 
                             {/* Actions */}
-                            <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4">
-                                <Button onClick={handleApply}>{applyText}</Button>
-                                <Button variant="outline" onClick={handleReset}>
+                            <div className="flex flex-wrap gap-3 sm:col-span-2 lg:col-span-4 pt-2">
+                                <Button 
+                                    onClick={handleApply}
+                                    className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-lg px-8 shadow-md"
+                                >
+                                    {applyText}
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    onClick={handleReset}
+                                    className="rounded-lg px-8 border-gray-300 hover:bg-purple-50 hover:text-purple-600"
+                                >
                                     {resetText}
                                 </Button>
                             </div>

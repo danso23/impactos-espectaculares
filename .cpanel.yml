@@ -1,0 +1,12 @@
+---
+deployment:
+  tasks:
+    - /bin/sh -c 'echo "=== DEPLOY START ===" > /home2/enticonfiamos/public_html/deploy_full.log 2>&1'
+    - /bin/sh -c '/bin/date >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1'
+    - /bin/sh -c '/bin/mkdir -p /home2/enticonfiamos/public_html/espectacularesapi /home2/enticonfiamos/public_html/espectacularesapi/public /home2/enticonfiamos/app.enticonfiamos.com.mx >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1'
+    - /bin/sh -c 'cd espectacularesapi && /usr/bin/tar --exclude=.env --exclude=public/storage --exclude=storage -cf - . | (cd /home2/enticonfiamos/public_html/espectacularesapi && /usr/bin/tar -xf -) >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1'
+    - /bin/sh -c 'if [ ! -e /home2/enticonfiamos/public_html/espectacularesapi/public/storage ]; then /bin/ln -s ../storage/app/public /home2/enticonfiamos/public_html/espectacularesapi/public/storage >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1; fi'
+    - /bin/sh -c '/usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan migrate --force >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1'
+    - /bin/sh -c 'RUN_SEEDERS=false; if [ "$RUN_SEEDERS" = "true" ]; then /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan db:seed --class=Database\\Seeders\\QuoteStatusSeeder --force >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1; /usr/local/bin/php /home2/enticonfiamos/public_html/espectacularesapi/artisan db:seed --class=Database\\Seeders\\QuoteCatalogSeeder --force >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1; fi'
+    - /bin/sh -c 'if [ -d espectacularesweb/dist ]; then cd espectacularesweb/dist && /usr/bin/tar -cf - . | (cd /home2/enticonfiamos/app.enticonfiamos.com.mx && /usr/bin/tar -xf -) >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1; else echo "Frontend dist no existe en el repo; se omite despliegue del frontend." >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1; fi'
+    - /bin/sh -c 'echo "=== DEPLOY END ===" >> /home2/enticonfiamos/public_html/deploy_full.log 2>&1'

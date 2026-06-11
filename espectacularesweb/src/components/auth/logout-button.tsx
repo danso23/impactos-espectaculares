@@ -31,8 +31,13 @@ function forceLocalLogout(navigate: ReturnType<typeof useNavigate>) {
 }
 
 async function logoutRequest() {
+  const refreshToken = localStorage.getItem("refresh_token")
   const res = await apiFetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      refresh_token: refreshToken || null,
+    }),
   })
 
   if (res.status === 204) return null
@@ -78,14 +83,15 @@ export function LogoutButton({
           className={[
             fullWidth ? "w-full justify-start" : "",
             compact ? "justify-center px-2" : "",
+            "text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors rounded-lg",
             className ?? "",
           ].join(" ")}
           disabled={loading}
           aria-label="Cerrar sesión"
           title="Cerrar sesión"
         >
-          <LogOut className={compact ? "h-4 w-4" : "mr-2 h-4 w-4"} />
-          {compact ? null : loading ? "Cerrando..." : "Cerrar sesión"}
+          <LogOut className={compact ? "h-5 w-5" : "mr-3 h-5 w-5"} />
+          {compact ? null : loading ? "Cerrando..." : <span className="font-medium text-base">Cerrar sesión</span>}
         </Button>
       </AlertDialogTrigger>
 

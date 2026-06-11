@@ -1,9 +1,10 @@
 import * as React from "react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { FileDown } from "lucide-react"
+import { FileDown, PencilLine, ReceiptText } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
-import type { QuoteRecord, QuoteStatus } from "@/types/Quote"
+import type { QuoteRecord } from "@/types/Quote"
+import { canChangeQuoteStatus, canConvertQuoteToRental, toneClass } from "@/pages/quotes/quoteStatus"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
@@ -23,25 +24,14 @@ function formatCurrency(value?: number | null) {
   }).format(value ?? 0)
 }
 
-function toneClass(status?: QuoteStatus | null) {
-  switch (status?.color) {
-    case "green":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700"
-    case "blue":
-      return "border-sky-200 bg-sky-50 text-sky-700"
-    case "purple":
-      return "border-violet-200 bg-violet-50 text-violet-700"
-    case "red":
-      return "border-rose-200 bg-rose-50 text-rose-700"
-    default:
-      return "border-slate-200 bg-slate-50 text-slate-700"
-  }
-}
-
 export function useQuoteTable({
   onDownload,
+  onChangeStatus,
+  onConvertToRental,
 }: {
   onDownload: (quote: QuoteRecord) => Promise<void> | void
+  onChangeStatus: (quote: QuoteRecord) => void
+  onConvertToRental: (quote: QuoteRecord) => void
 }) {
   return React.useMemo<ColumnDef<QuoteRecord>[]>(
     () => [
@@ -54,6 +44,11 @@ export function useQuoteTable({
             <div className="text-xs text-muted-foreground">
               Versión {row.original.version}
             </div>
+            {row.original.rental ? (
+              <div className="text-xs text-emerald-700">
+                Renta #{row.original.rental.id}
+              </div>
+            ) : null}
           </div>
         ),
       },
@@ -118,9 +113,23 @@ export function useQuoteTable({
             icon: <FileDown className="h-4 w-4" />,
             onClick: onDownload,
           },
+          {
+            key: "change-status",
+            label: "Cambiar estatus",
+            icon: <PencilLine className="h-4 w-4" />,
+            onClick: onChangeStatus,
+            visible: canChangeQuoteStatus,
+          },
+          {
+            key: "convert-to-rental",
+            label: "Convertir a renta",
+            icon: <ReceiptText className="h-4 w-4" />,
+            onClick: onConvertToRental,
+            visible: canConvertQuoteToRental,
+          },
         ],
       }),
     ],
-    [onDownload]
+    [onChangeStatus, onConvertToRental, onDownload]
   )
 }

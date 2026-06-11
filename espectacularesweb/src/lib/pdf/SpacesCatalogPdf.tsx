@@ -220,6 +220,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  iconTextBold: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+
   highlight: {
     color: "red",
     fontSize: 10,
@@ -271,39 +276,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
   },
+  featuresContainer: {
+    position: "absolute",
+    bottom: 50, // arriba del footer
+    left: 20,
+    width: "90%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  featureColumn: {
+    flex: 1,
+    gap: 6,
+  },
+
+  featureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  featureIcon: {
+    width: 14,
+    height: 14,
+  },
+
+  featureText: {
+    fontSize: 9,
+    color: "#2E2A6D",
+  },
 });
 
 function getStorageBaseUrl() {
-  const apiUrl = env.apiUrl?.replace(/\/+$/, "") ?? ""
-  return apiUrl ? `${apiUrl}/storage` : `${window.location.origin}/storage`
+  const apiUrl = env.apiUrl?.replace(/\/+$/, "") ?? "";
+  return apiUrl ? `${apiUrl}/storage` : `${window.location.origin}/storage`;
 }
 
 function resolveSpaceImageUrl(path?: string | null) {
-  if (!path) return null
-  if (/^(https?:\/\/|data:)/i.test(path)) return path
+  if (!path) return null;
+  if (/^(https?:\/\/|data:)/i.test(path)) return path;
 
-  const cleanPath = path.replace(/^\/+/, "")
-  return `${getStorageBaseUrl()}/${cleanPath}`
+  const cleanPath = path.replace(/^\/+/, "");
+  return `${getStorageBaseUrl()}/${cleanPath}`;
 }
 
 function getCatalogImages(space: SpaceApi) {
   const urls = (space.images ?? [])
     .map((image) => resolveSpaceImageUrl(image.path))
-    .filter((value): value is string => Boolean(value))
+    .filter((value): value is string => Boolean(value));
 
-  const fallbackMain = `${window.location.origin}/img/img1.png`
-  const fallbackAlt1 = `${window.location.origin}/img/img2.png`
-  const fallbackAlt2 = `${window.location.origin}/img/img3.png`
+  const fallbackMain = `${window.location.origin}/img/img1.png`;
+  const fallbackAlt1 = `${window.location.origin}/img/img2.png`;
+  const fallbackAlt2 = `${window.location.origin}/img/img3.png`;
 
   return {
     main: urls[0] ?? fallbackMain,
     secondary: urls[1] ?? urls[0] ?? fallbackAlt1,
     tertiary: urls[2] ?? urls[1] ?? urls[0] ?? fallbackAlt2,
-  }
+  };
 }
 
 function getGoogleMapsUrl(space: SpaceApi) {
-  return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`
+  return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`;
 }
 
 export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
@@ -342,8 +376,8 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
       {/* ================= ESPACIOS ================= */}
       {spaces.map((space) => {
-        const catalogImages = getCatalogImages(space)
-        const googleMapsUrl = getGoogleMapsUrl(space)
+        const catalogImages = getCatalogImages(space);
+        const googleMapsUrl = getGoogleMapsUrl(space);
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(googleMapsUrl)}`;
 
         const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
@@ -365,7 +399,7 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
             {/* ETIQUETA LATERAL */}
             <View style={styles.sideLabel}>
-              <Text style={styles.sideLabelText}>Carteleras Mérida</Text>
+              {/*<Text style={styles.sideLabelText}>Carteleras Mérida</Text>*/}
             </View>
 
             {/* IMAGEN PRINCIPAL */}
@@ -375,22 +409,28 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
             <View style={styles.contentRow}>
               {/* IZQUIERDA */}
               <View style={styles.leftInfo}>
+                <Text style={styles.iconTextBold}>
+                  <b>{space.assigned_id ?? "-"}</b>
+                </Text>
+                &nbsp;
                 <Text style={styles.iconText}>
                   {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
                 </Text>
-
+                &nbsp;
                 <Text style={styles.iconText}>UBICACIÓN:</Text>
-
                 <Text style={styles.iconText}>
                   {space.latitude}, {space.longitude}
                 </Text>
-
+                &nbsp;
+                <Text style={styles.iconText}>DESCRIPCIÓN:</Text>
+                <Text style={styles.iconText}>
+                  <b> {space.description ?? "No disponible"}</b>
+                </Text>
+                &nbsp;
                 <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
-
                 <Link src={googleMapsUrl}>
                   <Image src={qrUrl} style={styles.qr} />
                 </Link>
-
                 <Link src={googleMapsUrl} style={styles.mapLink}>
                   Ver ubicacion en Google Maps
                 </Link>
@@ -398,12 +438,74 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
 
               {/* DERECHA */}
               <View style={styles.rightColumn}>
-                <Image src={catalogImages.secondary} style={styles.smallImage} />
+                <Image
+                  src={catalogImages.secondary}
+                  style={styles.smallImage}
+                />
 
                 <Image src={catalogImages.tertiary} style={styles.smallImage} />
 
                 {/* MAPA */}
                 <Image src={mapUrl} style={styles.mapImage} />
+              </View>
+            </View>
+
+            {/* FEATURES (ICONOS + TEXTO) */}
+            <View style={styles.featuresContainer}>
+              {/* COLUMNA IZQUIERDA */}
+              <View style={styles.featureColumn}>
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/facebook.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    Impactos Espectaculares
+                  </Text>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/web.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    www.impactosespectaculares.com.mx
+                  </Text>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/email.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    gguendulainf@hotmail.com
+                  </Text>
+                </View>
+              </View>
+
+              {/* COLUMNA DERECHA */}
+              <View style={styles.featureColumn}>
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/phone.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    999 285 92 53 // 999 317 00 98
+                  </Text>
+                </View>
+
+                <View style={styles.featureItem}>
+                  <Image
+                    src={window.location.origin + "/img/icons/mobile.png"}
+                    style={styles.featureIcon}
+                  />
+                  <Text style={styles.featureText}>
+                    999 1 27 68 65 // 999 1 27 31 56
+                  </Text>
+                </View>
               </View>
             </View>
 
