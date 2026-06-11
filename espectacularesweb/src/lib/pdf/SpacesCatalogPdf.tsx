@@ -220,6 +220,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  iconTextBold: {
+    fontSize: 16,
+    marginBottom: 4,
+  },
+
   highlight: {
     color: "red",
     fontSize: 10,
@@ -404,7 +409,9 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
             <View style={styles.contentRow}>
               {/* IZQUIERDA */}
               <View style={styles.leftInfo}>
-                <Text style={styles.iconText}>{space.assigned_id ?? "-"}</Text>
+                <Text style={styles.iconTextBold}>
+                  <b>{space.assigned_id ?? "-"}</b>
+                </Text>
                 &nbsp;
                 <Text style={styles.iconText}>
                   {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
@@ -417,7 +424,7 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
                 &nbsp;
                 <Text style={styles.iconText}>DESCRIPCIÓN:</Text>
                 <Text style={styles.iconText}>
-                  {space.description ?? "No disponible"}
+                  <b> {space.description ?? "No disponible"}</b>
                 </Text>
                 &nbsp;
                 <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
