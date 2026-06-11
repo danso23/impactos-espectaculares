@@ -25,6 +25,43 @@ function formatCurrency(value?: number | null) {
   }).format(value)
 }
 
+function formatCustomerType(value?: string | null) {
+  if (!value) return "—"
+
+  if (value === "lead") return "Lead"
+  if (value === "cliente") return "Cliente"
+  if (value === "sin_cliente") return "Sin cliente"
+
+  return value
+}
+
+function statusClass(value?: string | null) {
+  if (value === "active") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700"
+  }
+
+  if (value === "completed") {
+    return "border-indigo-200 bg-indigo-50 text-indigo-700"
+  }
+
+  if (value === "cancelled") {
+    return "border-rose-200 bg-rose-50 text-rose-700"
+  }
+
+  return "border-slate-200 bg-slate-50 text-slate-600"
+}
+
+function statusLabel(value?: string | null) {
+  if (!value) return "—"
+
+  if (value === "draft") return "Borrador"
+  if (value === "active") return "Activa"
+  if (value === "completed") return "Completada"
+  if (value === "cancelled") return "Cancelada"
+
+  return value
+}
+
 export function useRentalTable({
   onEdit,
   onDelete,
@@ -42,12 +79,20 @@ export function useRentalTable({
       {
         accessorKey: "customer_type",
         header: "Cliente",
-        cell: ({ row }) => row.original.customer_type ?? "—",
+        cell: ({ row }) => formatCustomerType(row.original.customer_type),
       },
       {
         accessorKey: "status",
         header: "Estatus",
-        cell: ({ row }) => row.original.status ?? "—",
+        cell: ({ row }) => (
+          <span
+            className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${statusClass(
+              row.original.status
+            )}`}
+          >
+            {statusLabel(row.original.status)}
+          </span>
+        ),
       },
       {
         accessorKey: "starts_at",

@@ -34,6 +34,8 @@ import LeadsPage from "@/pages/crm/leadsPage";
 import ClientsPage from "@/pages/crm/clientsPage";
 import RolePage from "./pages/rolePage";
 import CaseroPage from "./pages/caseros/caseroPage";
+import ProviderPage from "@/pages/providers/providerPage";
+import RentalPage from "@/pages/rentals/rentalPage";
 
 type NavItem = {
   to: string;
@@ -238,16 +240,13 @@ export default function AppRoot() {
           <Route path="espacios" element={<SpacePage />} />
           <Route path="cotizaciones" element={<QuotesPage />} />
           <Route path="cotizaciones/nueva" element={<QuoteCreatePage />} />
-          <Route path="rentas" element={<RouteStub title="Rentas" />} />
+          <Route path="rentas" element={<RentalPage />} />
           <Route path="usuarios" element={<UsersPage />} />
           <Route path="roles" element={<RolePage />} />
           <Route path="pagos" element={<RouteStub title="Pagos" />} />
           <Route path="prospectos" element={<LeadsPage />} />
           <Route path="clientes" element={<ClientsPage />} />
-          <Route
-            path="proveedores"
-            element={<RouteStub title="Proveedores" />}
-          />
+          <Route path="proveedores" element={<ProviderPage />} />
           <Route path="caseros" element={<CaseroPage />} />
           <Route path="servicios" element={<RouteStub title="Servicios" />} />
           <Route
