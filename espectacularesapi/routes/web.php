@@ -56,8 +56,26 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->delete('spaces/{id}', ['uses' => 'SpaceController@delete']);
 
+        /** PROVIDERS **/
+        $router->get('providers', ['uses' => 'ProviderController@index']);
+        $router->get('providers/{id}', ['uses' => 'ProviderController@find']);
+        $router->post('providers', ['uses' => 'ProviderController@store']);
+        $router->put('providers/{id}', ['uses' => 'ProviderController@update']);
+        $router->patch('providers/{id}', ['uses' => 'ProviderController@update']);
+        $router->delete('providers/{id}', ['uses' => 'ProviderController@delete']);
+
+        /** RENTALS **/
+        $router->get('rentals', ['uses' => 'RentalController@index']);
+        $router->get('rentals/{id}', ['uses' => 'RentalController@find']);
+        $router->post('rentals', ['uses' => 'RentalController@store']);
+        $router->put('rentals/{id}', ['uses' => 'RentalController@update']);
+        $router->patch('rentals/{id}', ['uses' => 'RentalController@update']);
+        $router->delete('rentals/{id}', ['uses' => 'RentalController@delete']);
+
         /** QUOTES AND LEADS **/
         $router->get('quote-catalogs', ['uses' => 'QuoteController@catalogs']);
+        $router->get('configuration', ['uses' => 'ConfigurationController@show']);
+        $router->put('configuration', ['uses' => 'ConfigurationController@update']);
         $router->get('lead-catalogs', ['uses' => 'LeadController@catalogs']);
         $router->get('leads', ['uses' => 'LeadController@index']);
         $router->post('leads', ['uses' => 'LeadController@store']);

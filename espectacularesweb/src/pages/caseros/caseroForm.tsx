@@ -12,6 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
@@ -294,13 +295,10 @@ export function CaseroForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="casero-renta">Monto Renta (MXN)</Label>
-              <Input
+              <NumericInput
                 id="casero-renta"
-                type="number"
-                step="0.01"
-                min="0"
                 value={form.monto_renta}
-                onChange={(e) => updateField("monto_renta", e.target.value)}
+                onValueChange={(value) => updateField("monto_renta", String(value))}
                 placeholder="0.00"
               />
             </div>

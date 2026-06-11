@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Entities\Space;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 
@@ -215,5 +216,21 @@ class SpaceController extends BaseCrudController
             'Content-Length' => (string) filesize($absolutePath),
             'Cache-Control' => 'private, max-age=300',
         ]);
+    }
+
+    public function delete($id)
+    {
+        $space = Space::findOrFail($id);
+
+        $isUsedInQuotes = DB::table('quote_items')->where('space_id', $space->id)->exists();
+        $isUsedInRentals = DB::table('rental_items')->where('space_id', $space->id)->exists();
+
+        if ($isUsedInQuotes || $isUsedInRentals) {
+            return response()->json([
+                'message' => 'No se puede eliminar porque el espacio ya está usado en cotizaciones o rentas.',
+            ], 409);
+        }
+
+        return parent::delete($id);
     }
 }

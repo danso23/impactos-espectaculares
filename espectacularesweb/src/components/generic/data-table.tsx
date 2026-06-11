@@ -227,7 +227,14 @@ export function DataTable<TData>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs">
+                  <TableHead
+                    key={header.id}
+                    className={cn(
+                      "px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs",
+                      header.column.id === "actions" &&
+                        "sticky right-0 z-30 bg-gradient-to-r from-purple-600 to-indigo-600 shadow-[-10px_0_12px_-12px_rgba(0,0,0,0.35)]",
+                    )}
+                  >
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -254,7 +261,14 @@ export function DataTable<TData>({
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-6 py-4 text-gray-700">
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        "px-6 py-4 text-gray-700",
+                        cell.column.id === "actions" &&
+                          "sticky right-0 z-10 bg-white shadow-[-10px_0_12px_-12px_rgba(0,0,0,0.25)]",
+                      )}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),

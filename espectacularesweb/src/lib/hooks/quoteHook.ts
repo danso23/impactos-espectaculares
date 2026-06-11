@@ -7,13 +7,16 @@ import {
   createQuote,
   getQuoteHistory,
   getQuoteCatalogs,
+  updateQuoteConfiguration,
   getQuotes,
   previewQuote,
   searchQuoteCustomers,
 } from "@/lib/services/quoteService"
 import type {
+  QuoteCreateRequest,
   QuoteListParams,
   QuotePayload,
+  QuoteConfigurationUpdatePayload,
   QuoteConvertToRentalPayload,
   QuoteStatusChangePayload,
   SearchableCustomerType,
@@ -48,11 +51,12 @@ export function useQuoteCustomerSearch(
 ) {
   const access = tokenStore.getAccess()
   const deferredQuery = React.useDeferredValue(query.trim())
+  const searchQuery = deferredQuery.length >= 2 ? deferredQuery : ""
 
   return useQuery({
-    queryKey: ["quotes", "customers", type, deferredQuery],
-    queryFn: () => searchQuoteCustomers({ q: deferredQuery, type }),
-    enabled: enabled && !!access && deferredQuery.length >= 2,
+    queryKey: ["quotes", "customers", type, searchQuery],
+    queryFn: () => searchQuoteCustomers({ q: searchQuery, type }),
+    enabled: enabled && !!access && (searchQuery.length === 0 || searchQuery.length >= 2),
     staleTime: 15_000,
   })
 }
@@ -78,9 +82,20 @@ export function useCreateQuote() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: QuotePayload) => createQuote(payload),
+    mutationFn: (request: QuoteCreateRequest) => createQuote(request),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["quotes"] })
+    },
+  })
+}
+
+export function useUpdateQuoteConfiguration() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (payload: QuoteConfigurationUpdatePayload) => updateQuoteConfiguration(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["quotes", "catalogs"] })
     },
   })
 }
