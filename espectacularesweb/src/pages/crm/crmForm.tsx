@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -225,7 +226,10 @@ export function CrmForm({
       }}
     >
       <DialogTrigger asChild>
-        <Button>{isLead ? "Agregar prospecto" : "Agregar cliente"}</Button>
+        <Button className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-6 text-white shadow-lg transition-all hover:from-purple-700 hover:to-indigo-700 hover:-translate-y-0.5 border-none">
+          <Plus className="mr-2 h-5 w-5" />
+          {isLead ? "Agregar prospecto" : "Agregar cliente"}
+        </Button>
       </DialogTrigger>
 
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
