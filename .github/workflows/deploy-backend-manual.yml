@@ -11,14 +11,6 @@ on:
         options:
           - desarrollo
           - main
-      run_migrations:
-        description: Run php artisan migrate --force after deploy
-        required: true
-        default: no
-        type: choice
-        options:
-          - no
-          - yes
 
 concurrency:
   group: deploy-backend
@@ -30,38 +22,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          port: ${{ secrets.SSH_PORT }}
-          key: ${{ secrets.SSH_KEY }}
-          script_stop: true
-          script: |
-            set -e
+          ref: ${{ inputs.branch }}
 
-            SOURCE_PATH="${{ secrets.BACKEND_SOURCE_PATH }}"
-            TARGET_PATH="${{ secrets.BACKEND_TARGET_PATH }}"
-            PHP_BIN="${{ vars.PHP_BIN }}"
-
-            if [ -z "$PHP_BIN" ]; then
-              PHP_BIN=php
-            fi
-
-            mkdir -p "$TARGET_PATH"
-            mkdir -p "$TARGET_PATH/public"
-
-            cd "$SOURCE_PATH/espectacularesapi"
-            tar --exclude=.env --exclude=public/storage --exclude=storage -cf - . | (cd "$TARGET_PATH" && tar -xf -)
-
-            if [ ! -e "$TARGET_PATH/public/storage" ]; then
-              ln -s ../storage/app/public "$TARGET_PATH/public/storage"
-            fi
-
-            "$PHP_BIN" "$TARGET_PATH/artisan" config:clear
-            "$PHP_BIN" "$TARGET_PATH/artisan" cache:clear
-
-            if [ "${{ inputs.run_migrations }}" = "yes" ]; then
-              "$PHP_BIN" "$TARGET_PATH/artisan" migrate --force
-            fi
+      - name: Deploy via FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: ${{ secrets.FTP_PORT }}
+          protocol: ftps
+          security: loose
+          local-dir: espectacularesapi/
+          server-dir: ${{ secrets.BACKEND_FTP_SERVER_DIR }}
+          exclude: |
+            **/.env
+            **/.htaccess
+            **/storage/**
+            **/storage
+            **/public/storage/**
+            **/public/storage
