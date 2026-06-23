@@ -321,6 +321,7 @@ function resolveSpaceImageUrl(path?: string | null) {
 }
 
 function getCatalogImages(space: SpaceApi) {
+  console.log("SPACE PDF", space);
   const urls = (space.images ?? [])
     .map((image) => resolveSpaceImageUrl(image.path))
     .filter((value): value is string => Boolean(value));
@@ -409,24 +410,19 @@ export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
             <View style={styles.contentRow}>
               {/* IZQUIERDA */}
               <View style={styles.leftInfo}>
-                <Text style={styles.iconTextBold}>
-                  <b>{space.assigned_id ?? "-"}</b>
-                </Text>
-                &nbsp;
+                <Text style={styles.iconTextBold}>ID:</Text>
+                <Text style={styles.iconTextBold}>{space.assigned_id}</Text>
                 <Text style={styles.iconText}>
                   {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
                 </Text>
-                &nbsp;
-                <Text style={styles.iconText}>UBICACIÓN:</Text>
-                <Text style={styles.iconText}>
+                <Text style={styles.iconTextBold}>UBICACIÓN:</Text>
+                <Text style={styles.iconTextBold}>
                   {space.latitude}, {space.longitude}
                 </Text>
-                &nbsp;
-                <Text style={styles.iconText}>DESCRIPCIÓN:</Text>
-                <Text style={styles.iconText}>
-                  <b> {space.description ?? "No disponible"}</b>
+                <Text style={styles.iconTextBold}>DESCRIPCIÓN:</Text>
+                <Text style={styles.iconTextBold}>
+                  {space.description ?? "No disponible"}
                 </Text>
-                &nbsp;
                 <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
                 <Link src={googleMapsUrl}>
                   <Image src={qrUrl} style={styles.qr} />
