@@ -1,309 +1,430 @@
 import {
   Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
   Image,
   Link,
+  Page,
+  StyleSheet,
+  Text,
+  View,
 } from "@react-pdf/renderer";
-import type { SpaceApi } from "@/types/Space";
 import { env } from "@/config/env";
+import type { Space, SpaceApi } from "@/types/Space";
+
+export type CatalogSpace = SpaceApi | Space;
+
+const COLORS = {
+  ink: "#18152E",
+  muted: "#6F7188",
+  purple: "#7417EF",
+  violet: "#4A32F0",
+  orange: "#FF7B31",
+  paper: "#F7F7FC",
+  line: "#E7E5F2",
+  green: "#087742",
+};
 
 const styles = StyleSheet.create({
-  /* ================= PORTADA ================= */
   coverPage: {
-    backgroundColor: "#EDEDED",
-  },
-
-  coverContainer: {
-    flex: 1,
     position: "relative",
-    padding: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 44,
+    color: "#FFFFFF",
+    backgroundColor: "#1A153D",
   },
-
-  /* 🔷 FORMAS */
-  blueTop: {
+  coverGlowTop: {
     position: "absolute",
-    top: 0,
-    right: 0,
-    width: "65%",
-    height: 180,
-    backgroundColor: "#1D6FA5",
+    width: 310,
+    height: 310,
+    top: -150,
+    right: -110,
+    borderRadius: 155,
+    backgroundColor: "#5B356F",
   },
-
-  blueBottom: {
+  coverGlowBottom: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    width: "65%",
-    height: 180,
-    backgroundColor: "#1D6FA5",
+    width: 290,
+    height: 290,
+    bottom: -145,
+    left: -145,
+    borderRadius: 145,
+    backgroundColor: "#5C16B8",
   },
-
-  blueLight: {
+  coverAccent: {
     position: "absolute",
-    bottom: 120,
-    left: 0,
-    width: "55%",
-    height: 120,
-    backgroundColor: "#2CA6D9",
+    width: 150,
+    height: 150,
+    top: 70,
+    right: -60,
+    borderRadius: 75,
+    borderWidth: 1,
+    borderColor: "#7B6A9A",
   },
-
-  /* 🟣 BLOQUES */
-  purpleTop: {
-    position: "absolute",
-    top: 90,
-    right: 60,
-    width: 120,
-    height: 60,
-    backgroundColor: "#2E2A6D",
-  },
-
-  purpleBottom: {
-    position: "absolute",
-    bottom: 60,
-    left: 40,
-    width: 160,
-    height: 70,
-    backgroundColor: "#2E2A6D",
-  },
-
-  /* CONTENIDO */
-
-  title: {
-    fontSize: 44,
-    fontWeight: "bold",
-    color: "#2E2A6D",
-    letterSpacing: 2,
-  },
-
-  subtitle: {
-    fontSize: 16,
-    marginTop: 10,
-    color: "#2E2A6D",
-    letterSpacing: 3,
-  },
-
-  subLogo: {
-    width: 100,
-    marginTop: 20,
-  },
-
-  yearBox: {
-    position: "absolute",
-    bottom: 50,
-    right: 50,
-    border: "2 solid #2E2A6D",
-    padding: 12,
-  },
-
-  yearText: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#2E2A6D",
-    textAlign: "center",
-  },
-
-  /* ================= PÁGINA ESPACIO ================= */
-  page: {
-    backgroundColor: "#FFFFFF",
-    padding: 20,
-  },
-
-  logoBox: {
-    width: 120,
-    height: 40,
-  },
-
-  titleSpace: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginTop: 8,
-  },
-
-  subtitleSpace: {
-    fontSize: 10,
-    color: "#555",
-    marginBottom: 6,
-  },
-
-  bottomSection: {
+  coverHeader: {
     flexDirection: "row",
-    marginTop: 12,
-    gap: 10,
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  label: {
+  logoPill: {
+    width: 168,
+    height: 48,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+  },
+  coverLogo: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+  },
+  coverYear: {
+    fontSize: 9,
+    fontWeight: "bold",
+    letterSpacing: 2.2,
+    color: "#D5CFE5",
+  },
+  coverMain: {
+    marginTop: 160,
+    width: 480,
+  },
+  coverEyebrow: {
+    marginBottom: 18,
     fontSize: 10,
     fontWeight: "bold",
+    letterSpacing: 2.4,
+    color: "#C7B7FF",
   },
-
-  text: {
-    fontSize: 9,
+  coverTitle: {
+    fontSize: 37,
+    lineHeight: 0.98,
+    fontWeight: "bold",
+    letterSpacing: -1.2,
   },
-
-  qrSection: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  coverTitleAccent: {
+    color: COLORS.orange,
   },
-
-  rightImages: {
-    flex: 1,
-    gap: 6,
+  coverDescription: {
+    width: 390,
+    marginTop: 24,
+    fontSize: 13,
+    lineHeight: 1.55,
+    color: "#DCD9EE",
   },
-
-  footer: {
+  coverRule: {
+    width: 66,
+    height: 6,
+    marginTop: 26,
+    borderRadius: 3,
+    backgroundColor: COLORS.orange,
+  },
+  coverRulePurple: {
+    width: 34,
+    height: 6,
+    marginTop: -6,
+    marginLeft: 50,
+    borderRadius: 3,
+    backgroundColor: "#B71EFF",
+  },
+  coverFooter: {
     position: "absolute",
-    bottom: 10,
-    right: 20,
-    fontSize: 9,
-    color: "#999",
+    left: 44,
+    right: 44,
+    bottom: 42,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  coverTags: {
+    flexDirection: "row",
+  },
+  coverTag: {
+    marginRight: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "#766A9A",
+    borderRadius: 14,
+    fontSize: 7,
+    color: "#EAE8F7",
+  },
+  coverCity: {
+    textAlign: "right",
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  coverState: {
+    marginTop: 2,
+    textAlign: "right",
+    fontSize: 8,
+    fontWeight: "normal",
+    color: "#C7C3DC",
   },
 
   catalogPage: {
-    backgroundColor: "#F4F4F4",
-    padding: 20,
     position: "relative",
+    paddingHorizontal: 36,
+    paddingTop: 28,
+    paddingBottom: 30,
+    backgroundColor: COLORS.paper,
   },
-
   header: {
+    height: 34,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
   },
-
   logo: {
-    width: 140,
+    width: 132,
+    height: 32,
+    objectFit: "contain",
+    objectPosition: "left center",
   },
-
-  sideLabel: {
-    position: "absolute",
-    right: 0,
-    top: 120,
-    width: 40,
-    height: 300,
-    backgroundColor: "#2CA6D9",
-    justifyContent: "center",
-    alignItems: "center",
+  sheetIndex: {
+    fontSize: 7,
+    letterSpacing: 1.2,
+    color: COLORS.muted,
   },
-
-  sideLabelText: {
-    transform: "rotate(-90deg)",
-    fontSize: 12,
-    color: "#FFFFFF",
-    letterSpacing: 2,
+  hero: {
+    position: "relative",
+    height: 250,
+    marginTop: 12,
+    borderRadius: 18,
+    overflow: "hidden",
+    backgroundColor: "#DFDDE8",
   },
-
-  mainImage: {
+  heroImage: {
     width: "100%",
-    height: 260,
+    height: "100%",
     objectFit: "cover",
-    marginTop: 10,
   },
-
-  contentRow: {
+  heroTop: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    right: 14,
     flexDirection: "row",
-    marginTop: 15,
-    gap: 10,
+    justifyContent: "space-between",
   },
-
-  leftInfo: {
-    flex: 1.2,
+  availabilityBadge: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    fontSize: 7,
+    fontWeight: "bold",
+    letterSpacing: 0.6,
+    color: COLORS.green,
+    backgroundColor: "#EAFFF2",
   },
-
-  iconText: {
-    fontSize: 10,
+  idBadge: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    fontSize: 7,
+    fontWeight: "bold",
+    letterSpacing: 0.5,
+    color: "#FFFFFF",
+    backgroundColor: "#201947",
+  },
+  heroCaption: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 14,
+    backgroundColor: "rgba(24, 21, 46, 0.72)",
+  },
+  heroMeta: {
+    marginBottom: 3,
+    fontSize: 8,
+    color: "#DED9EB",
+  },
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+  contentRow: {
+    height: 178,
+    marginTop: 14,
+    flexDirection: "row",
+  },
+  technicalPanel: {
+    width: "64%",
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+  },
+  locationPanel: {
+    width: "33%",
+    marginLeft: "3%",
+    padding: 14,
+    borderRadius: 14,
+    color: "#FFFFFF",
+    backgroundColor: "#5420BD",
+  },
+  sectionLabel: {
+    marginBottom: 8,
+    fontSize: 7,
+    fontWeight: "bold",
+    letterSpacing: 1.1,
+    color: COLORS.purple,
+  },
+  sectionLabelLight: {
+    marginBottom: 8,
+    fontSize: 7,
+    fontWeight: "bold",
+    letterSpacing: 1.1,
+    color: "#D9CAFF",
+  },
+  description: {
+    minHeight: 28,
+    marginBottom: 8,
+    fontSize: 8,
+    lineHeight: 1.4,
+    color: "#4E5067",
+  },
+  specs: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  spec: {
+    width: "31.4%",
+    height: 46,
+    marginRight: "1.9%",
+    marginBottom: 6,
+    padding: 8,
+    borderRadius: 9,
+    backgroundColor: "#F5F3FB",
+  },
+  specLabel: {
     marginBottom: 4,
+    fontSize: 5.5,
+    letterSpacing: 0.5,
+    color: "#85859A",
   },
-
-  iconTextBold: {
-    fontSize: 16,
-    marginBottom: 4,
+  specValue: {
+    fontSize: 8,
+    fontWeight: "bold",
+    color: COLORS.ink,
   },
-
-  highlight: {
-    color: "red",
-    fontSize: 10,
-    marginTop: 6,
+  locationTitle: {
+    marginBottom: 6,
+    fontSize: 13,
     fontWeight: "bold",
   },
-
-  qr: {
-    width: 100,
-    height: 100,
-    marginTop: 10,
+  coordinates: {
+    fontSize: 8,
+    lineHeight: 1.5,
+    color: "#DDD6F5",
   },
-
+  qrRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  qr: {
+    width: 48,
+    height: 48,
+    padding: 3,
+    borderRadius: 5,
+    backgroundColor: "#FFFFFF",
+  },
+  qrCopy: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 7,
+    lineHeight: 1.35,
+    color: "#E9E4FA",
+  },
   mapLink: {
     marginTop: 8,
-    fontSize: 9,
-    color: "#1D6FA5",
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 7,
+    textAlign: "center",
+    fontSize: 7,
+    fontWeight: "bold",
+    color: "#5420BD",
+    backgroundColor: "#FFFFFF",
     textDecoration: "none",
   },
-
-  rightColumn: {
-    flex: 1,
-    gap: 6,
+  galleryRow: {
+    height: 112,
+    marginTop: 14,
+    flexDirection: "row",
   },
-
-  smallImage: {
-    width: "100%",
-    height: 100,
+  galleryImages: {
+    width: "52%",
+    flexDirection: "row",
   },
-
-  mapImage: {
-    width: "100%",
-    height: 120,
+  galleryImage: {
+    height: "100%",
+    borderRadius: 12,
+    objectFit: "cover",
+    backgroundColor: "#DFDDE8",
   },
-
-  footerBar: {
+  valuePanel: {
+    width: "45%",
+    marginLeft: "3%",
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#FFD6BE",
+    borderRadius: 12,
+    backgroundColor: "#FFF1E8",
+  },
+  valueLabel: {
+    marginBottom: 6,
+    fontSize: 6.5,
+    fontWeight: "bold",
+    letterSpacing: 1,
+    color: "#C94E0A",
+  },
+  valueTitle: {
+    marginBottom: 6,
+    fontSize: 11,
+    lineHeight: 1.15,
+    fontWeight: "bold",
+    color: COLORS.ink,
+  },
+  valueCopy: {
+    fontSize: 7,
+    lineHeight: 1.4,
+    color: "#6E4B39",
+  },
+  availableLine: {
+    marginTop: 8,
+    fontSize: 7,
+    fontWeight: "bold",
+    color: COLORS.green,
+  },
+  footer: {
     position: "absolute",
-    bottom: 0,
-    left: 0,
-    width: "100%",
-    height: 40,
-    backgroundColor: "#2E2A6D",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  footerText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    letterSpacing: 3,
-  },
-  featuresContainer: {
-    position: "absolute",
-    bottom: 50, // arriba del footer
-    left: 20,
-    width: "90%",
+    left: 36,
+    right: 36,
+    bottom: 18,
+    paddingTop: 7,
+    borderTopWidth: 1,
+    borderTopColor: "#DEDDEA",
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-
-  featureColumn: {
-    flex: 1,
-    gap: 6,
-  },
-
-  featureItem: {
-    flexDirection: "row",
     alignItems: "center",
-    gap: 6,
   },
-
-  featureIcon: {
-    width: 14,
-    height: 14,
+  footerContacts: {
+    flexDirection: "row",
   },
-
-  featureText: {
-    fontSize: 9,
-    color: "#2E2A6D",
+  footerText: {
+    marginRight: 14,
+    fontSize: 5.5,
+    color: "#68697D",
+  },
+  footerBrand: {
+    fontSize: 6,
+    fontWeight: "bold",
+    letterSpacing: 0.6,
+    color: "#4420A3",
   },
 });
 
@@ -316,202 +437,197 @@ function resolveSpaceImageUrl(path?: string | null) {
   if (!path) return null;
   if (/^(https?:\/\/|data:)/i.test(path)) return path;
 
-  const cleanPath = path.replace(/^\/+/, "");
-  return `${getStorageBaseUrl()}/${cleanPath}`;
+  return `${getStorageBaseUrl()}/${path.replace(/^\/+/, "")}`;
 }
 
-function getCatalogImages(space: SpaceApi) {
+function getCatalogImages(space: CatalogSpace) {
   const urls = (space.images ?? [])
     .map((image) => resolveSpaceImageUrl(image.path))
     .filter((value): value is string => Boolean(value));
 
-  const fallbackMain = `${window.location.origin}/img/img1.png`;
-  const fallbackAlt1 = `${window.location.origin}/img/img2.png`;
-  const fallbackAlt2 = `${window.location.origin}/img/img3.png`;
-
   return {
-    main: urls[0] ?? fallbackMain,
-    secondary: urls[1] ?? urls[0] ?? fallbackAlt1,
-    tertiary: urls[2] ?? urls[1] ?? urls[0] ?? fallbackAlt2,
+    main: urls[0] ?? `${window.location.origin}/img/img1.png`,
+    gallery: urls.slice(1, 3),
   };
 }
 
-function getGoogleMapsUrl(space: SpaceApi) {
-  return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`;
+function getGoogleMapsUrl(space: CatalogSpace) {
+  return `https://www.google.com/maps/search/?api=1&query=${space.latitude ?? 0},${space.longitude ?? 0}`;
 }
 
-export function SpacesCatalogDocument({ spaces }: { spaces: SpaceApi[] }) {
+function displayValue(value: unknown, fallback = "—") {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
+}
+
+function hasLights(value: CatalogSpace["has_lights"]) {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
+function isAvailable(space: CatalogSpace) {
+  if ("active" in space && space.active !== null && space.active !== undefined) {
+    return space.active === true || space.active === 1 || space.active === "1" || space.active === "true";
+  }
+
+  return "status" in space && space.status === "Disponible";
+}
+
+function getViewType(space: CatalogSpace) {
+  if ("view_type" in space && space.view_type) return space.view_type;
+  if ("viewType" in space) return space.viewType;
+  return null;
+}
+
+function Spec({ label, value }: { label: string; value: string }) {
   return (
-    <Document>
-      {/* ================= PORTADA ================= */}
+    <View style={styles.spec}>
+      <Text style={styles.specLabel}>{label.toUpperCase()}</Text>
+      <Text style={styles.specValue}>{value}</Text>
+    </View>
+  );
+}
+
+export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
+  const year = new Date().getFullYear();
+  const logoUrl = `${window.location.origin}/img/logo.png`;
+
+  return (
+    <Document title={`Catálogo de espacios ${year}`} author="Impactos Espectaculares">
       <Page size="A4" style={styles.coverPage}>
-        <View style={styles.coverContainer}>
-          <View style={styles.blueTop} />
-          <View style={styles.blueBottom} />
-          <View style={styles.blueLight} />
-          <View style={styles.purpleTop} />
-          <View style={styles.purpleBottom} />
+        <View style={styles.coverGlowTop} />
+        <View style={styles.coverGlowBottom} />
+        <View style={styles.coverAccent} />
 
-          {/* LOGO PRINCIPAL */}
-          <Image
-            src={window.location.origin + "/img/logo.png"}
-            style={styles.logo}
-          />
+        <View style={styles.coverHeader}>
+          <View style={styles.logoPill}>
+            <Image src={logoUrl} style={styles.coverLogo} />
+          </View>
+          <Text style={styles.coverYear}>EDICIÓN {year}</Text>
+        </View>
 
-          <Text style={styles.title}>CATÁLOGO</Text>
-          <Text style={styles.subtitle}>CARTELERAS MÉRIDA</Text>
+        <View style={styles.coverMain}>
+          <Text style={styles.coverEyebrow}>CATÁLOGO COMERCIAL</Text>
+          <Text style={styles.coverTitle}>ESPACIOS QUE</Text>
+          <Text style={[styles.coverTitle, styles.coverTitleAccent]}>HACEN IMPACTO</Text>
+          <Text style={styles.coverDescription}>
+            Ubicaciones estratégicas para conectar marcas con miles de personas todos los días.
+          </Text>
+          <View style={styles.coverRule} />
+          <View style={styles.coverRulePurple} />
+        </View>
 
-          {/* LOGO SECUNDARIO */}
-          <Image
-            src={window.location.origin + "/img/logo-secundario.png"}
-            style={styles.subLogo}
-          />
-
-          {/* AÑO */}
-          <View style={styles.yearBox}>
-            <Text style={styles.yearText}>20{"\n"}26</Text>
+        <View style={styles.coverFooter}>
+          <View style={styles.coverTags}>
+            <Text style={styles.coverTag}>Carteleras</Text>
+            <Text style={styles.coverTag}>Espectaculares</Text>
+            <Text style={styles.coverTag}>Publicidad exterior</Text>
+          </View>
+          <View>
+            <Text style={styles.coverCity}>Mérida</Text>
+            <Text style={styles.coverState}>Yucatán, México</Text>
           </View>
         </View>
       </Page>
 
-      {/* ================= ESPACIOS ================= */}
-      {spaces.map((space) => {
+      {spaces.map((space, index) => {
         const catalogImages = getCatalogImages(space);
         const googleMapsUrl = getGoogleMapsUrl(space);
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(googleMapsUrl)}`;
-
-        const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(googleMapsUrl)}`;
+        const latitude = displayValue(space.latitude);
+        const longitude = displayValue(space.longitude);
+        const available = isAvailable(space);
 
         return (
           <Page key={space.id} size="A4" style={styles.catalogPage}>
-            {/* HEADER */}
             <View style={styles.header}>
-              <Image
-                src={window.location.origin + "/img/logo.png"}
-                style={styles.logo}
-              />
-
-              <Image
-                src={window.location.origin + "/img/logo-secundario.png"}
-                style={styles.logo}
-              />
+              <Image src={logoUrl} style={styles.logo} />
+              <Text style={styles.sheetIndex}>
+                FICHA DE ESPACIO · {String(index + 1).padStart(2, "0")} / {year}
+              </Text>
             </View>
 
-            {/* ETIQUETA LATERAL */}
-            <View style={styles.sideLabel}>
-              {/*<Text style={styles.sideLabelText}>Carteleras Mérida</Text>*/}
+            <View style={styles.hero}>
+              <Image src={catalogImages.main} style={styles.heroImage} />
+              <View style={styles.heroTop}>
+                <Text style={styles.availabilityBadge}>
+                  {available ? "DISPONIBILIDAD INMEDIATA" : "CONSULTAR DISPONIBILIDAD"}
+                </Text>
+                <Text style={styles.idBadge}>ID {displayValue(space.assigned_id, String(space.id))}</Text>
+              </View>
+              <View style={styles.heroCaption}>
+                <Text style={styles.heroMeta}>{displayValue(space.type, "Espacio publicitario")} · Mérida, Yucatán</Text>
+                <Text style={styles.heroTitle}>{displayValue(space.title, "Espacio sin título")}</Text>
+              </View>
             </View>
 
-            {/* IMAGEN PRINCIPAL */}
-            <Image src={catalogImages.main} style={styles.mainImage} />
-
-            {/* CONTENIDO */}
             <View style={styles.contentRow}>
-              {/* IZQUIERDA */}
-              <View style={styles.leftInfo}>
-                <Text style={styles.iconTextBold}>
-                  <b>{space.assigned_id ?? "-"}</b>
-                </Text>
-                &nbsp;
-                <Text style={styles.iconText}>
-                  {space.width_m ?? "-"} x {space.height_m ?? "-"} MTS
-                </Text>
-                &nbsp;
-                <Text style={styles.iconText}>UBICACIÓN:</Text>
-                <Text style={styles.iconText}>
-                  {space.latitude}, {space.longitude}
-                </Text>
-                &nbsp;
-                <Text style={styles.iconText}>DESCRIPCIÓN:</Text>
-                <Text style={styles.iconText}>
-                  <b> {space.description ?? "No disponible"}</b>
-                </Text>
-                &nbsp;
-                <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
-                <Link src={googleMapsUrl}>
-                  <Image src={qrUrl} style={styles.qr} />
-                </Link>
-                <Link src={googleMapsUrl} style={styles.mapLink}>
-                  Ver ubicacion en Google Maps
-                </Link>
+              <View style={styles.technicalPanel}>
+                <Text style={styles.sectionLabel}>FICHA TÉCNICA</Text>
+                <Text style={styles.description}>{displayValue(space.description, "Descripción no disponible.")}</Text>
+                <View style={styles.specs}>
+                  <Spec label="Dimensiones" value={`${displayValue(space.width_m)} × ${displayValue(space.height_m)} m`} />
+                  <Spec label="Caras" value={displayValue(space.faces)} />
+                  <Spec label="Tipo" value={displayValue(space.type)} />
+                  <Spec label="Tipo de vista" value={displayValue(getViewType(space))} />
+                  <Spec label="Nivel" value={displayValue(space.socioeconomic_level)} />
+                  <Spec label="Iluminación" value={hasLights(space.has_lights) ? "Sí" : "No"} />
+                </View>
               </View>
 
-              {/* DERECHA */}
-              <View style={styles.rightColumn}>
-                <Image
-                  src={catalogImages.secondary}
-                  style={styles.smallImage}
-                />
-
-                <Image src={catalogImages.tertiary} style={styles.smallImage} />
-
-                {/* MAPA */}
-                <Image src={mapUrl} style={styles.mapImage} />
+              <View style={styles.locationPanel}>
+                <Text style={styles.sectionLabelLight}>UBICACIÓN</Text>
+                <Text style={styles.locationTitle}>Mérida, Yucatán</Text>
+                <Text style={styles.coordinates}>{latitude}{"\n"}{longitude}</Text>
+                <View style={styles.qrRow}>
+                  <Link src={googleMapsUrl}>
+                    <Image src={qrUrl} style={styles.qr} />
+                  </Link>
+                  <Text style={styles.qrCopy}>Escanea para consultar la ubicación exacta.</Text>
+                </View>
+                <Link src={googleMapsUrl} style={styles.mapLink}>Abrir en Google Maps →</Link>
               </View>
             </View>
 
-            {/* FEATURES (ICONOS + TEXTO) */}
-            <View style={styles.featuresContainer}>
-              {/* COLUMNA IZQUIERDA */}
-              <View style={styles.featureColumn}>
-                <View style={styles.featureItem}>
-                  <Image
-                    src={window.location.origin + "/img/icons/facebook.png"}
-                    style={styles.featureIcon}
-                  />
-                  <Text style={styles.featureText}>
-                    Impactos Espectaculares
-                  </Text>
-                </View>
-
-                <View style={styles.featureItem}>
-                  <Image
-                    src={window.location.origin + "/img/icons/web.png"}
-                    style={styles.featureIcon}
-                  />
-                  <Text style={styles.featureText}>
-                    www.impactosespectaculares.com.mx
-                  </Text>
-                </View>
-
-                <View style={styles.featureItem}>
-                  <Image
-                    src={window.location.origin + "/img/icons/email.png"}
-                    style={styles.featureIcon}
-                  />
-                  <Text style={styles.featureText}>
-                    gguendulainf@hotmail.com
-                  </Text>
-                </View>
+            <View style={styles.galleryRow}>
+              <View style={styles.galleryImages}>
+                {catalogImages.gallery.length > 0 ? (
+                  catalogImages.gallery.map((image, imageIndex) => (
+                    <Image
+                      key={`${space.id}-${imageIndex}`}
+                      src={image}
+                      style={[
+                        styles.galleryImage,
+                        {
+                          width: catalogImages.gallery.length === 1 ? "100%" : "49%",
+                          marginRight: imageIndex === 0 && catalogImages.gallery.length > 1 ? "2%" : 0,
+                        },
+                      ]}
+                    />
+                  ))
+                ) : (
+                  <Image src={catalogImages.main} style={[styles.galleryImage, { width: "100%" }]} />
+                )}
               </View>
 
-              {/* COLUMNA DERECHA */}
-              <View style={styles.featureColumn}>
-                <View style={styles.featureItem}>
-                  <Image
-                    src={window.location.origin + "/img/icons/phone.png"}
-                    style={styles.featureIcon}
-                  />
-                  <Text style={styles.featureText}>
-                    999 285 92 53 // 999 317 00 98
-                  </Text>
-                </View>
-
-                <View style={styles.featureItem}>
-                  <Image
-                    src={window.location.origin + "/img/icons/mobile.png"}
-                    style={styles.featureIcon}
-                  />
-                  <Text style={styles.featureText}>
-                    999 1 27 68 65 // 999 1 27 31 56
-                  </Text>
-                </View>
+              <View style={styles.valuePanel}>
+                <Text style={styles.valueLabel}>VALOR DEL ESPACIO</Text>
+                <Text style={styles.valueTitle}>Visibilidad que trabaja por tu marca</Text>
+                <Text style={styles.valueCopy}>
+                  Formato de gran escala para campañas de alto impacto. Consulta vigencia y condiciones comerciales con nuestro equipo.
+                </Text>
+                <Text style={styles.availableLine}>
+                  ● {available ? "Disponible para cotizar" : "Disponibilidad bajo consulta"}
+                </Text>
               </View>
             </View>
 
-            {/* FOOTER */}
-            <View style={styles.footerBar}>
-              <Text style={styles.footerText}>MÉRIDA ESPECTACULAR</Text>
+            <View style={styles.footer}>
+              <View style={styles.footerContacts}>
+                <Text style={styles.footerText}>impactosespectaculares.com.mx</Text>
+                <Text style={styles.footerText}>gguendulainf@hotmail.com</Text>
+                <Text style={styles.footerText}>999 285 92 53 · 999 317 00 98</Text>
+              </View>
+              <Text style={styles.footerBrand}>MÉRIDA ESPECTACULAR</Text>
             </View>
           </Page>
         );

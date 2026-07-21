@@ -192,13 +192,13 @@ const RolePage = () => {
 
       {/* Modal Estilo Shadcn Refinado */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
-        <DialogContent className="sm:max-w-[425px] rounded-xl border-none shadow-2xl overflow-hidden">
-           <DialogHeader className="p-6 pb-0">
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+        <DialogContent className="sm:max-w-[425px]">
+           <DialogHeader>
+              <DialogTitle>
                 {currentRole ? "Editar Rol" : "Nuevo Rol"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSave} className="p-6 pt-4 space-y-6">
+            <form onSubmit={handleSave} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-semibold text-gray-700">
                   Nombre del rol
@@ -208,23 +208,20 @@ const RolePage = () => {
                   value={roleName}
                   onChange={(e) => setRoleName(e.target.value)}
                   placeholder="Ej: Editor, Supervisor..."
-                  className="rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 bg-white h-11"
                   required
                 />
               </div>
-              <DialogFooter className="gap-2 sm:justify-end pt-2">
+              <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setOpenModal(false)}
-                  className="rounded-lg px-6 h-11 border-gray-300"
                 >
                   Cancelar
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={saving}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-8 h-11 shadow-md"
                 >
                   {saving ? "Guardando..." : "Guardar Cambios"}
                 </Button>

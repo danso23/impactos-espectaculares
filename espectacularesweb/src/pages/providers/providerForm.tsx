@@ -6,12 +6,14 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PhoneInput } from "@/components/ui/phone-input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import type { ProviderFormValues, ProviderRecord } from "@/types/Provider"
@@ -101,7 +103,10 @@ export function ProviderForm({
           </div>
           <div className="space-y-2">
             <Label>Teléfono</Label>
-            <Input value={form.phone} onChange={(e) => updateField("phone", e.target.value)} />
+            <PhoneInput
+              value={form.phone}
+              onValueChange={(value) => updateField("phone", value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Email</Label>
@@ -135,14 +140,14 @@ export function ProviderForm({
           <Switch checked={form.active} onCheckedChange={(checked) => updateField("active", checked)} />
         </div>
 
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : "Guardar"}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </DialogContent>
   )

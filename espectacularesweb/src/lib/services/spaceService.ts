@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/services/clientService"
-import type { Space, SpaceFormValues, SpaceApi } from "@/types/Space"
+import type { Space, SpaceFormPayload, SpaceFormValues, SpaceApi } from "@/types/Space"
 import type { ApiListResponse, ApiResponse } from "@/types/Api"
 import type { QueryParams } from "@/types/QueryParam"
 
@@ -33,8 +33,12 @@ export function getSpaces(params?: QueryParams) {
   return apiFetch<ApiListResponse<SpaceApi>>(`/api/spaces${qs}`)
 }
 
+export function getSpace(id: number) {
+  return apiFetch<ApiResponse<SpaceApi>>(`/api/spaces/${id}`)
+}
+
 /** CREATE y UPDATE */
-function buildSpaceFormData(payload: SpaceFormValues & { images?: File[] }) {
+function buildSpaceFormData(payload: SpaceFormValues & { images?: File[]; remove_image_ids?: number[] }) {
   const fd = new FormData()
 
   const keyMap: Partial<Record<keyof SpaceFormValues, string>> = {
@@ -49,7 +53,12 @@ function buildSpaceFormData(payload: SpaceFormValues & { images?: File[] }) {
 
     // imágenes
     if (rawKey === "images" && Array.isArray(value)) {
-      value.forEach((file) => fd.append("images[]", file))
+      ;(value as File[]).forEach((file) => fd.append("images[]", file))
+      return
+    }
+
+    if (rawKey === "remove_image_ids" && Array.isArray(value)) {
+      value.forEach((imageId) => fd.append("remove_image_ids[]", String(imageId)))
       return
     }
 
@@ -85,7 +94,7 @@ export function createSpace(payload: SpaceFormValues & { images?: File[] }) {
 /** UPDATE */
 export function updateSpace(
   id: number,
-  payload: SpaceFormValues & { images?: File[] }
+  payload: SpaceFormPayload
 ) {
   const fd = buildSpaceFormData(payload)
 

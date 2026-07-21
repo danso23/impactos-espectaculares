@@ -3,8 +3,10 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { LoginPage } from "@/pages/auth/login"
 import UsersPage from "@/pages/userPage"
 import SpacePage from "@/pages/space/spacePage"
+import SpaceEditorPage from "@/pages/space/spaceEditorPage"
 import ProviderPage from "@/pages/providers/providerPage"
 import RentalPage from "@/pages/rentals/rentalPage"
+import PaymentPage from "@/pages/payments/paymentPage"
 import { ProtectedRoute } from "@/routes/ProtectedRoute"
 import AppLayout from "@/layouts/AppLayout"
 
@@ -29,9 +31,11 @@ export default function AppRoutes() {
                     <Route index element={<Navigate to="espacios" replace />} />
 
                     <Route path="espacios" element={<SpacePage />} />
+                    <Route path="espacios/nuevo" element={<SpaceEditorPage />} />
+                    <Route path="espacios/:id/editar" element={<SpaceEditorPage />} />
                     <Route path="rentas" element={<RentalPage />} />
                     <Route path="usuarios" element={<UsersPage />} />
-                    <Route path="pagos" element={<RouteStub title="Pagos" />} />
+                    <Route path="pagos" element={<PaymentPage />} />
                     <Route path="prospectos" element={<RouteStub title="Prospectos" />} />
                     <Route path="clientes" element={<RouteStub title="Clientes" />} />
                     <Route path="proveedores" element={<ProviderPage />} />

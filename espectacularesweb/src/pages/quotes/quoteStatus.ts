@@ -22,8 +22,7 @@ export function canConvertQuoteToRental(quote: QuoteRecord) {
   return (
     quote.status?.key === "accepted" &&
     !quote.converted_to_rental_at &&
-    !quote.rental &&
-    (quote.totals.rentals_subtotal ?? 0) > 0
+    !quote.rental
   )
 }
 

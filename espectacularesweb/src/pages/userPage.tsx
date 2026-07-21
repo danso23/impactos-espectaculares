@@ -260,17 +260,17 @@ export default function UsersPage() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-xl border-none shadow-2xl overflow-hidden">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[500px]">
           <form onSubmit={handleSubmit}>
-            <DialogHeader className="p-6 pb-0">
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+            <DialogHeader>
+              <DialogTitle>
                 {editingUser ? "Editar Usuario" : "Nuevo Usuario"}
               </DialogTitle>
-              <DialogDescription className="text-gray-500">
+              <DialogDescription>
                 Completa los datos para gestionar el acceso del usuario.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 p-6 py-4">
+            <div className="grid gap-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-sm font-semibold text-gray-700">Nombre completo</Label>
@@ -278,7 +278,6 @@ export default function UsersPage() {
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="rounded-lg border-gray-300 h-11"
                     required
                   />
                 </div>
@@ -288,7 +287,6 @@ export default function UsersPage() {
                     id="username"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="rounded-lg border-gray-300 h-11"
                     required
                   />
                 </div>
@@ -300,7 +298,6 @@ export default function UsersPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="rounded-lg border-gray-300 h-11"
                   required
                 />
               </div>
@@ -313,7 +310,6 @@ export default function UsersPage() {
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="rounded-lg border-gray-300 h-11"
                   required={!editingUser}
                 />
               </div>
@@ -338,14 +334,13 @@ export default function UsersPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="p-6 pt-2 gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="rounded-lg px-6 h-11 border-gray-300">
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
               <Button 
                 type="submit" 
                 disabled={loading}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-8 h-11 shadow-md"
               >
                 {loading ? "Guardando..." : "Guardar Usuario"}
               </Button>
