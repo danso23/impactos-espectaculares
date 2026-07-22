@@ -1,6 +1,7 @@
 import { pdf } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
 import { SpacesCatalogDocument, type CatalogSpace } from "./SpacesCatalogPdf";
+import { SpacesCatalogDocumentV1 } from "./SpacesCatalogPdfV1";
 import { env } from "@/config/env";
 import { getToken } from "@/lib/auth";
 
@@ -49,9 +50,17 @@ async function hydrateSpaceImages(spaces: CatalogSpace[]) {
   )
 }
 
-export const downloadSpacesCatalog = async (spaces: CatalogSpace[]) => {
-  const hydratedSpaces = await hydrateSpaceImages(spaces)
-  const blob = await pdf(<SpacesCatalogDocument spaces={hydratedSpaces} />).toBlob();
+export type SpacesCatalogVersion = "v1" | "v2";
 
-  saveAs(blob, "catalogo-espacios.pdf");
+export const downloadSpacesCatalog = async (
+  spaces: CatalogSpace[],
+  version: SpacesCatalogVersion = "v2"
+) => {
+  const hydratedSpaces = await hydrateSpaceImages(spaces)
+  const document = version === "v1"
+    ? <SpacesCatalogDocumentV1 spaces={hydratedSpaces} />
+    : <SpacesCatalogDocument spaces={hydratedSpaces} />
+  const blob = await pdf(document).toBlob();
+
+  saveAs(blob, `catalogo-espacios-${version.toUpperCase()}.pdf`);
 };

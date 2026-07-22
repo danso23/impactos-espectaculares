@@ -76,6 +76,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
             onCheckedChange={(value) =>
               table.toggleAllPageRowsSelected(!!value)
             }
+            className="h-5 w-5 rounded-md border-2 border-white bg-white/15 text-violet-700 shadow-sm data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-violet-700 focus-visible:ring-white/70"
             aria-label="Seleccionar todo"
           />
         ),

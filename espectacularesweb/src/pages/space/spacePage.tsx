@@ -25,6 +25,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  ChevronDown,
   CircleCheckBig,
   CircleOff,
   ChevronLeft,
@@ -265,15 +273,34 @@ export default function SpacePage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  className="flex gap-2 rounded-lg border-gray-300 hover:bg-purple-50 hover:text-purple-600 shadow-sm"
-                  disabled={selectedSpaces.length === 0}
-                  onClick={() => downloadSpacesCatalog(selectedSpaces)}
-                >
-                  <FileDown className="h-4 w-4" />
-                  Descargar PDF
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="flex gap-2 rounded-lg border-gray-300 shadow-sm hover:bg-purple-50 hover:text-purple-600"
+                      disabled={selectedSpaces.length === 0}
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Descargar PDF
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-56">
+                    <DropdownMenuLabel>Versión del catálogo</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => downloadSpacesCatalog(selectedSpaces, "v2")}>
+                      <div>
+                        <p className="font-medium">Diseño nuevo · V2</p>
+                        <p className="text-xs text-muted-foreground">Formato editorial actualizado</p>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => downloadSpacesCatalog(selectedSpaces, "v1")}>
+                      <div>
+                        <p className="font-medium">Diseño anterior · V1</p>
+                        <p className="text-xs text-muted-foreground">Formato clásico del catálogo</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <Button
                   className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transition-all hover:from-purple-700 hover:to-indigo-700"
