@@ -12,6 +12,7 @@ const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
   "scroll",
   "touchstart",
 ]
+const AUTH_TOKEN_KEYS = new Set(["access_token", "token"])
 
 function inactivityTimeoutMs() {
   const minutes = Number(env.inactivityTimeoutMinutes)
@@ -44,6 +45,11 @@ export function SessionIdleGuard() {
   React.useEffect(() => {
     const timeout = inactivityTimeoutMs()
 
+    const storedLastActivity = (fallback = Date.now()) => {
+      const stored = Number(localStorage.getItem(LAST_ACTIVITY_KEY))
+      return Number.isFinite(stored) && stored > 0 ? stored : fallback
+    }
+
     const closeForInactivity = async () => {
       if (closingRef.current) return
       closingRef.current = true
@@ -70,13 +76,29 @@ export function SessionIdleGuard() {
       }
 
       timeoutRef.current = window.setTimeout(() => {
-        const stored = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || lastActivity)
-        schedule(Number.isFinite(stored) ? stored : lastActivity)
+        const latestActivity = storedLastActivity(lastActivity)
+        if (Date.now() - latestActivity >= timeout) {
+          void closeForInactivity()
+          return
+        }
+
+        schedule(latestActivity)
       }, remaining)
     }
 
     const registerActivity = () => {
+      if (closingRef.current || document.visibilityState === "hidden") return
+
       const now = Date.now()
+      const previousActivity = storedLastActivity(now)
+
+      // La primera interacción al volver de una pestaña suspendida no debe
+      // revivir una sesión que ya superó el tiempo de inactividad.
+      if (now - previousActivity >= timeout) {
+        void closeForInactivity()
+        return
+      }
+
       if (now - lastPersistedActivityRef.current < 1_000) return
 
       lastPersistedActivityRef.current = now
@@ -84,32 +106,53 @@ export function SessionIdleGuard() {
       schedule(now)
     }
 
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== LAST_ACTIVITY_KEY || !event.newValue) return
-      const activity = Number(event.newValue)
-      if (Number.isFinite(activity)) schedule(activity)
+    const verifyCurrentSession = () => {
+      if (closingRef.current || document.visibilityState === "hidden") return
+
+      const lastActivity = storedLastActivity()
+      if (Date.now() - lastActivity >= timeout) {
+        void closeForInactivity()
+        return
+      }
+
+      schedule(lastActivity)
     }
 
-    const storedActivity = Number(localStorage.getItem(LAST_ACTIVITY_KEY))
-    const initialActivity = Number.isFinite(storedActivity) && storedActivity > 0
-      ? storedActivity
-      : Date.now()
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === LAST_ACTIVITY_KEY && event.newValue) {
+        const activity = Number(event.newValue)
+        if (Number.isFinite(activity)) schedule(activity)
+        return
+      }
+
+      // Si otra pestaña cerró sesión, esta pestaña también debe salir.
+      if (event.key && AUTH_TOKEN_KEYS.has(event.key) && !event.newValue && !getToken()) {
+        if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
+        navigate("/login", { replace: true })
+      }
+    }
+
+    const initialActivity = storedLastActivity()
 
     localStorage.setItem(LAST_ACTIVITY_KEY, String(initialActivity))
     lastPersistedActivityRef.current = initialActivity
     schedule(initialActivity)
 
     ACTIVITY_EVENTS.forEach((eventName) => {
-      window.addEventListener(eventName, registerActivity, { passive: true })
+      window.addEventListener(eventName, registerActivity, { passive: true, capture: true })
     })
     window.addEventListener("storage", handleStorage)
-    window.addEventListener("focus", registerActivity)
+    window.addEventListener("focus", verifyCurrentSession)
+    window.addEventListener("pageshow", verifyCurrentSession)
+    document.addEventListener("visibilitychange", verifyCurrentSession)
 
     return () => {
       if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current)
-      ACTIVITY_EVENTS.forEach((eventName) => window.removeEventListener(eventName, registerActivity))
+      ACTIVITY_EVENTS.forEach((eventName) => window.removeEventListener(eventName, registerActivity, true))
       window.removeEventListener("storage", handleStorage)
-      window.removeEventListener("focus", registerActivity)
+      window.removeEventListener("focus", verifyCurrentSession)
+      window.removeEventListener("pageshow", verifyCurrentSession)
+      document.removeEventListener("visibilitychange", verifyCurrentSession)
     }
   }, [navigate])
 
