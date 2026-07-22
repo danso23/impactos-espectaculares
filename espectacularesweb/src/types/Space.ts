@@ -21,6 +21,7 @@ export type Space = {
   latitude?: number | null;
   longitude?: number | null;
   images?: SpaceImageApi[];
+  imageUrls?: string[];
   coverImageUrl?: string | null;
 };
 
@@ -36,6 +37,7 @@ export type SpaceImageApi = {
 };
 
 export type SpaceFormValues = {
+  active?: boolean;
   faces?: number;
   latitude?: number;
   longitude?: number;
@@ -48,7 +50,7 @@ export type SpaceFormValues = {
   description?: string;
   has_lights?: boolean;
   socioeconomic_level?: string;
-  viewType?: "Vista natural" | "Vista cruzada";
+  viewType?: "Vista natural" | "Vista cruzada" | "Natural/Cruzada";
   images?: File[];
   comments?: string;
 };
@@ -62,7 +64,7 @@ export type CreateSpaceInput = {
   price?: number;
   type?: string;
   socioeconomic_level?: string;
-  viewType?: "Vista natural" | "Vista cruzada";
+  viewType?: "Vista natural" | "Vista cruzada" | "Natural/Cruzada";
   width_m?: number;
   height_m?: number;
   active?: boolean;
@@ -96,4 +98,7 @@ export type SpaceApi = {
   images?: SpaceImageApi[];
 };
 
-export type SpaceFormPayload = SpaceFormValues & { images: File[] };
+export type SpaceFormPayload = SpaceFormValues & {
+  images: File[];
+  remove_image_ids?: number[];
+};

@@ -1,65 +1,56 @@
-import * as React from "react";
-import type { LatLngLiteral } from "leaflet";
-import type { SpaceFormPayload, SpaceFormValues } from "@/types/Space";
+import * as React from "react"
+import type { LatLngLiteral } from "leaflet"
+import { ImagePlus, MapPin, RefreshCw, Ruler, Save, Trash2, Undo2, X } from "lucide-react"
+import { toast } from "sonner"
 
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { HeatmapLayer } from "@/components/maps/heatmap-layer"
+import { MapPicker } from "@/components/maps/map-picker"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { NumericInput } from "@/components/ui/numeric-input"
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { NumericInput } from "@/components/ui/numeric-input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { useSpaceCoords } from "@/lib/hooks/spaceHook"
+import { prepareSpaceImages } from "@/lib/images/prepare-space-images"
+import type { SpaceFormPayload, SpaceFormValues } from "@/types/Space"
 
-import { MapPicker } from "@/components/maps/map-picker";
-import { HeatmapLayer } from "@/components/maps/heatmap-layer";
-import { useSpaceCoords } from "@/lib/hooks/spaceHook";
+export type SpaceType = "Espectacular" | "Muro" | "Parabus"
+export type ViewType = "Vista natural" | "Vista cruzada" | "Natural/Cruzada"
 
-export type SpaceType = "Espectacular" | "Muro" | "Parabus";
-export type ViewType = "Vista natural" | "Vista cruzada";
+const EMPTY_SELECT_VALUE = "__none__"
 
 type SpaceCoord = {
-  id?: number;
-  title?: string;
-  latitude: string | number;
-  longitude: string | number;
-};
+  id?: number
+  title?: string
+  latitude: string | number
+  longitude: string | number
+}
 
-type Props = {
-  /** create | edit */
-  mode?: "create" | "edit";
-  /** Dialog title */
-  title?: string;
-  /** Trigger text */
-  triggerText?: string;
-  /** usar propio botón/icono como trigger */
-  trigger?: React.ReactNode;
-  /** Valores iniciales para edición */
-  initialValues?: Partial<SpaceFormValues>;
-  /** texto del botón submit */
-  submitText?: string;
-  /** loading externo (useCreateSpace / useUpdateSpace del padre) */
-  isSubmitting?: boolean;
-  /** guardar (create/update) */
-  onSubmit: (payload: SpaceFormPayload) => Promise<void> | void;
-  /** callback cuando guardó */
-  onSaved?: (payload: SpaceFormPayload) => void;
-  /** callback cuando cancela */
-  onCancel?: () => void;
-  /** controlar el open desde fuera (opcional) */
-  open?: boolean;
-  onOpenChange?: (v: boolean) => void;
-  hideTrigger?: boolean;
-};
+type SpaceFormProps = {
+  mode?: "create" | "edit"
+  initialValues?: Partial<SpaceFormValues>
+  existingImages?: Array<{
+    id: number
+    url: string
+    isCover?: boolean
+  }>
+  isSubmitting?: boolean
+  onSubmit: (payload: SpaceFormPayload) => Promise<void> | void
+  onSaved?: (payload: SpaceFormPayload) => void
+  onCancel?: () => void
+}
 
 const baseForm: SpaceFormValues = {
+  active: true,
   faces: undefined,
   latitude: undefined,
   longitude: undefined,
@@ -71,434 +62,592 @@ const baseForm: SpaceFormValues = {
   height_m: undefined,
   description: "",
   has_lights: false,
+  socioeconomic_level: undefined,
   viewType: undefined,
   comments: "",
-};
+}
 
 export function SpaceForm({
   mode = "create",
-  title,
-  triggerText,
-  trigger,
   initialValues,
-  submitText,
+  existingImages = [],
   isSubmitting = false,
   onSubmit,
   onSaved,
   onCancel,
-  open: controlledOpen,
-  onOpenChange: controlledOnOpenChange,
-  hideTrigger,
-}: Props) {
-  const isCreate = mode === "create";
-
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
-  const open = controlledOpen ?? uncontrolledOpen;
-  const setOpen = controlledOnOpenChange ?? setUncontrolledOpen;
-
-  const [showHeat, setShowHeat] = React.useState(true);
-  const [selectedExistingId, setSelectedExistingId] = React.useState<
-    number | null
-  >(null);
-
-  const [images, setImages] = React.useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = React.useState<string[]>([]);
-
-  const coordsQuery = useSpaceCoords();
-  const coordsData = React.useMemo<SpaceCoord[]>(
-    () => (coordsQuery.data?.data ?? []) as SpaceCoord[],
-    [coordsQuery.data],
-  );
-
-  // rehidrata el form
+}: SpaceFormProps) {
+  const isCreate = mode === "create"
+  const [showHeat, setShowHeat] = React.useState(true)
+  const [selectedExistingId, setSelectedExistingId] = React.useState<number | null>(null)
+  const [images, setImages] = React.useState<File[]>([])
+  const [removedImageIds, setRemovedImageIds] = React.useState<number[]>([])
+  const [replacementImageId, setReplacementImageId] = React.useState<number | null>(null)
+  const [imagePreviews, setImagePreviews] = React.useState<string[]>([])
+  const [isPreparingImages, setIsPreparingImages] = React.useState(false)
+  const replacementInputRef = React.useRef<HTMLInputElement>(null)
   const [form, setForm] = React.useState<SpaceFormValues>(() => ({
     ...baseForm,
     ...initialValues,
-  }));
+  }))
+
+  const coordsQuery = useSpaceCoords()
+  const coordsData = React.useMemo<SpaceCoord[]>(
+    () => (coordsQuery.data?.data ?? []) as SpaceCoord[],
+    [coordsQuery.data]
+  )
 
   React.useEffect(() => {
-    setForm({ ...baseForm, ...initialValues });
-    setImages([]);
-    setSelectedExistingId(null);
-    setShowHeat(true);
-  }, [initialValues]);
-
-  // refetch coords al abrir
-  React.useEffect(() => {
-    if (!open) return;
-    coordsQuery.refetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    setForm({ ...baseForm, ...initialValues })
+    setImages([])
+    setRemovedImageIds([])
+    setReplacementImageId(null)
+    setSelectedExistingId(null)
+    setShowHeat(true)
+  }, [initialValues])
 
   React.useEffect(() => {
-    const urls = images.map((f) => URL.createObjectURL(f));
-    setImagePreviews(urls);
-    return () => urls.forEach((u) => URL.revokeObjectURL(u));
-  }, [images]);
-
-  const resetForm = () => {
-    setForm({ ...baseForm, ...initialValues });
-    setShowHeat(true);
-    setImages([]);
-    setImagePreviews([]);
-    setSelectedExistingId(null);
-  };
+    const urls = images.map((file) => URL.createObjectURL(file))
+    setImagePreviews(urls)
+    return () => urls.forEach((url) => URL.revokeObjectURL(url))
+  }, [images])
 
   const setField = <K extends keyof SpaceFormValues>(
     key: K,
-    value: SpaceFormValues[K],
-  ) => {
-    setForm((p) => ({ ...p, [key]: value }));
-  };
-
-  const handlePick = (c: LatLngLiteral) => {
-    setField("latitude", c.lat);
-    setField("longitude", c.lng);
-  };
+    value: SpaceFormValues[K]
+  ) => setForm((current) => ({ ...current, [key]: value }))
 
   const coords: LatLngLiteral | undefined =
     form.latitude !== undefined && form.longitude !== undefined
       ? { lat: form.latitude, lng: form.longitude }
-      : undefined;
+      : undefined
 
   const heatPoints = React.useMemo(
     () =>
-      coordsData.map((p) => ({
-        lat: Number(p.latitude),
-        lng: Number(p.longitude),
+      coordsData.map((point) => ({
+        lat: Number(point.latitude),
+        lng: Number(point.longitude),
         weight: 1,
       })),
-    [coordsData],
-  );
+    [coordsData]
+  )
 
-  const existingMarkers = React.useMemo(() => {
-    return coordsData.map((p: SpaceCoord, idx: number) => ({
-      id: Number(p.id ?? idx + 1),
-      title: String(p.title ?? `Espacio ${p.id ?? idx + 1}`),
-      position: { lat: Number(p.latitude), lng: Number(p.longitude) },
-    }));
-  }, [coordsData]);
+  const existingMarkers = React.useMemo(
+    () =>
+      coordsData.map((point, index) => ({
+        id: Number(point.id ?? index + 1),
+        title: String(point.title ?? `Espacio ${point.id ?? index + 1}`),
+        position: {
+          lat: Number(point.latitude),
+          lng: Number(point.longitude),
+        },
+      })),
+    [coordsData]
+  )
 
-  const handleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
+  const retainedExistingImages = existingImages.filter(
+    (image) => !removedImageIds.includes(image.id)
+  )
+  const availableImageSlots = Math.max(
+    0,
+    5 - retainedExistingImages.length - images.length
+  )
 
-    const onlyImages = files.filter((f) => f.type.startsWith("image/"));
-    setImages((prev) => [...prev, ...onlyImages].slice(0, 5));
+  const handleImagesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const availableSlots = availableImageSlots
+    const selectedFiles = Array.from(event.target.files ?? [])
+      .slice(0, availableSlots)
 
-    e.target.value = "";
-  };
+    event.target.value = ""
+    if (!selectedFiles.length) return
 
-  const removeImage = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-  };
+    setIsPreparingImages(true)
+    try {
+      const prepared = await prepareSpaceImages(selectedFiles)
+      setImages((current) => [...current, ...prepared].slice(0, 5))
+      toast.success("Imágenes optimizadas", {
+        description: "Se corrigió su orientación y tamaño para la carga.",
+      })
+    } catch (error) {
+      toast.error("No se pudieron preparar las imágenes", {
+        description: error instanceof Error ? error.message : "Revisa los archivos seleccionados.",
+      })
+    } finally {
+      setIsPreparingImages(false)
+    }
+  }
+
+  const requestImageReplacement = (imageId: number) => {
+    setReplacementImageId(imageId)
+    replacementInputRef.current?.click()
+  }
+
+  const restoreExistingImage = (imageId: number) => {
+    if (retainedExistingImages.length + images.length >= 5) {
+      toast.error("No hay espacio para restaurar esta imagen", {
+        description: "Quita primero una de las imágenes nuevas.",
+      })
+      return
+    }
+
+    setRemovedImageIds((current) =>
+      current.filter((currentImageId) => currentImageId !== imageId)
+    )
+  }
+
+  const handleReplacementChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+    event.target.value = ""
+
+    if (!selectedFile || replacementImageId === null) {
+      setReplacementImageId(null)
+      return
+    }
+
+    setIsPreparingImages(true)
+    try {
+      const [prepared] = await prepareSpaceImages([selectedFile])
+      if (!prepared) return
+
+      setRemovedImageIds((current) =>
+        current.includes(replacementImageId) ? current : [...current, replacementImageId]
+      )
+      setImages((current) => [...current, prepared])
+      toast.success("Imagen preparada para sustituirse", {
+        description: "El cambio se aplicará cuando guardes el espacio.",
+      })
+    } catch (error) {
+      toast.error("No se pudo preparar la imagen", {
+        description: error instanceof Error ? error.message : "Revisa el archivo seleccionado.",
+      })
+    } finally {
+      setReplacementImageId(null)
+      setIsPreparingImages(false)
+    }
+  }
 
   const validate = () => {
-    if (!form.faces || form.faces <= 0) return "Falta el número de caras";
-    if (!form.price || form.price <= 0) return "Falta el precio";
-    if (!form.type) return "Falta el tipo";
-    if (!form.width_m || form.width_m <= 0) return "Falta el ancho";
-    if (!form.height_m || form.height_m <= 0) return "Falta el alto";
-    if (!form.viewType) return "Falta el tipo de vista";
-    if (!form.title.trim()) return "Falta el título";
-    if (form.latitude === undefined || form.longitude === undefined)
-      return "Falta la ubicación";
-    return null;
-  };
+    if (!form.title.trim()) return "Falta el título"
+    if (!form.faces || form.faces <= 0) return "Falta el número de caras"
+    if (!form.price || form.price <= 0) return "Falta el precio"
+    if (!form.type) return "Falta el tipo"
+    if (!form.width_m || form.width_m <= 0) return "Falta el ancho"
+    if (!form.height_m || form.height_m <= 0) return "Falta el alto"
+    if (!form.viewType) return "Falta el tipo de vista"
+    if (form.latitude === undefined || form.longitude === undefined) return "Falta la ubicación"
+    return null
+  }
 
   const handleSubmit = async () => {
-    const msg = validate();
-    if (msg) {
-      toast.error(msg);
-      return;
+    const validationMessage = validate()
+    if (validationMessage) {
+      toast.error(validationMessage)
+      return
     }
 
     try {
-      const payload: SpaceFormPayload = { ...form, images };
-      await onSubmit(payload);
-
+      const payload: SpaceFormPayload = {
+        ...form,
+        images,
+        ...(isCreate || removedImageIds.length === 0
+          ? {}
+          : { remove_image_ids: removedImageIds }),
+      }
+      await onSubmit(payload)
       toast.success(isCreate ? "Espacio creado" : "Espacio actualizado", {
         description: "Se guardó correctamente.",
-      });
-
-      onSaved?.(payload);
-
-      resetForm();
-      setOpen(false);
-    } catch (err: unknown) {
+      })
+      onSaved?.(payload)
+    } catch (error) {
       toast.error("No se pudo guardar", {
-        description: err instanceof Error ? err.message : "Intenta nuevamente.",
-      });
+        description: error instanceof Error ? error.message : "Intenta nuevamente.",
+      })
     }
-  };
-
-  const handleCancel = () => {
-    resetForm();
-    setOpen(false);
-    onCancel?.();
-  };
-
-  const finalTitle = title ?? (isCreate ? "Nuevo espacio" : "Editar espacio");
-  const finalSubmitText = submitText ?? (isCreate ? "Guardar" : "Actualizar");
-  const finalTriggerText = triggerText ?? (isCreate ? "Agregar" : "Editar");
+  }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        if (isSubmitting) return;
-        setOpen(v);
-        if (!v) resetForm();
-      }}
-    >
-      {/* Trigger opcional */}
-      {!hideTrigger ? (
-        trigger ? (
-          <DialogTrigger asChild>{trigger}</DialogTrigger>
-        ) : (
-          <DialogTrigger asChild>
-            <Button>{finalTriggerText}</Button>
-          </DialogTrigger>
-        )
-      ) : null}
-
-      <DialogContent
-        className="sm:max-w-3xl max-h-[85vh] overflow-y-auto pr-1"
-        style={{ padding: "30px" }}
-      >
-        <DialogHeader>
-          <DialogTitle>{finalTitle}</DialogTitle>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="space-y-2 sm:col-span-2">
-            <Label>No. de caras</Label>
-            <NumericInput value={form.faces ?? ""} onValueChange={(value) => setField("faces", value)} />
-          </div>
-
-          <div className="flex items-center justify-between gap-3 sm:col-span-2">
-            <Label>Ubicación en el mapa</Label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Ver calor</span>
-              <Switch checked={showHeat} onCheckedChange={setShowHeat} />
-            </div>
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[320px_1fr]">
-              <div className="h-[320px] overflow-auto rounded-md border bg-background">
-                {existingMarkers.map((m) => {
-                  const active = m.id === selectedExistingId;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setSelectedExistingId(m.id)}
-                      className={[
-                        "w-full text-left px-3 py-2 border-b",
-                        active
-                          ? "bg-green-50 border-l-4 border-l-green-600"
-                          : "hover:bg-muted",
-                      ].join(" ")}
-                    >
-                      <div className="text-sm font-medium">{m.title}</div>
-                      <div className="text-xs opacity-70">
-                        {m.position.lat.toFixed(5)}, {m.position.lng.toFixed(5)}
-                      </div>
-                    </button>
-                  );
-                })}
+    <div className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
+        <Card className="overflow-hidden border-violet-100 shadow-lg shadow-violet-950/5 xl:sticky xl:top-6">
+          <CardHeader className="border-b border-violet-100 bg-violet-50/40">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <MapPin className="h-5 w-5 text-violet-600" />
+                  Ubicación
+                </CardTitle>
+                <CardDescription>Selecciona el punto exacto del espacio en el mapa.</CardDescription>
               </div>
-
-              <MapPicker
-                height={320}
-                value={coords}
-                onChange={handlePick}
-                existingMarkers={existingMarkers}
-                selectedMarkerId={selectedExistingId}
-                onSelectMarker={(id) => setSelectedExistingId(id)}
-                focusMarkerId={selectedExistingId}
-                pickOnMarkerClick={false}
-              >
-                {showHeat && heatPoints.length > 0 ? (
-                  <HeatmapLayer
-                    points={heatPoints}
-                    radius={28}
-                    blur={18}
-                    maxZoom={17}
-                    minOpacity={0.35}
-                  />
-                ) : null}
-              </MapPicker>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Mapa de calor</span>
+                <Switch checked={showHeat} onCheckedChange={setShowHeat} />
+              </div>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Latitud</Label>
-            <Input value={form.latitude ?? ""} readOnly />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Longitud</Label>
-            <Input value={form.longitude ?? ""} readOnly />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>ID</Label>
-            <Input
-              value={form.assigned_id ?? ""}
-              onChange={(e) => setField("assigned_id", e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Título</Label>
-            <Input
-              value={form.title}
-              onChange={(e) => setField("title", e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Precio</Label>
-            <NumericInput value={form.price ?? ""} onValueChange={(value) => setField("price", value)} />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Tipo</Label>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.type ?? ""}
-              onChange={(e) => setField("type", e.target.value as SpaceType)}
+          </CardHeader>
+          <CardContent className="space-y-4 p-4">
+            <MapPicker
+              height={500}
+              value={coords}
+              onChange={(position) => {
+                setField("latitude", position.lat)
+                setField("longitude", position.lng)
+              }}
+              existingMarkers={existingMarkers}
+              selectedMarkerId={selectedExistingId}
+              onSelectMarker={setSelectedExistingId}
+              focusMarkerId={selectedExistingId}
+              pickOnMarkerClick={false}
             >
-              <option value="">Seleccionar</option>
-              <option value="Espectacular">Espectacular</option>
-              <option value="Muro">Muro</option>
-              <option value="Parabus">Parabús</option>
-            </select>
-          </div>
+              {showHeat && heatPoints.length > 0 ? (
+                <HeatmapLayer
+                  points={heatPoints}
+                  radius={28}
+                  blur={18}
+                  maxZoom={17}
+                  minOpacity={0.35}
+                />
+              ) : null}
+            </MapPicker>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Ancho (m)</Label>
-            <NumericInput value={form.width_m ?? ""} onValueChange={(value) => setField("width_m", value)} />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Alto (m)</Label>
-            <NumericInput value={form.height_m ?? ""} onValueChange={(value) => setField("height_m", value)} />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Descripción</Label>
-            <Textarea
-              value={form.description ?? ""}
-              onChange={(e) => setField("description", e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Tiene luces</Label>
-            <div className="flex w-full items-center justify-between rounded-md border px-4 py-3">
-              <span className="text-sm text-muted-foreground">
-                {form.has_lights ? "Sí" : "No"}
-              </span>
-              <Switch
-                checked={form.has_lights}
-                onCheckedChange={(v) => setField("has_lights", v)}
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Latitud</Label>
+                <Input value={form.latitude ?? ""} readOnly />
+              </div>
+              <div className="space-y-2">
+                <Label>Longitud</Label>
+                <Input value={form.longitude ?? ""} readOnly />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Tipo de vista</Label>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.viewType ?? ""}
-              onChange={(e) => setField("viewType", e.target.value as ViewType)}
-            >
-              <option value="">Seleccionar</option>
-              <option value="Vista natural">Vista natural</option>
-              <option value="Vista cruzada">Vista cruzada</option>
-              <option value="Natural/Cruzada">Ambas vistas</option>
-            </select>
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Nivel socioeconómico</Label>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={form.socioeconomic_level ?? ""}
-              onChange={(e) => setField("socioeconomic_level", e.target.value)}
-            >
-              <option value="">Seleccionar</option>
-              <option value="A/B">A/B</option>
-              <option value="C+">C+</option>
-              <option value="C">C</option>
-              <option value="C-">C-</option>
-              <option value="D+">D+</option>
-              <option value="D">D</option>
-              <option value="E">E</option>
-            </select>
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Comentarios</Label>
-            <Textarea
-              value={form.comments ?? ""}
-              onChange={(e) => setField("comments", e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Imágenes</Label>
-            <Input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImagesChange}
-              disabled={isSubmitting}
-            />
-
-            {imagePreviews.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {imagePreviews.map((src, idx) => (
-                  <div
-                    key={src}
-                    className="relative overflow-hidden rounded-md border"
+            {existingMarkers.length ? (
+              <div className="max-h-40 overflow-y-auto rounded-xl border border-violet-100">
+                {existingMarkers.map((marker) => (
+                  <button
+                    key={marker.id}
+                    type="button"
+                    onClick={() => setSelectedExistingId(marker.id)}
+                    className={`flex w-full items-center justify-between border-b border-violet-50 px-3 py-2 text-left text-sm last:border-0 hover:bg-violet-50 ${
+                      marker.id === selectedExistingId ? "bg-violet-50 text-violet-800" : ""
+                    }`}
                   >
-                    <img
-                      src={src}
-                      alt={`Imagen ${idx + 1}`}
-                      className="h-28 w-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="absolute right-2 top-2 rounded bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
-                    >
-                      Quitar
-                    </button>
-                  </div>
+                    <span className="truncate font-medium">{marker.title}</span>
+                    <span className="ml-3 shrink-0 text-xs text-muted-foreground">
+                      {marker.position.lat.toFixed(4)}, {marker.position.lng.toFixed(4)}
+                    </span>
+                  </button>
                 ))}
               </div>
             ) : null}
-          </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          <Card className="border-violet-100 shadow-lg shadow-violet-950/5">
+            <CardHeader>
+              <CardTitle className="text-lg">Información general</CardTitle>
+              <CardDescription>Identificación y datos comerciales del espacio.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div className={`flex items-center justify-between rounded-xl border px-4 py-3 sm:col-span-2 ${
+                form.active === false
+                  ? "border-amber-200 bg-amber-50"
+                  : "border-emerald-200 bg-emerald-50"
+              }`}>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Disponibilidad comercial</p>
+                  <p className="text-xs text-muted-foreground">
+                    {form.active === false
+                      ? "Bloqueado: no podrá agregarse a nuevas cotizaciones o rentas."
+                      : "Disponible para nuevas cotizaciones y rentas."}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-semibold ${
+                    form.active === false ? "text-amber-700" : "text-emerald-700"
+                  }`}>
+                    {form.active === false ? "Bloqueado" : "Disponible"}
+                  </span>
+                  <Switch
+                    checked={form.active !== false}
+                    onCheckedChange={(value) => setField("active", value)}
+                    aria-label="Disponibilidad comercial del espacio"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>ID asignado</Label>
+                <Input
+                  value={form.assigned_id ?? ""}
+                  onChange={(event) => setField("assigned_id", event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>No. de caras</Label>
+                <NumericInput
+                  value={form.faces ?? ""}
+                  onValueChange={(value) => setField("faces", value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Título</Label>
+                <Input
+                  value={form.title}
+                  onChange={(event) => setField("title", event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo</Label>
+                <Select
+                  value={form.type ?? EMPTY_SELECT_VALUE}
+                  onValueChange={(value) =>
+                    setField("type", value === EMPTY_SELECT_VALUE ? undefined : value as SpaceType)
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY_SELECT_VALUE}>Seleccionar</SelectItem>
+                    <SelectItem value="Espectacular">Espectacular</SelectItem>
+                    <SelectItem value="Muro">Muro</SelectItem>
+                    <SelectItem value="Parabus">Parabús</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Precio</Label>
+                <NumericInput
+                  value={form.price ?? ""}
+                  onValueChange={(value) => setField("price", value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-violet-100 shadow-lg shadow-violet-950/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Ruler className="h-5 w-5 text-violet-600" />
+                Características
+              </CardTitle>
+              <CardDescription>Dimensiones, visibilidad y equipamiento.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Ancho (m)</Label>
+                <NumericInput
+                  value={form.width_m ?? ""}
+                  onValueChange={(value) => setField("width_m", value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Alto (m)</Label>
+                <NumericInput
+                  value={form.height_m ?? ""}
+                  onValueChange={(value) => setField("height_m", value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de vista</Label>
+                <Select
+                  value={form.viewType ?? EMPTY_SELECT_VALUE}
+                  onValueChange={(value) =>
+                    setField("viewType", value === EMPTY_SELECT_VALUE ? undefined : value as ViewType)
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY_SELECT_VALUE}>Seleccionar</SelectItem>
+                    <SelectItem value="Vista natural">Vista natural</SelectItem>
+                    <SelectItem value="Vista cruzada">Vista cruzada</SelectItem>
+                    <SelectItem value="Natural/Cruzada">Ambas vistas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Nivel socioeconómico</Label>
+                <Select
+                  value={form.socioeconomic_level ?? EMPTY_SELECT_VALUE}
+                  onValueChange={(value) =>
+                    setField("socioeconomic_level", value === EMPTY_SELECT_VALUE ? undefined : value)
+                  }
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY_SELECT_VALUE}>Seleccionar</SelectItem>
+                    {[
+                      "A/B", "C+", "C", "C-", "D+", "D", "E",
+                    ].map((level) => <SelectItem key={level} value={level}>{level}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3 sm:col-span-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Iluminación</p>
+                  <p className="text-xs text-muted-foreground">Indica si el espacio cuenta con luces.</p>
+                </div>
+                <Switch
+                  checked={form.has_lights}
+                  onCheckedChange={(value) => setField("has_lights", value)}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Descripción</Label>
+                <Textarea
+                  value={form.description ?? ""}
+                  onChange={(event) => setField("description", event.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-violet-100 shadow-lg shadow-violet-950/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ImagePlus className="h-5 w-5 text-violet-600" />
+                Notas e imágenes
+              </CardTitle>
+              <CardDescription>Información adicional y material visual.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Comentarios</Label>
+                <Textarea
+                  value={form.comments ?? ""}
+                  onChange={(event) => setField("comments", event.target.value)}
+                />
+              </div>
+
+              {!isCreate && existingImages.length ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>Imágenes actuales</Label>
+                    <span className="text-xs text-muted-foreground">
+                      {retainedExistingImages.length} conservadas
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {existingImages.map((image, index) => {
+                      const removed = removedImageIds.includes(image.id)
+
+                      return (
+                        <div
+                          key={image.id}
+                          className={`relative overflow-hidden rounded-xl border transition ${
+                            removed
+                              ? "border-red-200 bg-red-50 opacity-70"
+                              : "border-violet-100"
+                          }`}
+                        >
+                          <img
+                            src={image.url}
+                            alt={`Imagen actual ${index + 1}`}
+                            className="h-32 w-full object-cover"
+                          />
+                          {image.isCover && !removed ? (
+                            <span className="absolute left-2 top-2 rounded-full bg-violet-700 px-2 py-1 text-[10px] font-semibold text-white shadow">
+                              Portada
+                            </span>
+                          ) : null}
+
+                          {removed ? (
+                            <button
+                              type="button"
+                              onClick={() => restoreExistingImage(image.id)}
+                              className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-lg bg-white px-2 py-2 text-xs font-semibold text-slate-700 shadow hover:bg-slate-50"
+                            >
+                              <Undo2 className="h-3.5 w-3.5" />
+                              Deshacer eliminación
+                            </button>
+                          ) : (
+                            <div className="absolute inset-x-2 bottom-2 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => requestImageReplacement(image.id)}
+                                disabled={isSubmitting || isPreparingImages}
+                                className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-white/95 px-2 py-2 text-xs font-semibold text-violet-700 shadow hover:bg-white disabled:opacity-50"
+                              >
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                Sustituir
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRemovedImageIds((current) => [...current, image.id])
+                                }
+                                disabled={isSubmitting || isPreparingImages}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white shadow hover:bg-red-700 disabled:opacity-50"
+                                aria-label={`Eliminar imagen actual ${index + 1}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <input
+                    ref={replacementInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleReplacementChange}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Las eliminaciones y sustituciones se aplicarán hasta guardar los cambios.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label>{isCreate ? "Imágenes" : "Agregar imágenes"}</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImagesChange}
+                  disabled={isSubmitting || isPreparingImages || availableImageSlots === 0}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {isPreparingImages
+                    ? "Optimizando imágenes..."
+                    : `${availableImageSlots} espacio${availableImageSlots === 1 ? "" : "s"} disponible${availableImageSlots === 1 ? "" : "s"}. Se corrigen y comprimen automáticamente.`}
+                </p>
+              </div>
+
+              {imagePreviews.length ? (
+                <div className="space-y-2">
+                  <Label>Imágenes nuevas por guardar</Label>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {imagePreviews.map((source, index) => (
+                    <div key={source} className="relative overflow-hidden rounded-xl border border-violet-100">
+                      <img src={source} alt={`Imagen ${index + 1}`} className="h-28 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                        className="absolute right-2 top-2 rounded-lg bg-slate-950/70 p-1.5 text-white hover:bg-slate-950"
+                        aria-label={`Quitar imagen ${index + 1}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
+      </div>
 
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-          >
-            Cancelar
-          </Button>
-
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Guardando..." : finalSubmitText}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+      <div className="sticky bottom-0 z-20 flex flex-col-reverse gap-3 rounded-2xl border border-violet-100 bg-white/95 p-4 shadow-[0_-12px_32px_-20px_rgba(76,29,149,0.45)] backdrop-blur sm:flex-row sm:justify-end">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting || isPreparingImages}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={handleSubmit} disabled={isSubmitting || isPreparingImages}>
+          <Save className="h-4 w-4" />
+          {isPreparingImages ? "Procesando imágenes..." : isSubmitting ? "Guardando..." : isCreate ? "Guardar espacio" : "Guardar cambios"}
+        </Button>
+      </div>
+    </div>
+  )
 }

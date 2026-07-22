@@ -4,11 +4,12 @@ import type { QueryParams } from "@/types/QueryParam"
 import { env } from "@/config/env"
 import { asViewType } from "../helpers/viewTypeHelper"
 
-function resolveSpaceImageUrl(path?: string | null) {
+function resolveSpaceImageUrl(spaceId: number, imageId?: number | null, path?: string | null) {
+  const apiBase = env.apiUrl?.replace(/\/+$/, "") ?? ""
+  if (apiBase && imageId) return `${apiBase}/api/spaces/${spaceId}/images/${imageId}`
   if (!path) return null
   if (/^https?:\/\//i.test(path)) return path
 
-  const apiBase = env.apiUrl?.replace(/\/+$/, "") ?? ""
   const cleanPath = path.replace(/^\/+/, "")
 
   return apiBase ? `${apiBase}/storage/${cleanPath}` : `/storage/${cleanPath}`
@@ -22,6 +23,9 @@ export function apiToUiStatus(active?: boolean | number | string | null): Space[
 export function apiToUiSpace(r: SpaceApi): Space {
   const images = Array.isArray(r.images) ? r.images : []
   const coverImage = images.find((image) => image.is_cover) ?? images[0] ?? null
+  const imageUrls = images
+    .map((image) => resolveSpaceImageUrl(r.id, image.id, image.path))
+    .filter((url): url is string => Boolean(url))
 
   return {
     id: r.id,
@@ -32,6 +36,8 @@ export function apiToUiSpace(r: SpaceApi): Space {
       lat: r.latitude != null ? Number(r.latitude) : 0,
       lng: r.longitude != null ? Number(r.longitude) : 0,
     },
+    latitude: r.latitude != null ? Number(r.latitude) : null,
+    longitude: r.longitude != null ? Number(r.longitude) : null,
 
     status: apiToUiStatus(r.active),
     createdAt: r.created_at ? r.created_at.slice(0, 10) : "",
@@ -53,7 +59,8 @@ export function apiToUiSpace(r: SpaceApi): Space {
 
     viewType: asViewType(r.view_type),
     images,
-    coverImageUrl: resolveSpaceImageUrl(coverImage?.path),
+    imageUrls,
+    coverImageUrl: resolveSpaceImageUrl(r.id, coverImage?.id, coverImage?.path),
   }
 }
 

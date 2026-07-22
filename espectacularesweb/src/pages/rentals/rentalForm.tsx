@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -24,7 +25,6 @@ import {
 import type { RentalFormValues, RentalRecord } from "@/types/Rental"
 
 const EMPTY_FORM: RentalFormValues = {
-  quote_id: "",
   customer_type: "lead",
   customer_id: "",
   agency_id: "",
@@ -41,7 +41,6 @@ const EMPTY_FORM: RentalFormValues = {
 
 function recordToForm(record: RentalRecord): RentalFormValues {
   return {
-    quote_id: record.quote_id != null ? String(record.quote_id) : "",
     customer_type: record.customer_type ?? "lead",
     customer_id: record.customer_id != null ? String(record.customer_id) : "",
     agency_id: record.agency_id != null ? String(record.agency_id) : "",
@@ -103,14 +102,15 @@ export function RentalForm({
         <DialogDescription>
           {isEdit ? "Ajusta la información de la renta." : "Registra una renta manualmente."}
         </DialogDescription>
+        {isEdit ? (
+          <div className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs text-violet-700">
+            ID de renta: <span className="font-bold text-violet-900">#{editRecord.id}</span>
+          </div>
+        ) : null}
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Quote ID</Label>
-            <Input value={form.quote_id} onChange={(e) => updateField("quote_id", e.target.value)} />
-          </div>
           <div className="space-y-2">
             <Label>Tipo de cliente</Label>
             <Select
@@ -159,10 +159,10 @@ export function RentalForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="active">Activa / confirmada</SelectItem>
+                <SelectItem value="completed">Completada</SelectItem>
+                <SelectItem value="cancelled">Cancelada</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -197,14 +197,14 @@ export function RentalForm({
           />
         </div>
 
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : "Guardar"}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </DialogContent>
   )

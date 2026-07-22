@@ -264,6 +264,14 @@ export type QuoteConvertToRentalPayload = {
     type: SearchableCustomerType
     id: number
   } | null
+  rental: {
+    starts_at: string
+    ends_at: string
+  }
+  payment: {
+    frequency: import("@/types/Rental").PaymentFrequency
+    first_payment_date: string
+  }
 }
 
 export type QuoteListParams = {

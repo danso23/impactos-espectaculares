@@ -18,6 +18,8 @@ use App\Models\Entities\QuoteStatusHistory;
 use App\Models\Entities\ServiceCatalog;
 use App\Models\Entities\Space;
 use App\Services\QuoteCalculator;
+use App\Services\RentalPaymentSchedule;
+use App\Services\SpaceAvailability;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -29,10 +31,14 @@ use Illuminate\Support\Str;
 class QuoteController extends Controller
 {
     private QuoteCalculator $calculator;
+    private RentalPaymentSchedule $paymentSchedule;
+    private SpaceAvailability $spaceAvailability;
 
     public function __construct()
     {
         $this->calculator = new QuoteCalculator();
+        $this->paymentSchedule = new RentalPaymentSchedule();
+        $this->spaceAvailability = new SpaceAvailability();
     }
 
     public function catalogs()
@@ -468,6 +474,26 @@ class QuoteController extends Controller
             ], 422);
         }
 
+        $planValidator = Validator::make($request->all(), [
+            'rental.starts_at' => ['required', 'date'],
+            'rental.ends_at' => ['required', 'date', 'after_or_equal:rental.starts_at'],
+            'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly'],
+            'payment.first_payment_date' => ['required', 'date'],
+        ]);
+
+        if ($planValidator->fails()) {
+            return response()->json([
+                'message' => 'Define la vigencia y el plan de pagos de la renta.',
+                'errors' => $planValidator->errors(),
+            ], 422);
+        }
+
+        $planPayload = $planValidator->validated();
+        $startsAt = $planPayload['rental']['starts_at'];
+        $endsAt = $planPayload['rental']['ends_at'];
+        $paymentFrequency = $planPayload['payment']['frequency'];
+        $firstPaymentDate = $planPayload['payment']['first_payment_date'];
+
         $customerType = $quote->customer_type;
         $customerId = $quote->customer_id;
         $customerSummary = $quote->snapshot_json['customer'] ?? null;
@@ -504,20 +530,47 @@ class QuoteController extends Controller
             ->where('item_type', 'rental')
             ->values();
 
-        if ($rentalItems->isEmpty()) {
+        // Las cotizaciones anteriores al flujo de rentas pueden contener solo
+        // partidas de servicio. En ese caso la renta conserva esas partidas en
+        // su snapshot, aunque no generen registros de ocupación de espacios.
+        $conversionItems = $rentalItems->isNotEmpty()
+            ? $rentalItems
+            : $quote->items->values();
+
+        $quotedStartsAt = $rentalItems->min(fn (QuoteItem $item) => optional($item->start_date)->format('Y-m-d'));
+        $quotedEndsAt = $rentalItems->max(fn (QuoteItem $item) => optional($item->end_date)->format('Y-m-d'));
+
+        if ($quotedStartsAt && Carbon::parse($startsAt)->gt(Carbon::parse($quotedStartsAt))) {
             return response()->json([
-                'message' => 'La cotización no contiene rentas para convertir.',
+                'message' => "La renta debe iniciar a más tardar el {$quotedStartsAt} para cubrir las partidas cotizadas.",
+            ], 422);
+        }
+
+        if ($quotedEndsAt && Carbon::parse($endsAt)->lt(Carbon::parse($quotedEndsAt))) {
+            return response()->json([
+                'message' => "La renta debe finalizar al menos el {$quotedEndsAt} para cubrir las partidas cotizadas.",
+            ], 422);
+        }
+
+        try {
+            $paymentSchedule = $this->paymentSchedule->build(
+                $startsAt,
+                $endsAt,
+                $firstPaymentDate,
+                $paymentFrequency
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
             ], 422);
         }
 
         $userId = $this->authUserId($request);
 
-        $rental = DB::transaction(function () use ($quote, $rentalItems, $userId, $request, $customerType, $customerId, $customerSummary) {
-            $startsAt = $rentalItems->min(fn (QuoteItem $item) => optional($item->start_date)->format('Y-m-d'));
-            $endsAt = $rentalItems->max(fn (QuoteItem $item) => optional($item->end_date)->format('Y-m-d'));
-            $subtotal = round((float) $rentalItems->sum(fn (QuoteItem $item) => (float) $item->subtotal), 2);
-            $tax = round((float) $rentalItems->sum(fn (QuoteItem $item) => (float) $item->tax_amount), 2);
-            $total = round((float) $rentalItems->sum(fn (QuoteItem $item) => (float) $item->total), 2);
+        $rental = DB::transaction(function () use ($quote, $rentalItems, $conversionItems, $userId, $request, $customerType, $customerId, $customerSummary, $startsAt, $endsAt, $paymentFrequency, $firstPaymentDate, $paymentSchedule) {
+            $subtotal = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->subtotal), 2);
+            $tax = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->tax_amount), 2);
+            $total = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->total), 2);
 
             if (($quote->customer_type ?? null) === 'sin_cliente' || empty($quote->customer_id)) {
                 $snapshot = is_array($quote->snapshot_json) ? $quote->snapshot_json : [];
@@ -540,6 +593,9 @@ class QuoteController extends Controller
                 'status' => 'draft',
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
+                'payment_frequency' => $paymentFrequency,
+                'first_payment_date' => $firstPaymentDate,
+                'payment_installments' => count($paymentSchedule),
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'total' => $total,
@@ -554,10 +610,12 @@ class QuoteController extends Controller
                     'customer' => $quote->snapshot_json['customer'] ?? null,
                     'company' => $quote->snapshot_json['company'] ?? null,
                     'agency' => $quote->snapshot_json['agency'] ?? null,
-                    'items' => $rentalItems->map(function (QuoteItem $item) {
+                    'items' => $conversionItems->map(function (QuoteItem $item) {
                         return [
                             'quote_item_id' => $item->id,
+                            'item_type' => $item->item_type,
                             'space_id' => $item->space_id,
+                            'service_id' => $item->service_id,
                             'concept' => $item->concept,
                             'start_date' => optional($item->start_date)->format('Y-m-d'),
                             'end_date' => optional($item->end_date)->format('Y-m-d'),
@@ -577,8 +635,8 @@ class QuoteController extends Controller
                     'rental_id' => $rental->id,
                     'quote_item_id' => $item->id,
                     'space_id' => $item->space_id,
-                    'start_date' => optional($item->start_date)->format('Y-m-d'),
-                    'end_date' => optional($item->end_date)->format('Y-m-d'),
+                    'start_date' => $startsAt,
+                    'end_date' => $endsAt,
                     'unit_price' => $item->unit_price,
                     'qty' => $item->qty,
                     'subtotal' => $item->subtotal,
@@ -604,7 +662,7 @@ class QuoteController extends Controller
                 ],
             );
 
-            return $rental;
+            return $rental->load('invoices');
         });
 
         $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
@@ -678,6 +736,8 @@ class QuoteController extends Controller
                 if ($type === 'rental') {
                     if (empty($item['space_id'])) {
                         $validator->errors()->add("items.{$index}.space_id", 'El espacio es obligatorio para rentas.');
+                    } elseif (Space::query()->whereKey($item['space_id'])->where('active', false)->exists()) {
+                        $validator->errors()->add("items.{$index}.space_id", 'El espacio está bloqueado y no está disponible para nuevas cotizaciones.');
                     }
                     if (empty($item['start_date'])) {
                         $validator->errors()->add("items.{$index}.start_date", 'La fecha inicial es obligatoria para rentas.');
@@ -724,6 +784,23 @@ class QuoteController extends Controller
             $validated['items'] ?? [],
             $this->quoteConfigurationPricePerSquareMeter()
         );
+
+        $rentalPeriods = collect($validated['items'])
+            ->where('item_type', 'rental')
+            ->map(fn (array $item) => [
+                'space_id' => $item['space_id'],
+                'start_date' => $item['start_date'],
+                'end_date' => $item['end_date'],
+            ])
+            ->values()
+            ->all();
+        $conflicts = $this->spaceAvailability->conflictingSpaceIds($rentalPeriods);
+        if ($conflicts->isNotEmpty()) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Uno o más espacios ya están rentados durante las fechas seleccionadas.',
+                'errors' => ['items' => ['Espacios no disponibles: ' . $conflicts->implode(', ')]],
+            ], 422));
+        }
         $customerSummary = $this->resolveCustomerSummary(
             $validated['customer']['type'],
             isset($validated['customer']['id']) ? (int)$validated['customer']['id'] : null

@@ -6,6 +6,7 @@ use App\Models\Entities\Space;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 
@@ -37,7 +38,7 @@ class SpaceController extends BaseCrudController
 
             // imágenes
             'images'                => ['nullable', 'array', 'max:10'],
-            'images.*'              => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images.*'              => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
         ];
     }
 
@@ -62,7 +63,9 @@ class SpaceController extends BaseCrudController
 
             // mágenes (en update las agregamos)
             'images' => ['sometimes', 'nullable', 'array', 'max:10'],
-            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            'remove_image_ids' => ['sometimes', 'array'],
+            'remove_image_ids.*' => ['integer', 'distinct'],
         ];
     }
 
@@ -87,6 +90,15 @@ class SpaceController extends BaseCrudController
                 'total' => $items->total(),
                 'totalPages' => $items->lastPage(),
             ],
+        ]);
+    }
+
+    public function find($id)
+    {
+        $space = Space::query()->with('images')->findOrFail($id);
+
+        return response()->json([
+            'data' => $space,
         ]);
     }
 
@@ -130,10 +142,32 @@ class SpaceController extends BaseCrudController
         $data = $validator->validated();
         $data = $this->beforeUpdate($data, $request, $space);
 
+        $removeImageIds = collect($data['remove_image_ids'] ?? [])
+            ->map(fn ($imageId) => (int) $imageId)
+            ->unique()
+            ->values();
+        unset($data['remove_image_ids'], $data['images']);
+
+        $remainingImageCount = $space->images()
+            ->when($removeImageIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $removeImageIds))
+            ->count();
+        $newImages = $request->file('images', []);
+        $newImageCount = is_array($newImages) ? count($newImages) : ($newImages ? 1 : 0);
+
+        if ($remainingImageCount + $newImageCount > 10) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => ['images' => ['El espacio puede tener como máximo 10 imágenes.']],
+            ], 422);
+        }
+
         $space->update($data);
+
+        $this->removeImagesFromSpace($space, $removeImageIds->all());
 
         // agregar imágenes nuevas
         $this->storeImagesForSpace($space, $request);
+        $this->ensureImageCover($space);
 
         return response()->json([
             'message' => 'Actualizado correctamente',
@@ -167,6 +201,26 @@ class SpaceController extends BaseCrudController
                 'is_cover' => !$hasCover && $position === 1,
             ]);
         }
+    }
+
+    private function removeImagesFromSpace(Space $space, array $imageIds): void
+    {
+        if (empty($imageIds)) return;
+
+        $images = $space->images()->whereIn('id', $imageIds)->get();
+
+        foreach ($images as $image) {
+            Storage::disk('public')->delete($image->path);
+            $image->delete();
+        }
+    }
+
+    private function ensureImageCover(Space $space): void
+    {
+        $images = $space->images()->orderBy('position')->orderBy('id')->get();
+        if ($images->isEmpty() || $images->contains(fn ($image) => (bool) $image->is_cover)) return;
+
+        $images->first()->update(['is_cover' => true]);
     }
 
     /**
@@ -210,12 +264,51 @@ class SpaceController extends BaseCrudController
         }
 
         $mimeType = mime_content_type($absolutePath) ?: 'application/octet-stream';
+        $contents = $this->orientedImageContents($absolutePath, $mimeType);
 
-        return response(file_get_contents($absolutePath), 200, [
+        return response($contents ?? file_get_contents($absolutePath), 200, [
             'Content-Type' => $mimeType,
-            'Content-Length' => (string) filesize($absolutePath),
             'Cache-Control' => 'private, max-age=300',
         ]);
+    }
+
+    private function orientedImageContents(string $path, string $mimeType): ?string
+    {
+        if ($mimeType !== 'image/jpeg' || !function_exists('exif_read_data') || !function_exists('imagecreatefromjpeg')) {
+            return null;
+        }
+
+        $orientation = (int) ((@exif_read_data($path)['Orientation'] ?? 1));
+        if ($orientation === 1) return null;
+
+        $image = @imagecreatefromjpeg($path);
+        if (!$image) return null;
+
+        if (in_array($orientation, [2, 4, 5, 7], true) && function_exists('imageflip')) {
+            imageflip($image, IMG_FLIP_HORIZONTAL);
+        }
+
+        $degrees = match ($orientation) {
+            3, 4 => 180,
+            5, 6 => -90,
+            7, 8 => 90,
+            default => 0,
+        };
+
+        if ($degrees !== 0) {
+            $rotated = imagerotate($image, $degrees, 0);
+            if ($rotated !== false) {
+                imagedestroy($image);
+                $image = $rotated;
+            }
+        }
+
+        ob_start();
+        imagejpeg($image, null, 90);
+        $contents = ob_get_clean();
+        imagedestroy($image);
+
+        return is_string($contents) ? $contents : null;
     }
 
     public function delete($id)

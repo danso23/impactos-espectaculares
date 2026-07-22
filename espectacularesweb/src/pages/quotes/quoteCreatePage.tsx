@@ -6,7 +6,6 @@ import { FileDown, RefreshCw, Save, Trash2, ImagePlus, X } from "lucide-react"
 import {
   useCreateQuote,
   useQuoteCatalogs,
-  useQuoteCustomerSearch,
   useUpdateQuoteConfiguration,
 } from "@/lib/hooks/quoteHook"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
@@ -25,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { QuoteCustomerSelector } from "@/pages/quotes/quoteCustomerSelector"
 import type {
   CustomerType,
   QuoteAmountType,
@@ -35,7 +35,6 @@ import type {
   QuotePayload,
   QuotePreviewData,
   QuoteRecord,
-  SearchableCustomerType,
 } from "@/types/Quote"
 
 type QuoteLocationState = {
@@ -124,9 +123,7 @@ export default function QuoteCreatePage() {
   const updateConfigurationMutation = useUpdateQuoteConfiguration()
 
   const [customerType, setCustomerType] = React.useState<CustomerType>("lead")
-  const [customerSearch, setCustomerSearch] = React.useState("")
   const [selectedCustomer, setSelectedCustomer] = React.useState<QuoteCustomer | null>(null)
-  const [showCustomerList, setShowCustomerList] = React.useState(false)
 
   const [companyId, setCompanyId] = React.useState<number | null>(null)
   const [letterheadId, setLetterheadId] = React.useState<number | null>(null)
@@ -153,13 +150,7 @@ export default function QuoteCreatePage() {
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(false)
   const [savedQuote, setSavedQuote] = React.useState<QuoteRecord | null>(null)
   const previewRequestId = React.useRef(0)
-  const customerSearchRef = React.useRef<HTMLDivElement | null>(null)
   const isWithoutCustomer = customerType === "sin_cliente"
-  const customerSearchType: SearchableCustomerType = customerType === "cliente" ? "cliente" : "lead"
-  const customerListLabel = customerSearchType === "cliente" ? "clientes" : "leads"
-  const customerSearchTerm = customerSearch.trim()
-
-  const customerQuery = useQuoteCustomerSearch(customerSearch, customerSearchType, !isWithoutCustomer)
 
   const catalogs = catalogsQuery.data?.data
   const companies = React.useMemo(() => catalogs?.companies ?? [], [catalogs])
@@ -216,42 +207,9 @@ export default function QuoteCreatePage() {
     setLetterheadId(defaultLetterhead?.id ?? null)
   }, [companyLetterheads, letterheadId, selectedCompany])
 
-  React.useEffect(() => {
-    if (!showCustomerList) return
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (!target || customerSearchRef.current?.contains(target)) return
-      setShowCustomerList(false)
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowCustomerList(false)
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown, true)
-    document.addEventListener("keydown", handleKeyDown)
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true)
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [showCustomerList])
-
-  const filteredCustomerResults = customerQuery.data?.data ?? []
-  const customerSearchHasData = !!customerQuery.data
   const customerDisplayName = isWithoutCustomer
     ? "Sin cliente"
     : selectedCustomer?.display_name ?? "Pendiente"
-  const customerSelectionHint = isWithoutCustomer
-    ? "La cotización se guardará sin cliente asignado."
-    : selectedCustomer
-      ? `Seleccionado: ${selectedCustomer.display_name}.`
-      : customerType === "lead"
-        ? "Selecciona un lead disponible o cambia el tipo a Sin cliente si no deseas asignar uno."
-        : "Selecciona un cliente disponible o cambia el tipo a Sin cliente si no deseas asignar uno."
   const saveBlockingMessage =
     !companyId
       ? "Selecciona una empresa emisora."
@@ -550,85 +508,12 @@ export default function QuoteCreatePage() {
               <CardDescription>Cliente, empresa emisora, agencia y vigencia.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <QuoteField label="Tipo de cliente">
-                    <Select
-                      value={customerType}
-                      onValueChange={(value) => {
-                        setCustomerType(value as CustomerType)
-                        setSelectedCustomer(null)
-                        setCustomerSearch("")
-                        setShowCustomerList(value !== "sin_cliente")
-                      }}
-                    >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lead">Lead / Prospecto</SelectItem>
-                    <SelectItem value="cliente">Cliente</SelectItem>
-                    <SelectItem value="sin_cliente">Sin cliente</SelectItem>
-                  </SelectContent>
-                </Select>
-              </QuoteField>
-
-              {isWithoutCustomer ? (
-                <QuoteField label="Cliente">
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                    La cotización se guardará sin cliente asignado.
-                  </div>
-                </QuoteField>
-              ) : (
-                <div ref={customerSearchRef} className="relative space-y-2">
-                  <Label>Cliente</Label>
-                  <Input
-                    placeholder="Buscar cliente..."
-                    value={selectedCustomer ? selectedCustomer.display_name : customerSearch}
-                    onChange={(event) => {
-                      setCustomerSearch(event.target.value)
-                      setSelectedCustomer(null)
-                      setShowCustomerList(true)
-                    }}
-                    onFocus={() => setShowCustomerList(true)}
-                  />
-
-                  {showCustomerList && !selectedCustomer ? (
-                    <Card className="absolute z-20 mt-1 max-h-60 w-full overflow-auto">
-                      <CardContent className="space-y-1 p-2">
-                        {customerQuery.isFetching && !customerSearchHasData ? (
-                          <div className="p-2 text-sm text-muted-foreground">Buscando...</div>
-                        ) : null}
-
-                        {customerSearchHasData && filteredCustomerResults.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground">
-                            {customerSearchTerm
-                              ? `Sin resultados para "${customerSearchTerm}".`
-                              : `No hay ${customerListLabel} disponibles.`}
-                          </div>
-                        ) : null}
-
-                        {filteredCustomerResults.map((customer) => (
-                          <button
-                            key={`${customer.type}-${customer.id}`}
-                            type="button"
-                            className="flex w-full flex-col rounded-md px-3 py-2 text-left hover:bg-muted"
-                            onClick={() => {
-                              setSelectedCustomer(customer)
-                              setCustomerSearch(customer.display_name)
-                              setShowCustomerList(false)
-                            }}
-                          >
-                            <span className="text-sm font-medium">{customer.display_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {customer.contact_name || customer.email || customer.phone || "Sin datos extra"}
-                            </span>
-                          </button>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">{customerSelectionHint}</p>
-                </div>
-              )}
+              <QuoteCustomerSelector
+                customerType={customerType}
+                selectedCustomer={selectedCustomer}
+                onCustomerTypeChange={setCustomerType}
+                onCustomerChange={setSelectedCustomer}
+              />
 
               <QuoteField label="Empresa emisora">
                 <Select

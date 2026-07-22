@@ -15,6 +15,7 @@ import type {
   PaginationState,
   RowSelectionState,
   OnChangeFn,
+  Row,
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ type DataTableProps<TData> = {
 
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
+  enableRowSelection?: boolean | ((row: Row<TData>) => boolean);
 
   getRowId?: (row: TData, index: number) => string;
 
@@ -86,6 +88,7 @@ export function DataTable<TData>({
   enableSearch = true,
   rowSelection,
   onRowSelectionChange,
+  enableRowSelection = true,
   getRowId,
   searchPlaceholder = "Buscar...",
   searchValue,
@@ -142,7 +145,7 @@ export function DataTable<TData>({
     },
 
     onRowSelectionChange: onRowSelectionChange,
-    enableRowSelection: true,
+    enableRowSelection,
 
     onSortingChange: setSorting,
 

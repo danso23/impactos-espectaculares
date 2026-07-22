@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LogoutButton } from "./components/auth/logout-button";
+import { SessionIdleGuard } from "./components/auth/session-idle-guard";
 import { LoginPage } from "./pages/auth/login";
 import { Can } from "@/components/auth/Can";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
@@ -28,6 +29,7 @@ import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import UsersPage from "@/pages/userPage";
 import SpacePage from "./pages/space/spacePage";
+import SpaceEditorPage from "./pages/space/spaceEditorPage";
 import QuoteCreatePage from "@/pages/quotes/quoteCreatePage";
 import QuotesPage from "@/pages/quotes/quotesPage";
 import LeadsPage from "@/pages/crm/leadsPage";
@@ -36,6 +38,7 @@ import RolePage from "./pages/rolePage";
 import CaseroPage from "./pages/caseros/caseroPage";
 import ProviderPage from "@/pages/providers/providerPage";
 import RentalPage from "@/pages/rentals/rentalPage";
+import PaymentPage from "@/pages/payments/paymentPage";
 
 type NavItem = {
   to: string;
@@ -97,6 +100,7 @@ function AppLayout() {
 
   return (
     <div className="h-dvh bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 text-foreground overflow-hidden">
+      <SessionIdleGuard />
       <div className="flex h-full">
         {/* Sidebar */}
         <aside
@@ -238,12 +242,14 @@ export default function AppRoot() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/espacios" replace />} />
           <Route path="espacios" element={<SpacePage />} />
+          <Route path="espacios/nuevo" element={<SpaceEditorPage />} />
+          <Route path="espacios/:id/editar" element={<SpaceEditorPage />} />
           <Route path="cotizaciones" element={<QuotesPage />} />
           <Route path="cotizaciones/nueva" element={<QuoteCreatePage />} />
           <Route path="rentas" element={<RentalPage />} />
           <Route path="usuarios" element={<UsersPage />} />
           <Route path="roles" element={<RolePage />} />
-          <Route path="pagos" element={<RouteStub title="Pagos" />} />
+          <Route path="pagos" element={<PaymentPage />} />
           <Route path="prospectos" element={<LeadsPage />} />
           <Route path="clientes" element={<ClientsPage />} />
           <Route path="proveedores" element={<ProviderPage />} />

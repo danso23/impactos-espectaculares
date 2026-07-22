@@ -45,6 +45,7 @@ export function LoginPage() {
 
             localStorage.setItem("token", data.access_token as string) // compat mientras migras
             localStorage.setItem("user", JSON.stringify(data.user))
+            localStorage.setItem("espectaculares.session.last_activity", String(Date.now()))
 
             // redirige
             navigate("/")

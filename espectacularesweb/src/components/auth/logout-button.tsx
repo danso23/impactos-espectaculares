@@ -15,8 +15,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { apiFetch } from "@/lib/api"
-import { clearAuth } from "@/lib/auth"
+import { env } from "@/config/env"
+import { clearAuth, getToken } from "@/lib/auth"
 
 type LogoutButtonProps = {
   className?: string
@@ -32,9 +32,16 @@ function forceLocalLogout(navigate: ReturnType<typeof useNavigate>) {
 
 async function logoutRequest() {
   const refreshToken = localStorage.getItem("refresh_token")
-  const res = await apiFetch(`${import.meta.env.VITE_API_URL}/api/logout`, {
+  const accessToken = getToken()
+  if (!accessToken || !env.apiUrl) return null
+
+  const res = await fetch(`${env.apiUrl.replace(/\/+$/, "")}/api/logout`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
       refresh_token: refreshToken || null,
     }),

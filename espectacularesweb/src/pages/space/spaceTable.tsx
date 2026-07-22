@@ -27,6 +27,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         key: "quote",
         label: "Cotizar",
         icon: <FileText className="h-4 w-4" />,
+        disabled: (row) => row.status !== "Disponible",
         onClick: (row) =>
           opts.onQuote ? opts.onQuote(row) : console.log("Cotizar", row.id),
       },
@@ -75,6 +76,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
             onCheckedChange={(value) =>
               table.toggleAllPageRowsSelected(!!value)
             }
+            className="h-5 w-5 rounded-md border-2 border-white bg-white/15 text-violet-700 shadow-sm data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-violet-700 focus-visible:ring-white/70"
             aria-label="Seleccionar todo"
           />
         ),
@@ -82,6 +84,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
+            disabled={!row.getCanSelect()}
             aria-label="Seleccionar fila"
           />
         ),
@@ -117,6 +120,34 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("title")}</div>
         ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="-ml-3"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Estatus
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const status = row.original.status;
+          const available = status === "Disponible";
+
+          return (
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+                available
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
+            >
+              {status}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "type",
@@ -264,18 +295,6 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
           const c = row.getValue("coords") as Space["coords"];
           return `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
         },
-      },
-      {
-        accessorKey: "status",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Estatus
-          </Button>
-        ),
       },
       {
         accessorKey: "createdAt",

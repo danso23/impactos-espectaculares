@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { CurpInput, RfcInput } from "@/components/ui/mexican-id-input"
+import { PhoneInput } from "@/components/ui/phone-input"
 import {
   Select,
   SelectContent,
@@ -22,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { isValidCurp, isValidRfc } from "@/lib/helpers/mexicanId"
 import type {
   ClientFormValues,
   CrmUser,
@@ -183,6 +186,9 @@ export function CrmForm({
   const validate = () => {
     const nombre = isLead ? leadForm.nombre : clientForm.nombre
     if (!nombre.trim()) return "El nombre es obligatorio."
+    const activeForm = isLead ? leadForm : clientForm
+    if (!isValidRfc(activeForm.rfc)) return "Captura un RFC válido o rellénalo completamente con X."
+    if (!isValidCurp(activeForm.curp)) return "Captura una CURP válida o rellénala completamente con X."
     return null
   }
 
@@ -313,24 +319,24 @@ export function CrmForm({
             </Field>
 
             <Field label="Teléfono">
-              <Input
+              <PhoneInput
                 value={activeForm.telefono}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("telefono", e.target.value)
-                    : setClientField("telefono", e.target.value)
+                    ? setLeadField("telefono", value)
+                    : setClientField("telefono", value)
                 }
                 placeholder="Teléfono principal"
               />
             </Field>
 
             <Field label="Teléfono secundario">
-              <Input
+              <PhoneInput
                 value={activeForm.telefono_2}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("telefono_2", e.target.value)
-                    : setClientField("telefono_2", e.target.value)
+                    ? setLeadField("telefono_2", value)
+                    : setClientField("telefono_2", value)
                 }
                 placeholder="Teléfono alterno"
               />
@@ -362,26 +368,24 @@ export function CrmForm({
             </Field>
 
             <Field label="RFC">
-              <Input
+              <RfcInput
                 value={activeForm.rfc}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("rfc", e.target.value)
-                    : setClientField("rfc", e.target.value)
+                    ? setLeadField("rfc", value)
+                    : setClientField("rfc", value)
                 }
-                placeholder="RFC"
               />
             </Field>
 
             <Field label="CURP">
-              <Input
+              <CurpInput
                 value={activeForm.curp}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("curp", e.target.value)
-                    : setClientField("curp", e.target.value)
+                    ? setLeadField("curp", value)
+                    : setClientField("curp", value)
                 }
-                placeholder="CURP"
               />
             </Field>
           </div>
@@ -524,12 +528,12 @@ export function CrmForm({
             </Field>
 
             <Field label="Teléfono aval">
-              <Input
+              <PhoneInput
                 value={activeForm.telefono_aval}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("telefono_aval", e.target.value)
-                    : setClientField("telefono_aval", e.target.value)
+                    ? setLeadField("telefono_aval", value)
+                    : setClientField("telefono_aval", value)
                 }
                 placeholder="Teléfono del aval"
               />

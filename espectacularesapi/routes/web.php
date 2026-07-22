@@ -24,6 +24,9 @@ $router->post('/auth/refresh', 'AuthController@refresh');
 $router->group(['prefix' => 'api'], function () use ($router) {
 
     $router->post('login', ['uses' => 'AuthController@login']);
+    // Las imágenes ya se publican desde storage; esta ruta además normaliza
+    // la orientación EXIF de archivos históricos.
+    $router->get('spaces/{spaceId}/images/{imageId}', ['uses' => 'SpaceController@image']);
 
     $router->group(['middleware' => 'authToken'], function () use ($router) {
 
@@ -51,7 +54,7 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->post('spaces', ['uses' => 'SpaceController@store']);
         $router->get('spaces', ['uses' => 'SpaceController@index']);
         $router->get('spaces/coords', ['uses' => 'SpaceController@coords']);
-        $router->get('spaces/{spaceId}/images/{imageId}', ['uses' => 'SpaceController@image']);
+        $router->get('spaces/{id}', ['uses' => 'SpaceController@find']);
         $router->put('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->patch('spaces/{id}', ['uses' => 'SpaceController@update']);
         $router->delete('spaces/{id}', ['uses' => 'SpaceController@delete']);
@@ -68,9 +71,14 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->get('rentals', ['uses' => 'RentalController@index']);
         $router->get('rentals/{id}', ['uses' => 'RentalController@find']);
         $router->post('rentals', ['uses' => 'RentalController@store']);
+        $router->post('rentals/{id}/confirm', ['uses' => 'RentalController@confirm']);
         $router->put('rentals/{id}', ['uses' => 'RentalController@update']);
         $router->patch('rentals/{id}', ['uses' => 'RentalController@update']);
         $router->delete('rentals/{id}', ['uses' => 'RentalController@delete']);
+
+        /** PAYMENTS **/
+        $router->get('payments', ['uses' => 'PaymentController@index']);
+        $router->post('invoices/{invoiceId}/payments', ['uses' => 'PaymentController@store']);
 
         /** QUOTES AND LEADS **/
         $router->get('quote-catalogs', ['uses' => 'QuoteController@catalogs']);
