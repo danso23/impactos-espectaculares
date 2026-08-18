@@ -50,6 +50,7 @@ function buildQuoteFormData(request: QuoteCreateRequest) {
   const fd = new FormData()
   const { payload, images } = request
 
+  appendFormData(fd, "quote_kind", payload.quote_kind)
   appendFormData(fd, "customer", payload.customer)
   appendFormData(fd, "issuer_company_id", payload.issuer_company_id)
   appendFormData(fd, "letterhead_id", payload.letterhead_id)

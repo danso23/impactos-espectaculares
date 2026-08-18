@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { userService } from "@/lib/services/userService"
 import type { Role } from "@/lib/services/userService"
 import type { AuthUser } from "@/types/AuthUser"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, UsersRound } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -26,6 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { Can } from "@/components/auth/Can"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import { ModuleHeader } from "@/components/generic/module-header"
 
 type UserWithRoles = AuthUser & { roles_array: string[] }
 
@@ -173,12 +174,12 @@ export default function UsersPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Usuarios</h1>
-          <p className="text-gray-600">Gestiona los usuarios y sus roles en el sistema.</p>
-        </div>
-        <Can role="admin">
+      <ModuleHeader
+        title="Usuarios"
+        badge="Control de usuarios"
+        description="Gestiona los usuarios y sus roles en el sistema."
+        icon={UsersRound}
+        actions={<Can permission="users.edit">
            <Button 
             onClick={() => handleOpenModal()}
             className="flex items-center gap-2 px-6 py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border-none"
@@ -186,8 +187,8 @@ export default function UsersPage() {
             <Plus className="w-5 h-5" />
             <span>Nuevo usuario</span>
           </Button>
-        </Can>
-      </div>
+        </Can>}
+      />
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
         <Table>
@@ -230,7 +231,7 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <Can role="admin">
+                      <Can permission="users.edit">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -240,14 +241,16 @@ export default function UsersPage() {
                           <Pencil className="w-5 h-5" />
                         </Button>
                         {user.username !== 'admin' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            onClick={() => handleDeleteClick(user)}
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
+                          <Can permission="users.delete">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              onClick={() => handleDeleteClick(user)}
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          </Can>
                         )}
                       </Can>
                     </div>

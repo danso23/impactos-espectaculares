@@ -38,7 +38,7 @@ export function getSpace(id: number) {
 }
 
 /** CREATE y UPDATE */
-function buildSpaceFormData(payload: SpaceFormValues & { images?: File[]; remove_image_ids?: number[] }) {
+function buildSpaceFormData(payload: SpaceFormValues & { images?: File[]; remove_image_ids?: number[]; image_order_ids?: number[] }) {
   const fd = new FormData()
 
   const keyMap: Partial<Record<keyof SpaceFormValues, string>> = {
@@ -51,6 +51,11 @@ function buildSpaceFormData(payload: SpaceFormValues & { images?: File[]; remove
     const key = rawKey as keyof SpaceFormValues
     const apiKey = keyMap[key] ?? rawKey
 
+    if (
+      (rawKey === "blocked_from" || rawKey === "blocked_until") &&
+      value === ""
+    ) return
+
     // imágenes
     if (rawKey === "images" && Array.isArray(value)) {
       ;(value as File[]).forEach((file) => fd.append("images[]", file))
@@ -59,6 +64,11 @@ function buildSpaceFormData(payload: SpaceFormValues & { images?: File[]; remove
 
     if (rawKey === "remove_image_ids" && Array.isArray(value)) {
       value.forEach((imageId) => fd.append("remove_image_ids[]", String(imageId)))
+      return
+    }
+
+    if (rawKey === "image_order_ids" && Array.isArray(value)) {
+      value.forEach((imageId) => fd.append("image_order_ids[]", String(imageId)))
       return
     }
 

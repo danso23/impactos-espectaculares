@@ -18,6 +18,9 @@ export type Space = {
   description?: string | null;
   comments?: string | null;
   active?: boolean | null;
+  blocked_from?: string | null;
+  blocked_until?: string | null;
+  is_blocked_now?: boolean | null;
   latitude?: number | null;
   longitude?: number | null;
   images?: SpaceImageApi[];
@@ -38,6 +41,8 @@ export type SpaceImageApi = {
 
 export type SpaceFormValues = {
   active?: boolean;
+  blocked_from?: string;
+  blocked_until?: string;
   faces?: number;
   latitude?: number;
   longitude?: number;
@@ -68,6 +73,8 @@ export type CreateSpaceInput = {
   width_m?: number;
   height_m?: number;
   active?: boolean;
+  blocked_from?: string;
+  blocked_until?: string;
   images?: File[];
 };
 
@@ -80,6 +87,9 @@ export type SpaceApi = {
   price?: number | string | null;
 
   active?: boolean | number | string | null;
+  blocked_from?: string | null;
+  blocked_until?: string | null;
+  is_blocked_now?: boolean | number | string | null;
   created_at?: string | null;
 
   latitude?: number | string | null;
@@ -101,4 +111,5 @@ export type SpaceApi = {
 export type SpaceFormPayload = SpaceFormValues & {
   images: File[];
   remove_image_ids?: number[];
+  image_order_ids?: number[];
 };

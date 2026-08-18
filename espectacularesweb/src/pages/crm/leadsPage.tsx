@@ -1,8 +1,10 @@
 import * as React from "react"
+import { UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ModuleHeader } from "@/components/generic/module-header"
+import { Card, CardContent } from "@/components/ui/card"
 import {
   Select,
   SelectContent,
@@ -14,6 +16,7 @@ import { useConvertLeadToClient, useCreateLead, useLeadCatalogs, useLeads } from
 import { CrmForm } from "@/pages/crm/crmForm"
 import { useLeadTable } from "@/pages/crm/crmTable"
 import type { LeadFormValues, LeadRecord } from "@/types/Crm"
+import { Can } from "@/components/auth/Can"
 
 const ALL = "all"
 
@@ -73,16 +76,13 @@ export default function LeadsPage() {
   const columns = useLeadTable({ onConvert: handleConvert })
 
   return (
-    <div className="space-y-4 p-6">
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle>Prospectos</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Registra y da seguimiento a tus leads comerciales.
-            </p>
-          </div>
-
+    <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
+      <ModuleHeader
+        title="Prospectos"
+        badge="Seguimiento comercial"
+        description="Registra y da seguimiento a tus leads comerciales."
+        icon={UsersRound}
+        actions={<Can permission="leads.edit">
           <CrmForm
             mode="lead"
             statuses={statuses}
@@ -92,9 +92,11 @@ export default function LeadsPage() {
               await createLeadMutation.mutateAsync(payload as LeadFormValues)
             }}
           />
-        </CardHeader>
+        </Can>}
+      />
 
-        <CardContent className="space-y-4">
+      <Card>
+        <CardContent className="space-y-4 pt-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="w-full sm:w-64">
               <Select

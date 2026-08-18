@@ -3,6 +3,7 @@
 namespace App\Models\Entities;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class Space extends Model
 {
@@ -24,6 +25,8 @@ class Space extends Model
         'latitude',
         'longitude',
         'active',
+        'blocked_from',
+        'blocked_until',
     ];
 
     protected $casts = [
@@ -35,7 +38,58 @@ class Space extends Model
         'has_lights' => 'boolean',
         'faces' => 'integer',
         'active' => 'boolean',
+        'blocked_from' => 'date:Y-m-d',
+        'blocked_until' => 'date:Y-m-d',
     ];
+
+    public function scopeWithBlockStatus($query)
+    {
+        $today = Carbon::today()->toDateString();
+
+        return $query->selectRaw(
+            "CASE
+                WHEN COALESCE(spaces.active, 0) = 0
+                  AND (spaces.blocked_from IS NULL OR spaces.blocked_from <= ?)
+                  AND (spaces.blocked_until IS NULL OR spaces.blocked_until >= ?)
+                THEN 1
+                ELSE 0
+            END AS is_blocked_now",
+            [$today, $today]
+        );
+    }
+
+    public function scopeCurrentlyBlocked($query)
+    {
+        $today = Carbon::today()->toDateString();
+
+        return $query
+            ->where('active', false)
+            ->where(function ($start) use ($today) {
+                $start->whereNull('blocked_from')->orWhereDate('blocked_from', '<=', $today);
+            })
+            ->where(function ($end) use ($today) {
+                $end->whereNull('blocked_until')->orWhereDate('blocked_until', '>=', $today);
+            });
+    }
+
+    public function scopeCurrentlyAvailable($query)
+    {
+        $today = Carbon::today()->toDateString();
+
+        return $query->where(function ($available) use ($today) {
+            $available
+                ->where('active', true)
+                ->orWhere(function ($outsideBlock) use ($today) {
+                    $outsideBlock
+                        ->where('active', false)
+                        ->where(function ($outsideDates) use ($today) {
+                            $outsideDates
+                                ->whereDate('blocked_from', '>', $today)
+                                ->orWhereDate('blocked_until', '<', $today);
+                        });
+                });
+        });
+    }
     
     public function images()
     {

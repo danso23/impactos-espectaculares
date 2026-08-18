@@ -4,6 +4,7 @@ import { ArrowRightLeft } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { ClientRecord, LeadRecord, LeadStatus } from "@/types/Crm"
+import { useRoles } from "@/hooks/useRoles"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
@@ -42,6 +43,8 @@ export function useLeadTable({
 }: {
   onConvert: (row: LeadRecord) => Promise<void> | void
 }) {
+  const { can } = useRoles()
+
   return React.useMemo<ColumnDef<LeadRecord>[]>(
     () => [
       {
@@ -113,12 +116,12 @@ export function useLeadTable({
             label: "Convertir a cliente",
             icon: <ArrowRightLeft className="h-4 w-4" />,
             onClick: onConvert,
-            visible: (row) => row.status?.key !== "won",
+            visible: (row) => can("leads.edit") && row.status?.key !== "won",
           },
         ],
       }),
     ],
-    [onConvert]
+    [onConvert, can]
   )
 }
 

@@ -20,7 +20,7 @@ async function hydrateSpaceImages(spaces: CatalogSpace[]) {
   return await Promise.all(
     spaces.map(async (space) => {
       const images = await Promise.all(
-        (space.images ?? []).slice(0, 3).map(async (image) => {
+        (space.images ?? []).slice(0, 4).map(async (image) => {
           if (!image?.id || !env.apiUrl) return image
 
           const response = await fetch(
@@ -52,15 +52,30 @@ async function hydrateSpaceImages(spaces: CatalogSpace[]) {
 
 export type SpacesCatalogVersion = "v1" | "v2";
 
+export const createSpacesCatalogPdf = async (
+  spaces: CatalogSpace[],
+  version: SpacesCatalogVersion = "v2",
+  options: { enableMapLinks?: boolean } = {}
+) => {
+  const hydratedSpaces = await hydrateSpaceImages(spaces)
+  const enableMapLinks = options.enableMapLinks ?? true
+  const document = version === "v1"
+    ? <SpacesCatalogDocumentV1 spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />
+    : <SpacesCatalogDocument spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />
+  return await pdf(document).toBlob();
+};
+
+export const saveSpacesCatalogPdf = (
+  blob: Blob,
+  version: SpacesCatalogVersion = "v2"
+) => {
+  saveAs(blob, `catalogo-espacios-${version.toUpperCase()}.pdf`);
+};
+
 export const downloadSpacesCatalog = async (
   spaces: CatalogSpace[],
   version: SpacesCatalogVersion = "v2"
 ) => {
-  const hydratedSpaces = await hydrateSpaceImages(spaces)
-  const document = version === "v1"
-    ? <SpacesCatalogDocumentV1 spaces={hydratedSpaces} />
-    : <SpacesCatalogDocument spaces={hydratedSpaces} />
-  const blob = await pdf(document).toBlob();
-
-  saveAs(blob, `catalogo-espacios-${version.toUpperCase()}.pdf`);
+  const blob = await createSpacesCatalogPdf(spaces, version);
+  saveSpacesCatalogPdf(blob, version);
 };

@@ -12,6 +12,7 @@ import { toast } from "sonner"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import { DataTable } from "@/components/generic/data-table"
+import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/select"
 import { useReceivables, useRegisterPayment } from "@/lib/hooks/paymentHook"
 import type { PaymentMethod, ReceivableRecord } from "@/types/Payment"
+import { useRoles } from "@/hooks/useRoles"
 
 const ALL_STATUSES = "all"
 
@@ -79,6 +81,7 @@ function statusPresentation(record: ReceivableRecord) {
 }
 
 export default function PaymentPage() {
+  const { can } = useRoles()
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
@@ -202,15 +205,15 @@ export default function PaymentPage() {
       },
     },
     createActionsColumn<ReceivableRecord>({
-      actions: [{
+      actions: can("payments.edit") ? [{
         key: "register-payment",
         label: "Registrar pago",
         icon: <Banknote className="h-4 w-4" />,
         visible: (row) => row.balance > 0 && row.status !== "cancelled",
         onClick: setSelectedReceivable,
-      }],
+      }] : [],
     }),
-  ], [])
+  ], [can])
 
   const handleRegisterPayment = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -246,14 +249,12 @@ export default function PaymentPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
-      <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-          <WalletCards className="h-3.5 w-3.5" />
-          Control de cobranza
-        </div>
-        <h1 className="text-3xl font-bold text-gray-800">Pagos</h1>
-        <p className="max-w-2xl text-gray-600">Administra vencimientos, saldos y pagos recibidos de las rentas.</p>
-      </div>
+      <ModuleHeader
+        title="Pagos"
+        badge="Control de cobranza"
+        description="Administra vencimientos, saldos y pagos recibidos de las rentas."
+        icon={WalletCards}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="border-gray-200 shadow-md">

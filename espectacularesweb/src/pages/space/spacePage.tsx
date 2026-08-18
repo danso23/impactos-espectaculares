@@ -5,10 +5,22 @@ import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@/components/generic/data-table";
 import { Filter } from "@/components/generic/filter";
+import { ModuleHeader } from "@/components/generic/module-header";
 
-import { downloadSpacesCatalog } from "@/lib/pdf/downloadSpacesCatalog";
+import {
+  createSpacesCatalogPdf,
+  saveSpacesCatalogPdf,
+  type SpacesCatalogVersion,
+} from "@/lib/pdf/downloadSpacesCatalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -21,6 +33,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -37,11 +50,18 @@ import {
   CircleOff,
   ChevronLeft,
   ChevronRight,
+  Check,
+  Copy,
+  Download,
+  Eye,
+  ExternalLink,
   FileDown,
   Lightbulb,
+  LoaderCircle,
   MapPinned,
   Plus,
   Search,
+  Share2,
 } from "lucide-react";
 import type { RowSelectionState } from "@tanstack/react-table";
 
@@ -52,6 +72,10 @@ import { useSpaceTable } from "./spaceTable";
 import { Can } from "@/components/auth/Can";
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog";
 import { toast } from "sonner";
+import {
+  createCatalogShare,
+  type CatalogShareCreated,
+} from "@/lib/services/spaceCatalogShareService";
 
 const initialFilters: FilterValues = {
   dateFrom: undefined,
@@ -76,6 +100,20 @@ export default function SpacePage() {
   const [viewOpen, setViewOpen] = React.useState(false);
   const [viewingSpace, setViewingSpace] = React.useState<Space | null>(null);
   const [activeImageIndex, setActiveImageIndex] = React.useState(0);
+  const [catalogPreviewOpen, setCatalogPreviewOpen] = React.useState(false);
+  const [catalogPreviewUrl, setCatalogPreviewUrl] = React.useState<string | null>(null);
+  const [catalogPreviewBlob, setCatalogPreviewBlob] = React.useState<Blob | null>(null);
+  const [catalogPreviewSpaces, setCatalogPreviewSpaces] = React.useState<Space[]>([]);
+  const [catalogPreviewVersion, setCatalogPreviewVersion] =
+    React.useState<SpacesCatalogVersion>("v2");
+  const [isCatalogPreviewLoading, setIsCatalogPreviewLoading] = React.useState(false);
+  const [isCatalogDownloadLoading, setIsCatalogDownloadLoading] = React.useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
+  const [shareDuration, setShareDuration] = React.useState("48");
+  const [customShareHours, setCustomShareHours] = React.useState("48");
+  const [catalogShare, setCatalogShare] = React.useState<CatalogShareCreated | null>(null);
+  const [isCreatingShare, setIsCreatingShare] = React.useState(false);
+  const [shareCopied, setShareCopied] = React.useState(false);
 
   // Deletion state
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
@@ -181,24 +219,147 @@ export default function SpacePage() {
   const selectedSpaces = React.useMemo(() => {
     return data.filter((space) => rowSelection[String(space.id)]);
   }, [rowSelection, data]);
+  const hasBlockedSelection = selectedSpaces.some(
+    (space) => space.status === "Bloqueado",
+  );
+
+  React.useEffect(() => {
+    return () => {
+      if (catalogPreviewUrl) URL.revokeObjectURL(catalogPreviewUrl);
+    };
+  }, [catalogPreviewUrl]);
+
+  const handlePreviewCatalog = async (version: SpacesCatalogVersion) => {
+    setIsCatalogPreviewLoading(true);
+
+    try {
+      const previewSpaces = [...selectedSpaces];
+      const blob = await createSpacesCatalogPdf(previewSpaces, version, {
+        enableMapLinks: false,
+      });
+      setCatalogPreviewBlob(blob);
+      setCatalogPreviewSpaces(previewSpaces);
+      setCatalogPreviewVersion(version);
+      setCatalogPreviewUrl(URL.createObjectURL(blob));
+      setCatalogPreviewOpen(true);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo generar la vista previa del catálogo."
+      );
+    } finally {
+      setIsCatalogPreviewLoading(false);
+    }
+  };
+
+  const handleCatalogPreviewOpenChange = (open: boolean) => {
+    setCatalogPreviewOpen(open);
+
+    if (!open) {
+      setCatalogPreviewBlob(null);
+      setCatalogPreviewSpaces([]);
+      setCatalogPreviewUrl(null);
+    }
+  };
+
+  const getSpaceMapUrl = (space: Space) => {
+    const latitude = space.latitude ?? space.coords?.lat ?? 0;
+    const longitude = space.longitude ?? space.coords?.lng ?? 0;
+    return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+  };
+
+  const openSpaceMap = (space: Space) => {
+    const mapWindow = window.open(getSpaceMapUrl(space), "_blank");
+    if (mapWindow) mapWindow.opener = null;
+  };
+
+  const handleDownloadCatalog = async () => {
+    if (catalogPreviewSpaces.length === 0) return;
+    setIsCatalogDownloadLoading(true);
+
+    try {
+      const blob = await createSpacesCatalogPdf(
+        catalogPreviewSpaces,
+        catalogPreviewVersion,
+        { enableMapLinks: true }
+      );
+      saveSpacesCatalogPdf(blob, catalogPreviewVersion);
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo descargar el catálogo."
+      );
+    } finally {
+      setIsCatalogDownloadLoading(false);
+    }
+  };
+
+  const handleShareDialogOpenChange = (open: boolean) => {
+    setShareDialogOpen(open);
+    if (!open) {
+      setCatalogShare(null);
+      setShareCopied(false);
+    }
+  };
+
+  const handleCreateCatalogShare = async () => {
+    const hours = Number(shareDuration === "custom" ? customShareHours : shareDuration);
+    if (!Number.isInteger(hours) || hours < 1 || hours > 8760) {
+      toast.error("Define una vigencia entre 1 y 8760 horas.");
+      return;
+    }
+
+    setIsCreatingShare(true);
+    try {
+      const share = await createCatalogShare(
+        selectedSpaces.map((space) => space.id),
+        hours
+      );
+      setCatalogShare(share);
+      setShareCopied(false);
+      toast.success("Enlace público generado correctamente.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo generar el enlace compartible."
+      );
+    } finally {
+      setIsCreatingShare(false);
+    }
+  };
+
+  const copyShareUrl = async () => {
+    if (!catalogShare) return;
+
+    try {
+      await navigator.clipboard.writeText(catalogShare.url);
+      setShareCopied(true);
+      toast.success("Enlace copiado al portapapeles.");
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = catalogShare.url;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+      setShareCopied(true);
+      toast.success("Enlace copiado al portapapeles.");
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-            <MapPinned className="h-3.5 w-3.5" />
-            Control de espacios
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Espacios</h1>
-            <p className="mt-2 max-w-2xl text-gray-600">
-              Revisa y administra los espacios publicitarios desde una sola pantalla.
-            </p>
-          </div>
-        </div>
-
-        <Can role="admin">
+      <ModuleHeader
+        title="Espacios"
+        badge="Control de espacios"
+        description="Revisa y administra los espacios publicitarios desde una sola pantalla."
+        icon={MapPinned}
+        actions={<Can permission="spaces.edit">
           <Button
             className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-6 py-6 shadow-lg transform hover:-translate-y-0.5 transition-all border-none"
             onClick={() => navigate("/espacios/nuevo")}
@@ -206,8 +367,8 @@ export default function SpacePage() {
             <Plus className="h-4 w-4" />
             Nuevo espacio
           </Button>
-        </Can>
-      </div>
+        </Can>}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="border-gray-200 shadow-md">
@@ -278,22 +439,27 @@ export default function SpacePage() {
                     <Button
                       variant="outline"
                       className="flex gap-2 rounded-lg border-gray-300 shadow-sm hover:bg-purple-50 hover:text-purple-600"
-                      disabled={selectedSpaces.length === 0}
+                      disabled={selectedSpaces.length === 0 || isCatalogPreviewLoading}
+                      title="Previsualizar PDF"
                     >
-                      <FileDown className="h-4 w-4" />
-                      Descargar PDF
+                      {isCatalogPreviewLoading ? (
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="h-4 w-4" />
+                      )}
+                      {isCatalogPreviewLoading ? "Generando..." : "PDF"}
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="min-w-56">
                     <DropdownMenuLabel>Versión del catálogo</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => downloadSpacesCatalog(selectedSpaces, "v2")}>
+                    <DropdownMenuItem onClick={() => handlePreviewCatalog("v2")}>
                       <div>
                         <p className="font-medium">Diseño nuevo · V2</p>
                         <p className="text-xs text-muted-foreground">Formato editorial actualizado</p>
                       </div>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => downloadSpacesCatalog(selectedSpaces, "v1")}>
+                    <DropdownMenuItem onClick={() => handlePreviewCatalog("v1")}>
                       <div>
                         <p className="font-medium">Diseño anterior · V1</p>
                         <p className="text-xs text-muted-foreground">Formato clásico del catálogo</p>
@@ -303,8 +469,25 @@ export default function SpacePage() {
                 </DropdownMenu>
 
                 <Button
-                  className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transition-all hover:from-purple-700 hover:to-indigo-700"
+                  type="button"
+                  variant="outline"
+                  className="rounded-lg border-violet-200 text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
                   disabled={selectedSpaces.length === 0}
+                  onClick={() => setShareDialogOpen(true)}
+                  title="Compartir catálogo"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Compartir
+                </Button>
+
+                <Button
+                  className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transition-all hover:from-purple-700 hover:to-indigo-700"
+                  disabled={selectedSpaces.length === 0 || hasBlockedSelection}
+                  title={
+                    hasBlockedSelection
+                      ? "Los espacios bloqueados pueden incluirse en el catálogo, pero no en una cotización."
+                      : "Crear cotización"
+                  }
                   onClick={() => {
                     navigate("/cotizaciones/nueva", {
                       state: { spaces: selectedSpaces },
@@ -370,7 +553,7 @@ export default function SpacePage() {
             getRowId={(row) => String(row.id)}
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
-            enableRowSelection={(row) => row.original.status === "Disponible"}
+            enableRowSelection
             pageSize={perPage}
             enablePagination
             manualPagination
@@ -554,6 +737,171 @@ export default function SpacePage() {
               ) : null}
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={catalogPreviewOpen} onOpenChange={handleCatalogPreviewOpenChange}>
+        <DialogContent className="h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden p-0 sm:max-w-6xl sm:p-0">
+          <DialogHeader className="m-0 px-5 py-4 sm:m-0 sm:px-7 sm:py-5">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-violet-600" />
+              Vista previa del catálogo {catalogPreviewVersion.toUpperCase()}
+            </DialogTitle>
+            <DialogDescription>
+              Revisa el documento antes de guardarlo en tu equipo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-0 bg-slate-100 p-2 sm:p-4">
+            {catalogPreviewUrl ? (
+              <iframe
+                src={`${catalogPreviewUrl}#toolbar=1&navpanes=0&view=FitH`}
+                title={`Vista previa del catálogo ${catalogPreviewVersion.toUpperCase()}`}
+                className="h-full w-full rounded-lg border border-slate-200 bg-white"
+              />
+            ) : null}
+          </div>
+
+          <DialogFooter className="m-0 px-5 py-4 sm:m-0 sm:px-7">
+            {catalogPreviewSpaces.length === 1 ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openSpaceMap(catalogPreviewSpaces[0])}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir ubicación
+              </Button>
+            ) : catalogPreviewSpaces.length > 1 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline">
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir ubicación
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-72 min-w-64 overflow-y-auto">
+                  <DropdownMenuLabel>Selecciona un espacio</DropdownMenuLabel>
+                  {catalogPreviewSpaces.map((space) => (
+                    <DropdownMenuItem key={space.id} onClick={() => openSpaceMap(space)}>
+                      {space.title || `Espacio ${space.id}`}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleCatalogPreviewOpenChange(false)}
+            >
+              Cerrar
+            </Button>
+            <Button
+              type="button"
+              disabled={!catalogPreviewBlob || isCatalogDownloadLoading}
+              onClick={handleDownloadCatalog}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700"
+            >
+              {isCatalogDownloadLoading ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {isCatalogDownloadLoading ? "Preparando..." : "Descargar PDF"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={shareDialogOpen} onOpenChange={handleShareDialogOpenChange}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Share2 className="h-5 w-5 text-violet-600" />
+              Compartir catálogo
+            </DialogTitle>
+            <DialogDescription>
+              Genera un enlace público temporal para los {selectedSpaces.length} espacios seleccionados. La descarga PDF seguirá disponible por separado.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Vigencia del enlace</label>
+              <Select value={shareDuration} onValueChange={setShareDuration} disabled={isCreatingShare || Boolean(catalogShare)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona la vigencia" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24">24 horas</SelectItem>
+                  <SelectItem value="48">48 horas</SelectItem>
+                  <SelectItem value="72">72 horas</SelectItem>
+                  <SelectItem value="168">7 días</SelectItem>
+                  <SelectItem value="custom">Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {shareDuration === "custom" && !catalogShare ? (
+              <div className="space-y-2">
+                <label htmlFor="catalog-share-hours" className="text-sm font-semibold text-slate-700">
+                  Horas de vigencia
+                </label>
+                <Input
+                  id="catalog-share-hours"
+                  type="number"
+                  min={1}
+                  max={8760}
+                  value={customShareHours}
+                  onChange={(event) => setCustomShareHours(event.target.value)}
+                  disabled={isCreatingShare}
+                />
+              </div>
+            ) : null}
+
+            {catalogShare ? (
+              <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900">Enlace listo para compartir</p>
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Vence el {new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(catalogShare.expires_at))}
+                  </p>
+                </div>
+                <Input value={catalogShare.url} readOnly className="bg-white" />
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button type="button" onClick={copyShareUrl} className="flex-1">
+                    {shareCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {shareCopied ? "Copiado" : "Copiar enlace"}
+                  </Button>
+                  <Button type="button" variant="outline" asChild className="flex-1 bg-white">
+                    <a href={catalogShare.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      Abrir catálogo
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => handleShareDialogOpenChange(false)}>
+              Cerrar
+            </Button>
+            {!catalogShare ? (
+              <Button
+                type="button"
+                onClick={handleCreateCatalogShare}
+                disabled={isCreatingShare || selectedSpaces.length === 0}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700"
+              >
+                {isCreatingShare ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+                {isCreatingShare ? "Generando..." : "Generar enlace"}
+              </Button>
+            ) : null}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -1,7 +1,9 @@
 import * as React from "react"
+import { MapPinned } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
 import {
   useCaseros,
@@ -12,6 +14,7 @@ import {
 import { CaseroForm } from "@/pages/caseros/caseroForm"
 import { useCaseroTable } from "@/pages/caseros/caseroTable"
 import type { CaseroFormValues, CaseroRecord } from "@/types/Casero"
+import { Can } from "@/components/auth/Can"
 
 export default function CaseroPage() {
   const createMutation = useCreateCasero()
@@ -109,20 +112,18 @@ export default function CaseroPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Caseros</h1>
-          <p className="text-gray-600">
-            Propietarios de terrenos donde se ubican los espectaculares.
-          </p>
-        </div>
-
-        <CaseroForm
-          isSubmitting={createMutation.isPending}
-          onSubmit={handleCreate}
-        />
-      </div>
+      <ModuleHeader
+        title="Caseros"
+        badge="Control de propietarios"
+        description="Propietarios de terrenos donde se ubican los espectaculares."
+        icon={MapPinned}
+        actions={<Can permission="caseros.edit">
+          <CaseroForm
+            isSubmitting={createMutation.isPending}
+            onSubmit={handleCreate}
+          />
+        </Can>}
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">

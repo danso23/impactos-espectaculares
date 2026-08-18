@@ -16,9 +16,11 @@ import {
   ReceiptText,
   Shield,
   UserCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ModuleHeader } from "@/components/generic/module-header";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LogoutButton } from "./components/auth/logout-button";
 import { SessionIdleGuard } from "./components/auth/session-idle-guard";
@@ -26,6 +28,7 @@ import { LoginPage } from "./pages/auth/login";
 import { Can } from "@/components/auth/Can";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { getUser } from "@/lib/auth";
+import { useRoles } from "@/hooks/useRoles";
 import { cn } from "@/lib/utils";
 import UsersPage from "@/pages/userPage";
 import SpacePage from "./pages/space/spacePage";
@@ -39,40 +42,78 @@ import CaseroPage from "./pages/caseros/caseroPage";
 import ProviderPage from "@/pages/providers/providerPage";
 import RentalPage from "@/pages/rentals/rentalPage";
 import PaymentPage from "@/pages/payments/paymentPage";
+import PublicCatalogPage from "@/pages/public/PublicCatalogPage";
 
 type NavItem = {
   to: string;
   label: string;
   icon: React.ElementType;
-  roles?: string[];
+  permission: string;
 };
 
 const NAV: readonly NavItem[] = [
-  { to: "/espacios", label: "Espacios", icon: PanelsTopLeft },
-  { to: "/cotizaciones", label: "Cotizaciones", icon: ReceiptText },
-  { to: "/rentas", label: "Rentas", icon: BadgeDollarSign },
-  { to: "/usuarios", label: "Usuarios", icon: UserCog, roles: ["admin"] },
-  { to: "/roles", label: "Roles", icon: Shield, roles: ["admin"] },
-  { to: "/pagos", label: "Pagos", icon: HandCoins },
-  { to: "/prospectos", label: "Prospectos", icon: Users },
-  { to: "/clientes", label: "Clientes", icon: Contact2 },
-  { to: "/proveedores", label: "Proveedores", icon: Building2 },
-  { to: "/caseros", label: "Caseros", icon: MapPin },
-  { to: "/servicios", label: "Servicios", icon: Settings },
-  { to: "/colaboradores", label: "Colaboradores", icon: Users },
+  { to: "/espacios", label: "Espacios", icon: PanelsTopLeft, permission: "spaces.view" },
+  { to: "/cotizaciones", label: "Cotizaciones", icon: ReceiptText, permission: "quotes.view" },
+  { to: "/rentas", label: "Rentas", icon: BadgeDollarSign, permission: "rentals.view" },
+  { to: "/usuarios", label: "Usuarios", icon: UserCog, permission: "users.view" },
+  { to: "/roles", label: "Roles", icon: Shield, permission: "roles.view" },
+  { to: "/pagos", label: "Pagos", icon: HandCoins, permission: "payments.view" },
+  { to: "/prospectos", label: "Prospectos", icon: Users, permission: "leads.view" },
+  { to: "/clientes", label: "Clientes", icon: Contact2, permission: "clients.view" },
+  { to: "/proveedores", label: "Proveedores", icon: Building2, permission: "providers.view" },
+  { to: "/caseros", label: "Caseros", icon: MapPin, permission: "caseros.view" },
+  { to: "/servicios", label: "Servicios", icon: Settings, permission: "services.view" },
+  { to: "/colaboradores", label: "Colaboradores", icon: Users, permission: "collaborators.view" },
 ] as const;
 
 const SIDEBAR_STORAGE_KEY = "espectaculares.sidebar.collapsed";
 
-function RouteStub({ title }: { title: string }) {
+function RouteStub({
+  title,
+  badge = "Módulo del sistema",
+  description,
+  icon = Settings,
+}: {
+  title: string;
+  badge?: string;
+  description?: string;
+  icon?: LucideIcon;
+}) {
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <div className="mt-4 rounded-lg border border-gray-200 p-6 text-sm text-gray-600">
+    <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
+      <ModuleHeader
+        title={title}
+        badge={badge}
+        description={description ?? `Administra la información del módulo de ${title.toLowerCase()}.`}
+        icon={icon}
+      />
+      <div className="rounded-lg border border-gray-200 bg-white p-6 text-sm text-gray-600">
         Contenido de <span className="font-medium text-gray-900">{title}</span>.
       </div>
     </div>
   );
+}
+
+function PermissionRoute({ permission, children }: { permission: string; children: React.ReactNode }) {
+  const { can } = useRoles();
+
+  if (!can(permission)) {
+    return (
+      <div className="mx-auto max-w-xl rounded-xl border border-amber-200 bg-amber-50 p-8 text-center shadow-sm">
+        <Shield className="mx-auto h-10 w-10 text-amber-600" />
+        <h1 className="mt-4 text-xl font-semibold text-gray-800">Acceso restringido</h1>
+        <p className="mt-2 text-sm text-gray-600">No tienes permiso para ver este módulo.</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+function FirstAllowedRoute() {
+  const { can } = useRoles();
+  const destination = NAV.find((item) => can(item.permission))?.to ?? "/sin-acceso";
+  return <Navigate to={destination} replace />;
 }
 
 function AppLayout() {
@@ -142,10 +183,10 @@ function AppLayout() {
           <ScrollArea className="flex-1 py-4">
             <nav className="space-y-0.5">
               {NAV.map((item) => {
-                const { to, label, icon: Icon, roles } = item;
+                const { to, label, icon: Icon, permission } = item;
                 
                 return (
-                  <Can key={to} roles={roles} fallback={null}>
+                  <Can key={to} permission={permission} fallback={null}>
                     <NavLink
                       to={to}
                       title={label}
@@ -238,27 +279,29 @@ export default function AppRoot() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/catalogo/:token" element={<PublicCatalogPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/espacios" replace />} />
-          <Route path="espacios" element={<SpacePage />} />
-          <Route path="espacios/nuevo" element={<SpaceEditorPage />} />
-          <Route path="espacios/:id/editar" element={<SpaceEditorPage />} />
-          <Route path="cotizaciones" element={<QuotesPage />} />
-          <Route path="cotizaciones/nueva" element={<QuoteCreatePage />} />
-          <Route path="rentas" element={<RentalPage />} />
-          <Route path="usuarios" element={<UsersPage />} />
-          <Route path="roles" element={<RolePage />} />
-          <Route path="pagos" element={<PaymentPage />} />
-          <Route path="prospectos" element={<LeadsPage />} />
-          <Route path="clientes" element={<ClientsPage />} />
-          <Route path="proveedores" element={<ProviderPage />} />
-          <Route path="caseros" element={<CaseroPage />} />
-          <Route path="servicios" element={<RouteStub title="Servicios" />} />
+          <Route path="/" element={<FirstAllowedRoute />} />
+          <Route path="espacios" element={<PermissionRoute permission="spaces.view"><SpacePage /></PermissionRoute>} />
+          <Route path="espacios/nuevo" element={<PermissionRoute permission="spaces.edit"><SpaceEditorPage /></PermissionRoute>} />
+          <Route path="espacios/:id/editar" element={<PermissionRoute permission="spaces.edit"><SpaceEditorPage /></PermissionRoute>} />
+          <Route path="cotizaciones" element={<PermissionRoute permission="quotes.view"><QuotesPage /></PermissionRoute>} />
+          <Route path="cotizaciones/nueva" element={<PermissionRoute permission="quotes.edit"><QuoteCreatePage /></PermissionRoute>} />
+          <Route path="rentas" element={<PermissionRoute permission="rentals.view"><RentalPage /></PermissionRoute>} />
+          <Route path="usuarios" element={<PermissionRoute permission="users.view"><UsersPage /></PermissionRoute>} />
+          <Route path="roles" element={<PermissionRoute permission="roles.view"><RolePage /></PermissionRoute>} />
+          <Route path="pagos" element={<PermissionRoute permission="payments.view"><PaymentPage /></PermissionRoute>} />
+          <Route path="prospectos" element={<PermissionRoute permission="leads.view"><LeadsPage /></PermissionRoute>} />
+          <Route path="clientes" element={<PermissionRoute permission="clients.view"><ClientsPage /></PermissionRoute>} />
+          <Route path="proveedores" element={<PermissionRoute permission="providers.view"><ProviderPage /></PermissionRoute>} />
+          <Route path="caseros" element={<PermissionRoute permission="caseros.view"><CaseroPage /></PermissionRoute>} />
+          <Route path="servicios" element={<PermissionRoute permission="services.view"><RouteStub title="Servicios" badge="Catálogo de servicios" icon={Settings} /></PermissionRoute>} />
           <Route
             path="colaboradores"
-            element={<RouteStub title="Colaboradores" />}
+            element={<PermissionRoute permission="collaborators.view"><RouteStub title="Colaboradores" badge="Control de colaboradores" icon={Users} /></PermissionRoute>}
           />
+          <Route path="sin-acceso" element={<PermissionRoute permission="__none__"><span /></PermissionRoute>} />
           <Route path="*" element={<RouteStub title="No encontrado" />} />
         </Route>
       </Route>
