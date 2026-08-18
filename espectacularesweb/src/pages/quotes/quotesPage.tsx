@@ -1,9 +1,10 @@
 import * as React from "react"
 import { Link } from "react-router-dom"
-import { Plus } from "lucide-react"
+import { Plus, ReceiptText } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -20,6 +21,7 @@ import { getQuote } from "@/lib/services/quoteService"
 import { QuoteStatusDialog } from "@/pages/quotes/quoteStatusDialog"
 import { useQuoteTable } from "@/pages/quotes/quoteTable"
 import type { QuoteRecord } from "@/types/Quote"
+import { Can } from "@/components/auth/Can"
 
 const ALL = "all"
 
@@ -84,19 +86,20 @@ export default function QuotesPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Cotizaciones</h1>
-          <p className="text-gray-600">Consulta las cotizaciones registradas y filtra por estatus.</p>
-        </div>
-
-        <Button asChild className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-6 py-6 shadow-lg transform hover:-translate-y-0.5 transition-all border-none">
-          <Link to="/cotizaciones/nueva">
-            <Plus className="mr-2 h-5 w-5" />
-            <span>Nueva cotización</span>
-          </Link>
-        </Button>
-      </div>
+      <ModuleHeader
+        title="Cotizaciones"
+        badge="Control de cotizaciones"
+        description="Consulta las cotizaciones registradas y filtra por estatus."
+        icon={ReceiptText}
+        actions={<Can permission="quotes.edit">
+          <Button asChild className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-6 py-6 shadow-lg transform hover:-translate-y-0.5 transition-all border-none">
+            <Link to="/cotizaciones/nueva">
+              <Plus className="mr-2 h-5 w-5" />
+              <span>Nueva cotización</span>
+            </Link>
+          </Button>
+        </Can>}
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
         <div className="flex flex-col sm:flex-row gap-4 w-full">

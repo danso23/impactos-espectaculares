@@ -18,38 +18,43 @@ type BuildSpaceTableOptions = {
 };
 
 export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
-  const { hasRole } = useRoles();
+  const { can } = useRoles();
 
   /** ACCIONES DEL DATATABLE */
   const actions = React.useMemo<TableAction<Space>[]>(() => {
-    const baseActions: TableAction<Space>[] = [
-      {
+    const baseActions: TableAction<Space>[] = [];
+
+    if (can("quotes.edit")) {
+      baseActions.push({
         key: "quote",
         label: "Cotizar",
         icon: <FileText className="h-4 w-4" />,
         disabled: (row) => row.status !== "Disponible",
         onClick: (row) =>
           opts.onQuote ? opts.onQuote(row) : console.log("Cotizar", row.id),
-      },
-      {
+      });
+    }
+
+    baseActions.push({
         key: "view",
         label: "Ver",
         icon: <Eye className="h-4 w-4" />,
         onClick: (row) =>
           opts.onView ? opts.onView(row) : console.log("Ver", row.id),
-      },
-    ];
+      });
 
-    if (hasRole("admin")) {
-      baseActions.push(
-        {
+    if (can("spaces.edit")) {
+      baseActions.push({
           key: "edit",
           label: "Editar",
           icon: <Pencil className="h-4 w-4" />,
           onClick: (row) =>
             opts.onEdit ? opts.onEdit(row) : console.log("Editar", row.id),
-        },
-        {
+        });
+    }
+
+    if (can("spaces.delete")) {
+      baseActions.push({
           key: "delete",
           label: "Eliminar",
           variant: "destructive",
@@ -59,12 +64,11 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
             if (opts.onDelete) return opts.onDelete(row);
             console.log("Eliminar", row.id);
           },
-        }
-      );
+        });
     }
 
     return baseActions;
-  }, [opts, hasRole]);
+  }, [opts, can]);
 
   const columns = React.useMemo<ColumnDef<Space>[]>(() => {
     return [

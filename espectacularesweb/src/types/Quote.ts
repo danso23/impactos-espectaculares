@@ -3,6 +3,7 @@ import type { ApiListResponse, ApiResponse } from "@/types/Api"
 export type CustomerType = "lead" | "cliente" | "sin_cliente"
 export type SearchableCustomerType = Exclude<CustomerType, "sin_cliente">
 export type QuoteItemType = "rental" | "service"
+export type QuoteKind = "advertisement" | "space"
 export type QuoteAmountType = "none" | "percent" | "fixed"
 
 export type QuoteCatalogCompany = {
@@ -131,6 +132,7 @@ export type QuoteItemInput = {
 }
 
 export type QuotePayload = {
+  quote_kind: QuoteKind
   customer: {
     type: CustomerType
     id?: number | null
@@ -183,6 +185,7 @@ export type QuoteTotals = {
 }
 
 export type QuotePreviewData = {
+  quote_kind: QuoteKind
   customer: QuoteCustomer
   company: QuoteCatalogCompany
   letterhead?: QuoteCatalogLetterhead | null
@@ -210,6 +213,7 @@ export type QuoteRecord = {
   id: number
   folio: string
   version: number
+  quote_kind: QuoteKind
   customer_type?: CustomerType | null
   customer_id?: number | null
   customer?: QuoteCustomer | null

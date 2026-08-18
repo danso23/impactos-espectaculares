@@ -36,6 +36,8 @@ export default function SpaceEditorPage() {
         rawSpace?.active === 1 ||
         rawSpace?.active === "1" ||
         rawSpace?.active === "true",
+      blocked_from: rawSpace?.blocked_from?.slice(0, 10) ?? "",
+      blocked_until: rawSpace?.blocked_until?.slice(0, 10) ?? "",
       faces: space.faces,
       assigned_id: space.assigned_id ?? "",
       title: space.title ?? "",

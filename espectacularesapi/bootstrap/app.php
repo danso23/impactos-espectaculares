@@ -100,6 +100,7 @@ $app->routeMiddleware([
     'auth' => App\Http\Middleware\Authenticate::class,
     'check' => App\Http\Middleware\TokenVerification::class,
     'authToken' => App\Http\Middleware\TokenVerification::class,
+    'permission' => App\Http\Middleware\CheckPermission::class,
     'jwt_auth' => \Tymon\JWTAuth\Http\Middleware\Authenticate::class,
     'cors' => App\Http\Middleware\CorsMiddleware::class,
 ]);
@@ -123,6 +124,7 @@ $app->configure('jwt');
 $app->configure('mail');
 $app->configure('auth');
 $app->configure('permission');
+$app->configure('access');
 $app->configure('cache');
 
 $app->singleton(Illuminate\Cache\CacheManager::class, function () use ($app) {

@@ -6,12 +6,14 @@ import type {
   QuoteCatalogCompany,
   QuoteCustomer,
   QuoteImage,
+  QuoteKind,
   QuotePreviewItem,
   QuoteStatus,
   QuoteTotals,
 } from "@/types/Quote"
 
 type QuotePdfData = {
+  quote_kind?: QuoteKind | null
   folio?: string | null
   created_at?: string | null
   valid_until?: string | null
@@ -84,6 +86,7 @@ export function downloadQuotePdf(data: QuotePdfData, filename?: string) {
   doc.text(`Empresa: ${data.company?.name || "—"}`, 14, 38)
   doc.text(`Estatus: ${data.status?.name || "Borrador"}`, 14, 44)
   doc.text(`Vigencia: ${formatDate(data.valid_until)}`, 14, 50)
+  doc.text(`Tipo: ${data.quote_kind === "advertisement" ? "Anuncio" : "Espacio"}`, 110, 26)
   if (data.images?.length) {
     doc.text(`Imágenes adjuntas: ${data.images.length}`, 14, 56)
   }

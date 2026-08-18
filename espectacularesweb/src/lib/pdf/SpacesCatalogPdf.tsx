@@ -7,8 +7,18 @@ import {
   Text,
   View,
 } from "@react-pdf/renderer";
-import { env } from "@/config/env";
 import type { Space, SpaceApi } from "@/types/Space";
+import {
+  displayValue,
+  formatCatalogDate,
+  formatCatalogPrice,
+  getGoogleMapsUrl,
+  getAvailabilityDate,
+  getViewType,
+  hasLights,
+  isAvailable,
+  resolveSpaceImageUrl,
+} from "@/lib/catalog/catalogHelpers";
 
 export type CatalogSpace = SpaceApi | Space;
 
@@ -352,13 +362,16 @@ const styles = StyleSheet.create({
     textDecoration: "none",
   },
   galleryRow: {
-    height: 112,
+    height: 145,
     marginTop: 14,
     flexDirection: "row",
   },
   galleryImages: {
-    width: "52%",
+    width: "64%",
     flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignContent: "space-between",
   },
   galleryImage: {
     height: "100%",
@@ -367,7 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#DFDDE8",
   },
   valuePanel: {
-    width: "45%",
+    width: "33%",
     marginLeft: "3%",
     padding: 14,
     borderWidth: 1,
@@ -381,6 +394,25 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     letterSpacing: 1,
     color: "#C94E0A",
+  },
+  valuePrice: {
+    marginBottom: 10,
+    fontSize: 15,
+    fontWeight: "bold",
+    color: COLORS.ink,
+  },
+  availabilityLabel: {
+    marginBottom: 4,
+    fontSize: 6.5,
+    fontWeight: "bold",
+    letterSpacing: 0.8,
+    color: "#C94E0A",
+  },
+  availabilityDate: {
+    fontSize: 9,
+    lineHeight: 1.3,
+    fontWeight: "bold",
+    color: COLORS.ink,
   },
   valueTitle: {
     marginBottom: 6,
@@ -405,40 +437,46 @@ const styles = StyleSheet.create({
     left: 36,
     right: 36,
     bottom: 18,
-    paddingTop: 7,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "#DEDDEA",
+  },
+  footerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
+  },
+  footerColumnLeft: {
+    width: "53%",
+  },
+  footerColumnRight: {
+    width: "43%",
+  },
+  footerItem: {
+    minHeight: 21,
+    flexDirection: "row",
     alignItems: "center",
   },
-  footerContacts: {
-    flexDirection: "row",
+  footerIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 9,
+    objectFit: "contain",
   },
   footerText: {
-    marginRight: 14,
-    fontSize: 5.5,
-    color: "#68697D",
+    fontSize: 9.5,
+    lineHeight: 1.15,
+    color: "#2E2A6D",
+    textDecoration: "none",
   },
   footerBrand: {
-    fontSize: 6,
+    marginTop: 4,
+    textAlign: "right",
+    fontSize: 7.5,
     fontWeight: "bold",
-    letterSpacing: 0.6,
+    letterSpacing: 1,
     color: "#4420A3",
   },
 });
-
-function getStorageBaseUrl() {
-  const apiUrl = env.apiUrl?.replace(/\/+$/, "") ?? "";
-  return apiUrl ? `${apiUrl}/storage` : `${window.location.origin}/storage`;
-}
-
-function resolveSpaceImageUrl(path?: string | null) {
-  if (!path) return null;
-  if (/^(https?:\/\/|data:)/i.test(path)) return path;
-
-  return `${getStorageBaseUrl()}/${path.replace(/^\/+/, "")}`;
-}
 
 function getCatalogImages(space: CatalogSpace) {
   const urls = (space.images ?? [])
@@ -447,35 +485,8 @@ function getCatalogImages(space: CatalogSpace) {
 
   return {
     main: urls[0] ?? `${window.location.origin}/img/img1.png`,
-    gallery: urls.slice(1, 3),
+    gallery: urls.slice(1, 4),
   };
-}
-
-function getGoogleMapsUrl(space: CatalogSpace) {
-  return `https://www.google.com/maps/search/?api=1&query=${space.latitude ?? 0},${space.longitude ?? 0}`;
-}
-
-function displayValue(value: unknown, fallback = "—") {
-  if (value === null || value === undefined || value === "") return fallback;
-  return String(value);
-}
-
-function hasLights(value: CatalogSpace["has_lights"]) {
-  return value === true || value === 1 || value === "1" || value === "true";
-}
-
-function isAvailable(space: CatalogSpace) {
-  if ("active" in space && space.active !== null && space.active !== undefined) {
-    return space.active === true || space.active === 1 || space.active === "1" || space.active === "true";
-  }
-
-  return "status" in space && space.status === "Disponible";
-}
-
-function getViewType(space: CatalogSpace) {
-  if ("view_type" in space && space.view_type) return space.view_type;
-  if ("viewType" in space) return space.viewType;
-  return null;
 }
 
 function Spec({ label, value }: { label: string; value: string }) {
@@ -487,7 +498,13 @@ function Spec({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
+export function SpacesCatalogDocument({
+  spaces,
+  enableMapLinks = true,
+}: {
+  spaces: CatalogSpace[];
+  enableMapLinks?: boolean;
+}) {
   const year = new Date().getFullYear();
   const logoUrl = `${window.location.origin}/img/logo.png`;
 
@@ -536,6 +553,12 @@ export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
         const latitude = displayValue(space.latitude);
         const longitude = displayValue(space.longitude);
         const available = isAvailable(space);
+        const availableFrom = getAvailabilityDate(space);
+        const availabilityDate = formatCatalogDate(
+          availableFrom,
+          available ? "Disponibilidad inmediata" : "Por confirmar"
+        );
+        const blockedUntil = formatCatalogDate(space.blocked_until, "Por confirmar");
 
         return (
           <Page key={space.id} size="A4" style={styles.catalogPage}>
@@ -550,7 +573,11 @@ export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
               <Image src={catalogImages.main} style={styles.heroImage} />
               <View style={styles.heroTop}>
                 <Text style={styles.availabilityBadge}>
-                  {available ? "DISPONIBILIDAD INMEDIATA" : "CONSULTAR DISPONIBILIDAD"}
+                  {available
+                    ? "DISPONIBILIDAD INMEDIATA"
+                    : space.blocked_until
+                      ? `BLOQUEADO HASTA ${blockedUntil.toUpperCase()}`
+                      : "CONSULTAR DISPONIBILIDAD"}
                 </Text>
                 <Text style={styles.idBadge}>ID {displayValue(space.assigned_id, String(space.id))}</Text>
               </View>
@@ -579,12 +606,14 @@ export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
                 <Text style={styles.locationTitle}>Mérida, Yucatán</Text>
                 <Text style={styles.coordinates}>{latitude}{"\n"}{longitude}</Text>
                 <View style={styles.qrRow}>
-                  <Link src={googleMapsUrl}>
-                    <Image src={qrUrl} style={styles.qr} />
-                  </Link>
+                  <Image src={qrUrl} style={styles.qr} />
                   <Text style={styles.qrCopy}>Escanea para consultar la ubicación exacta.</Text>
                 </View>
-                <Link src={googleMapsUrl} style={styles.mapLink}>Abrir en Google Maps →</Link>
+                {enableMapLinks ? (
+                  <Link src={googleMapsUrl} style={styles.mapLink}>Abrir en Google Maps →</Link>
+                ) : (
+                  <Text style={styles.mapLink}>Abrir en Google Maps →</Text>
+                )}
               </View>
             </View>
 
@@ -598,8 +627,13 @@ export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
                       style={[
                         styles.galleryImage,
                         {
-                          width: catalogImages.gallery.length === 1 ? "100%" : "49%",
-                          marginRight: imageIndex === 0 && catalogImages.gallery.length > 1 ? "2%" : 0,
+                          width:
+                            catalogImages.gallery.length === 1
+                              ? "100%"
+                              : catalogImages.gallery.length === 2
+                                ? "49%"
+                                : "32%",
+                          height: "100%",
                         },
                       ]}
                     />
@@ -611,21 +645,84 @@ export function SpacesCatalogDocument({ spaces }: { spaces: CatalogSpace[] }) {
 
               <View style={styles.valuePanel}>
                 <Text style={styles.valueLabel}>VALOR DEL ESPACIO</Text>
-                <Text style={styles.valueTitle}>Visibilidad que trabaja por tu marca</Text>
-                <Text style={styles.valueCopy}>
-                  Formato de gran escala para campañas de alto impacto. Consulta vigencia y condiciones comerciales con nuestro equipo.
+                <Text style={styles.valuePrice}>{formatCatalogPrice(space.price)}</Text>
+                <Text style={styles.availabilityLabel}>
+                  {!available && space.blocked_until ? "DISPONIBLE A PARTIR DE" : "FECHA DE DISPONIBILIDAD"}
                 </Text>
+                <Text style={styles.availabilityDate}>{availabilityDate}</Text>
                 <Text style={styles.availableLine}>
-                  ● {available ? "Disponible para cotizar" : "Disponibilidad bajo consulta"}
+                  {available ? "Disponible para cotizar" : "Disponibilidad bajo consulta"}
                 </Text>
               </View>
             </View>
 
             <View style={styles.footer}>
-              <View style={styles.footerContacts}>
-                <Text style={styles.footerText}>impactosespectaculares.com.mx</Text>
-                <Text style={styles.footerText}>gguendulainf@hotmail.com</Text>
-                <Text style={styles.footerText}>999 285 92 53 · 999 317 00 98</Text>
+              <View style={styles.footerContent}>
+                <View style={styles.footerColumnLeft}>
+                  <Link
+                    src="https://www.facebook.com/impactosespectaculares"
+                    style={styles.footerItem}
+                  >
+                    <Image
+                      src={`${window.location.origin}/img/icons/facebook.png`}
+                      style={styles.footerIcon}
+                    />
+                    <Text style={styles.footerText}>Impactos Espectaculares</Text>
+                  </Link>
+                  <Link
+                    src="https://www.impactosespectaculares.com.mx/"
+                    style={styles.footerItem}
+                  >
+                    <Image
+                      src={`${window.location.origin}/img/icons/web.png`}
+                      style={styles.footerIcon}
+                    />
+                    <Text style={styles.footerText}>www.impactosespectaculares.com.mx</Text>
+                  </Link>
+                  <Link
+                    src="mailto:gguendulainf@hotmail.com"
+                    style={styles.footerItem}
+                  >
+                    <Image
+                      src={`${window.location.origin}/img/icons/email.png`}
+                      style={styles.footerIcon}
+                    />
+                    <Text style={styles.footerText}>gguendulainf@hotmail.com</Text>
+                  </Link>
+                </View>
+
+                <View style={styles.footerColumnRight}>
+                  <View style={styles.footerItem}>
+                    <Image
+                      src={`${window.location.origin}/img/icons/phone.png`}
+                      style={styles.footerIcon}
+                    />
+                    <Text style={styles.footerText}>
+                      <Link src="tel:+529992859253" style={styles.footerText}>
+                        999 285 92 53
+                      </Link>
+                      {" / "}
+                      <Link src="tel:+529993170098" style={styles.footerText}>
+                        999 317 00 98
+                      </Link>
+                    </Text>
+                  </View>
+                  <View style={styles.footerItem}>
+                    <Image
+                      src={`${window.location.origin}/img/icons/mobile.png`}
+                      style={styles.footerIcon}
+                    />
+                    <Text style={styles.footerText}>
+                      <Link src="tel:+529991276865" style={styles.footerText}>
+                        999 1 27 68 65
+                      </Link>
+                      {" / "}
+                      <Link src="tel:+529991273156" style={styles.footerText}>
+                        999 1 27 31 56
+                      </Link>
+                    </Text>
+                  </View>
+                </View>
               </View>
               <Text style={styles.footerBrand}>MÉRIDA ESPECTACULAR</Text>
             </View>

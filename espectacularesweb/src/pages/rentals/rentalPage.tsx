@@ -4,6 +4,7 @@ import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -35,6 +36,7 @@ import type { RentalCreatePayload, RentalFormValues, RentalRecord } from "@/type
 import { RentalCreateForm } from "./rentalCreateForm"
 import { RentalForm } from "./rentalForm"
 import { useRentalTable } from "./rentalTable"
+import { Can } from "@/components/auth/Can"
 
 function formatCurrency(value?: number | string | null) {
   return new Intl.NumberFormat("es-MX", {
@@ -189,22 +191,15 @@ export default function RentalPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
-            <ReceiptText className="h-3.5 w-3.5" />
-            Control de rentas
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Rentas</h1>
-            <p className="mt-2 max-w-2xl text-gray-600">
-              Revisa y administra las rentas registradas desde una sola pantalla.
-            </p>
-          </div>
-        </div>
-
-        <RentalCreateForm isSubmitting={createMutation.isPending} onSubmit={handleCreate} />
-      </div>
+      <ModuleHeader
+        title="Rentas"
+        badge="Control de rentas"
+        description="Revisa y administra las rentas registradas desde una sola pantalla."
+        icon={ReceiptText}
+        actions={<Can permission="rentals.edit">
+          <RentalCreateForm isSubmitting={createMutation.isPending} onSubmit={handleCreate} />
+        </Can>}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="border-gray-200 shadow-md">

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { FileDown, RefreshCw, Save, Trash2, ImagePlus, X } from "lucide-react"
+import { ArrowLeft, FileDown, RefreshCw, Save, Trash2, ImagePlus, X } from "lucide-react"
 
 import {
   useCreateQuote,
@@ -24,6 +24,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { QuoteCustomerSelector } from "@/pages/quotes/quoteCustomerSelector"
 import type {
   CustomerType,
@@ -32,6 +42,7 @@ import type {
   QuoteCreatePageSpaceSeed,
   QuoteCustomer,
   QuoteItemInput,
+  QuoteKind,
   QuotePayload,
   QuotePreviewData,
   QuoteRecord,
@@ -124,6 +135,7 @@ export default function QuoteCreatePage() {
 
   const [customerType, setCustomerType] = React.useState<CustomerType>("lead")
   const [selectedCustomer, setSelectedCustomer] = React.useState<QuoteCustomer | null>(null)
+  const [quoteKind, setQuoteKind] = React.useState<QuoteKind>("space")
 
   const [companyId, setCompanyId] = React.useState<number | null>(null)
   const [letterheadId, setLetterheadId] = React.useState<number | null>(null)
@@ -149,7 +161,10 @@ export default function QuoteCreatePage() {
   const [previewError, setPreviewError] = React.useState<string | null>(null)
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(false)
   const [savedQuote, setSavedQuote] = React.useState<QuoteRecord | null>(null)
+  const [exitDialogOpen, setExitDialogOpen] = React.useState(false)
   const previewRequestId = React.useRef(0)
+  const initialFormFingerprint = React.useRef<string | null>(null)
+  const allowNavigation = React.useRef(false)
   const isWithoutCustomer = customerType === "sin_cliente"
 
   const catalogs = catalogsQuery.data?.data
@@ -207,6 +222,114 @@ export default function QuoteCreatePage() {
     setLetterheadId(defaultLetterhead?.id ?? null)
   }, [companyLetterheads, letterheadId, selectedCompany])
 
+  const formFingerprint = React.useMemo(
+    () => JSON.stringify({
+      quoteKind,
+      customerType,
+      customerId: selectedCustomer?.id ?? null,
+      companyId,
+      letterheadId,
+      agencyId,
+      validUntil,
+      includeTax,
+      taxRate,
+      discountType,
+      discountValue,
+      commissionType,
+      commissionValue,
+      termsHtml,
+      notes,
+      items,
+      images: quoteImages.map((file) => ({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+      })),
+    }),
+    [
+      agencyId,
+      commissionType,
+      commissionValue,
+      companyId,
+      customerType,
+      discountType,
+      discountValue,
+      includeTax,
+      items,
+      letterheadId,
+      notes,
+      quoteImages,
+      quoteKind,
+      selectedCustomer?.id,
+      taxRate,
+      termsHtml,
+      validUntil,
+    ],
+  )
+
+  React.useEffect(() => {
+    if (initialFormFingerprint.current !== null) return
+    if (catalogsQuery.isLoading) return
+    if (companies.length > 0 && !companyId) return
+    if (companyLetterheads.length > 0 && !letterheadId) return
+
+    initialFormFingerprint.current = formFingerprint
+  }, [
+    catalogsQuery.isLoading,
+    companies.length,
+    companyId,
+    companyLetterheads.length,
+    formFingerprint,
+    letterheadId,
+  ])
+
+  const hasUnsavedChanges =
+    seededSpaces.length > 0 ||
+    (initialFormFingerprint.current !== null && initialFormFingerprint.current !== formFingerprint)
+
+  React.useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || allowNavigation.current) return
+      event.preventDefault()
+      event.returnValue = ""
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  React.useEffect(() => {
+    const handleLinkNavigation = (event: MouseEvent) => {
+      if (!hasUnsavedChanges || allowNavigation.current || event.defaultPrevented) return
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+      const target = event.target
+      if (!(target instanceof Element)) return
+
+      const link = target.closest("a[href]")
+      if (!(link instanceof HTMLAnchorElement)) return
+
+      const destination = new URL(link.href, window.location.href)
+      if (destination.origin !== window.location.origin) return
+      if (destination.pathname === window.location.pathname && destination.search === window.location.search) return
+
+      const shouldLeave = window.confirm(
+        "Tienes cambios sin guardar. Si sales perderás todos los avances de esta cotización. ¿Deseas continuar?",
+      )
+
+      if (!shouldLeave) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return
+      }
+
+      allowNavigation.current = true
+    }
+
+    document.addEventListener("click", handleLinkNavigation, true)
+    return () => document.removeEventListener("click", handleLinkNavigation, true)
+  }, [hasUnsavedChanges])
+
   const customerDisplayName = isWithoutCustomer
     ? "Sin cliente"
     : selectedCustomer?.display_name ?? "Pendiente"
@@ -224,6 +347,7 @@ export default function QuoteCreatePage() {
     if (!isWithoutCustomer && !selectedCustomer) return null
 
     return {
+      quote_kind: quoteKind,
       customer: {
         type: customerType,
         id: isWithoutCustomer ? null : selectedCustomer?.id ?? null,
@@ -266,6 +390,7 @@ export default function QuoteCreatePage() {
     items,
     letterheadId,
     notes,
+    quoteKind,
     selectedCustomer,
     taxRate,
     termsHtml,
@@ -449,6 +574,7 @@ export default function QuoteCreatePage() {
       setPreview(null)
       setQuoteImages([])
       toast.success(`Cotización ${response.data.folio} guardada correctamente.`)
+      allowNavigation.current = true
       if (window.history.length > 1) {
         navigate(-1)
       } else {
@@ -472,6 +598,7 @@ export default function QuoteCreatePage() {
 
     downloadQuotePdf(
       {
+        quote_kind: quoteKind,
         customer: preview.customer,
         company: preview.company,
         agency: preview.agency,
@@ -491,13 +618,34 @@ export default function QuoteCreatePage() {
     [items]
   )
 
+  const handleBackToQuotes = () => {
+    if (hasUnsavedChanges) {
+      setExitDialogOpen(true)
+      return
+    }
+
+    navigate("/cotizaciones")
+  }
+
+  const confirmExit = () => {
+    allowNavigation.current = true
+    setExitDialogOpen(false)
+    navigate("/cotizaciones")
+  }
+
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Nueva cotización</h1>
-        <p className="text-sm text-muted-foreground">
-          Esta pantalla ya consume catálogos y cálculo comercial desde el backend de cotizaciones.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold">Nueva cotización</h1>
+          <p className="text-sm text-muted-foreground">
+            Esta pantalla ya consume catálogos y cálculo comercial desde el backend de cotizaciones.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={handleBackToQuotes}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver a cotizaciones
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,2fr)_380px]">
@@ -508,6 +656,21 @@ export default function QuoteCreatePage() {
               <CardDescription>Cliente, empresa emisora, agencia y vigencia.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
+              <QuoteField label="Tipo de cotización">
+                <Select
+                  value={quoteKind}
+                  onValueChange={(value) => setQuoteKind(value as QuoteKind)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="advertisement">Anuncio</SelectItem>
+                    <SelectItem value="space">Espacio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </QuoteField>
+
               <QuoteCustomerSelector
                 customerType={customerType}
                 selectedCustomer={selectedCustomer}
@@ -981,6 +1144,23 @@ export default function QuoteCreatePage() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Salir de la nueva cotización?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tienes cambios sin guardar. Si sales ahora perderás todos los avances de esta cotización.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmExit}>
+              Salir sin guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

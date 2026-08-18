@@ -264,6 +264,7 @@ class QuoteController extends Controller
 
         return response()->json([
             'data' => [
+                'quote_kind' => $validated['quote_kind'],
                 'customer' => $customerSummary,
                 'company' => $company,
                 'letterhead' => $letterhead,
@@ -289,6 +290,7 @@ class QuoteController extends Controller
 
         $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request) {
             $quote = Quote::create([
+                'quote_kind' => $validated['quote_kind'],
                 'lead_id' => $validated['customer']['type'] === 'lead' ? $validated['customer']['id'] : null,
                 'customer_type' => $validated['customer']['type'],
                 'customer_id' => $validated['customer']['id'] ?? null,
@@ -676,6 +678,7 @@ class QuoteController extends Controller
     private function validateAndResolvePayload(Request $request): array
     {
         $validator = Validator::make($request->all(), [
+            'quote_kind' => ['nullable', 'in:advertisement,space'],
             'customer.type' => ['required', 'in:lead,cliente,sin_cliente'],
             'customer.id' => ['nullable', 'integer', 'min:1'],
             'issuer_company_id' => ['required', 'integer', 'exists:companies,id'],
@@ -736,8 +739,6 @@ class QuoteController extends Controller
                 if ($type === 'rental') {
                     if (empty($item['space_id'])) {
                         $validator->errors()->add("items.{$index}.space_id", 'El espacio es obligatorio para rentas.');
-                    } elseif (Space::query()->whereKey($item['space_id'])->where('active', false)->exists()) {
-                        $validator->errors()->add("items.{$index}.space_id", 'El espacio está bloqueado y no está disponible para nuevas cotizaciones.');
                     }
                     if (empty($item['start_date'])) {
                         $validator->errors()->add("items.{$index}.start_date", 'La fecha inicial es obligatoria para rentas.');
@@ -765,6 +766,7 @@ class QuoteController extends Controller
         }
 
         $validated = $validator->validated();
+        $validated['quote_kind'] = $validated['quote_kind'] ?? 'space';
 
         $company = Company::query()->findOrFail($validated['issuer_company_id']);
         $letterhead = isset($validated['letterhead_id'])
@@ -953,6 +955,7 @@ class QuoteController extends Controller
             'id' => $quote->id,
             'folio' => $quote->folio,
             'version' => $quote->version,
+            'quote_kind' => $quote->quote_kind ?: ($snapshot['quote_kind'] ?? 'space'),
             'customer_type' => $customerType,
             'customer_id' => $customerId,
             'customer' => $snapshot['customer'] ?? $resolvedCustomer,
@@ -1078,6 +1081,7 @@ class QuoteController extends Controller
     ): array {
         return [
             'snapshot_version' => $quote->version,
+            'quote_kind' => $quote->quote_kind ?: 'space',
             'customer' => $customerSummary,
             'company' => [
                 'id' => $company->id,

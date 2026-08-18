@@ -9,6 +9,7 @@ import {
 } from "@react-pdf/renderer";
 import type { CatalogSpace } from "./SpacesCatalogPdf";
 import { env } from "@/config/env";
+import { formatCatalogDate, formatCatalogPrice, getAvailabilityDate, isAvailable } from "@/lib/catalog/catalogHelpers";
 
 const styles = StyleSheet.create({
   /* ================= PORTADA ================= */
@@ -341,7 +342,13 @@ function getGoogleMapsUrl(space: CatalogSpace) {
   return `https://www.google.com/maps/search/?api=1&query=${space.latitude},${space.longitude}`;
 }
 
-export function SpacesCatalogDocumentV1({ spaces }: { spaces: CatalogSpace[] }) {
+export function SpacesCatalogDocumentV1({
+  spaces,
+  enableMapLinks = true,
+}: {
+  spaces: CatalogSpace[];
+  enableMapLinks?: boolean;
+}) {
   return (
     <Document>
       {/* ================= PORTADA ================= */}
@@ -423,13 +430,30 @@ export function SpacesCatalogDocumentV1({ spaces }: { spaces: CatalogSpace[] }) 
                 <Text style={styles.iconTextBold}>
                   {space.description ?? "No disponible"}
                 </Text>
-                <Text style={styles.highlight}>DISPONIBILIDAD INMEDIATA</Text>
-                <Link src={googleMapsUrl}>
+                <Text style={styles.iconText}>PRECIO: {formatCatalogPrice(space.price)}</Text>
+                <Text style={styles.iconText}>
+                  DISPONIBLE A PARTIR DE: {formatCatalogDate(
+                    getAvailabilityDate(space),
+                    isAvailable(space) ? "Disponibilidad inmediata" : "Por confirmar"
+                  )}
+                </Text>
+                <Text style={styles.highlight}>
+                  {isAvailable(space) ? "DISPONIBLE PARA COTIZAR" : "CONSULTAR DISPONIBILIDAD"}
+                </Text>
+                {enableMapLinks ? (
+                  <Link src={googleMapsUrl}>
+                    <Image src={qrUrl} style={styles.qr} />
+                  </Link>
+                ) : (
                   <Image src={qrUrl} style={styles.qr} />
-                </Link>
-                <Link src={googleMapsUrl} style={styles.mapLink}>
-                  Ver ubicacion en Google Maps
-                </Link>
+                )}
+                {enableMapLinks ? (
+                  <Link src={googleMapsUrl} style={styles.mapLink}>
+                    Ver ubicacion en Google Maps
+                  </Link>
+                ) : (
+                  <Text style={styles.mapLink}>Ver ubicacion en Google Maps</Text>
+                )}
               </View>
 
               {/* DERECHA */}

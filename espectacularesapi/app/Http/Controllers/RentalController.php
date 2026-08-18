@@ -130,20 +130,6 @@ class RentalController extends BaseCrudController
         }
 
         $data = $validator->validated();
-        $blockedSpaceIds = DB::table('spaces')
-            ->whereIn('id', collect($data['items'])->pluck('space_id')->unique())
-            ->where('active', false)
-            ->pluck('id');
-
-        if ($blockedSpaceIds->isNotEmpty()) {
-            return response()->json([
-                'message' => 'Uno o más espacios están bloqueados.',
-                'errors' => ['items' => [
-                    'Espacios no disponibles: ' . $blockedSpaceIds->implode(', '),
-                ]],
-            ], 422);
-        }
-
         $customerType = $data['customer']['type'];
         $customerId = (int) $data['customer']['id'];
 
@@ -277,11 +263,7 @@ class RentalController extends BaseCrudController
                     'end_date' => optional($item->end_date)->format('Y-m-d'),
                 ])->all();
                 $spaceIds = collect($periods)->pluck('space_id')->unique()->sort()->values();
-                $spaces = DB::table('spaces')->whereIn('id', $spaceIds)->lockForUpdate()->get();
-                $blockedSpaceIds = $spaces->where('active', false)->pluck('id');
-                if ($blockedSpaceIds->isNotEmpty()) {
-                    throw new \DomainException('Espacios bloqueados: ' . $blockedSpaceIds->implode(', ') . '.');
-                }
+                DB::table('spaces')->whereIn('id', $spaceIds)->lockForUpdate()->get();
                 $conflicts = $this->spaceAvailability->conflictingSpaceIds($periods, (int) $rental->id);
 
                 if ($conflicts->isNotEmpty()) {

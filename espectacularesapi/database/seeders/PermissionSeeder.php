@@ -15,22 +15,12 @@ class PermissionSeeder extends Seeder
 
         $guard = config('auth.defaults.guard') ?? 'api';
 
-        // Definir permisos básicos
-        $permissions = [
-            'users.view',
-            'users.create',
-            'users.edit',
-            'users.delete',
-            'roles.manage',
-            'spaces.view',
-            'spaces.create',
-            'spaces.edit',
-            'spaces.delete',
-            'quotes.view',
-            'quotes.create',
-            'quotes.edit',
-            'quotes.delete',
-        ];
+        $permissions = [];
+        foreach (array_keys(config('access.modules', [])) as $module) {
+            foreach (array_keys(config('access.actions', [])) as $action) {
+                $permissions[] = $module . '.' . $action;
+            }
+        }
 
         foreach ($permissions as $permissionName) {
             Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => $guard]);

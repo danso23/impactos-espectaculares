@@ -15,7 +15,19 @@ function resolveSpaceImageUrl(spaceId: number, imageId?: number | null, path?: s
   return apiBase ? `${apiBase}/storage/${cleanPath}` : `/storage/${cleanPath}`
 }
 
-export function apiToUiStatus(active?: boolean | number | string | null): Space["status"] {
+export function apiToUiStatus(
+  active?: boolean | number | string | null,
+  isBlockedNow?: boolean | number | string | null
+): Space["status"] {
+  if (isBlockedNow !== null && isBlockedNow !== undefined) {
+    const blocked =
+      isBlockedNow === true ||
+      isBlockedNow === 1 ||
+      isBlockedNow === "1" ||
+      isBlockedNow === "true"
+    return blocked ? "Bloqueado" : "Disponible"
+  }
+
   const isActive = active === true || active === 1 || active === "1" || active === "true"
   return isActive ? "Disponible" : "Bloqueado"
 }
@@ -39,8 +51,20 @@ export function apiToUiSpace(r: SpaceApi): Space {
     latitude: r.latitude != null ? Number(r.latitude) : null,
     longitude: r.longitude != null ? Number(r.longitude) : null,
 
-    status: apiToUiStatus(r.active),
+    status: apiToUiStatus(r.active, r.is_blocked_now),
+    active:
+      r.active === true ||
+      r.active === 1 ||
+      r.active === "1" ||
+      r.active === "true",
     createdAt: r.created_at ? r.created_at.slice(0, 10) : "",
+    blocked_from: r.blocked_from?.slice(0, 10) ?? null,
+    blocked_until: r.blocked_until?.slice(0, 10) ?? null,
+    is_blocked_now:
+      r.is_blocked_now === true ||
+      r.is_blocked_now === 1 ||
+      r.is_blocked_now === "1" ||
+      r.is_blocked_now === "true",
 
     type: r.type ?? null,
     socioeconomic_level: r.socioeconomic_level ?? null,

@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { LatLngLiteral } from "leaflet"
-import { ImagePlus, MapPin, RefreshCw, Ruler, Save, Trash2, Undo2, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, ImagePlus, MapPin, RefreshCw, Ruler, Save, Trash2, Undo2, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { HeatmapLayer } from "@/components/maps/heatmap-layer"
@@ -27,6 +27,7 @@ export type SpaceType = "Espectacular" | "Muro" | "Parabus"
 export type ViewType = "Vista natural" | "Vista cruzada" | "Natural/Cruzada"
 
 const EMPTY_SELECT_VALUE = "__none__"
+const MAX_SPACE_IMAGES = 10
 
 type SpaceCoord = {
   id?: number
@@ -51,6 +52,8 @@ type SpaceFormProps = {
 
 const baseForm: SpaceFormValues = {
   active: true,
+  blocked_from: "",
+  blocked_until: "",
   faces: undefined,
   latitude: undefined,
   longitude: undefined,
@@ -81,6 +84,9 @@ export function SpaceForm({
   const [selectedExistingId, setSelectedExistingId] = React.useState<number | null>(null)
   const [images, setImages] = React.useState<File[]>([])
   const [removedImageIds, setRemovedImageIds] = React.useState<number[]>([])
+  const [existingImageOrder, setExistingImageOrder] = React.useState<number[]>(() =>
+    existingImages.map((image) => image.id)
+  )
   const [replacementImageId, setReplacementImageId] = React.useState<number | null>(null)
   const [imagePreviews, setImagePreviews] = React.useState<string[]>([])
   const [isPreparingImages, setIsPreparingImages] = React.useState(false)
@@ -100,10 +106,11 @@ export function SpaceForm({
     setForm({ ...baseForm, ...initialValues })
     setImages([])
     setRemovedImageIds([])
+    setExistingImageOrder(existingImages.map((image) => image.id))
     setReplacementImageId(null)
     setSelectedExistingId(null)
     setShowHeat(true)
-  }, [initialValues])
+  }, [initialValues, existingImages])
 
   React.useEffect(() => {
     const urls = images.map((file) => URL.createObjectURL(file))
@@ -144,18 +151,19 @@ export function SpaceForm({
     [coordsData]
   )
 
-  const retainedExistingImages = existingImages.filter(
+  const orderedExistingImages = existingImageOrder
+    .map((imageId) => existingImages.find((image) => image.id === imageId))
+    .filter((image): image is NonNullable<typeof image> => Boolean(image))
+  const retainedExistingImages = orderedExistingImages.filter(
     (image) => !removedImageIds.includes(image.id)
   )
   const availableImageSlots = Math.max(
     0,
-    5 - retainedExistingImages.length - images.length
+    MAX_SPACE_IMAGES - retainedExistingImages.length - images.length
   )
 
   const handleImagesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const availableSlots = availableImageSlots
-    const selectedFiles = Array.from(event.target.files ?? [])
-      .slice(0, availableSlots)
+    const selectedFiles = Array.from(event.target.files ?? []).slice(0, availableImageSlots)
 
     event.target.value = ""
     if (!selectedFiles.length) return
@@ -163,7 +171,7 @@ export function SpaceForm({
     setIsPreparingImages(true)
     try {
       const prepared = await prepareSpaceImages(selectedFiles)
-      setImages((current) => [...current, ...prepared].slice(0, 5))
+      setImages((current) => [...current, ...prepared].slice(0, MAX_SPACE_IMAGES))
       toast.success("Imágenes optimizadas", {
         description: "Se corrigió su orientación y tamaño para la carga.",
       })
@@ -182,9 +190,9 @@ export function SpaceForm({
   }
 
   const restoreExistingImage = (imageId: number) => {
-    if (retainedExistingImages.length + images.length >= 5) {
+    if (retainedExistingImages.length + images.length >= MAX_SPACE_IMAGES) {
       toast.error("No hay espacio para restaurar esta imagen", {
-        description: "Quita primero una de las imágenes nuevas.",
+        description: `Cada espacio puede tener como máximo ${MAX_SPACE_IMAGES} imágenes.`,
       })
       return
     }
@@ -192,6 +200,28 @@ export function SpaceForm({
     setRemovedImageIds((current) =>
       current.filter((currentImageId) => currentImageId !== imageId)
     )
+  }
+
+  const moveNewImage = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= images.length) return
+
+    setImages((current) => {
+      const reordered = [...current]
+      const [image] = reordered.splice(fromIndex, 1)
+      reordered.splice(toIndex, 0, image)
+      return reordered
+    })
+  }
+
+  const moveExistingImage = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= existingImageOrder.length) return
+
+    setExistingImageOrder((current) => {
+      const reordered = [...current]
+      const [imageId] = reordered.splice(fromIndex, 1)
+      reordered.splice(toIndex, 0, imageId)
+      return reordered
+    })
   }
 
   const handleReplacementChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,6 +259,14 @@ export function SpaceForm({
     if (!form.title.trim()) return "Falta el título"
     if (!form.faces || form.faces <= 0) return "Falta el número de caras"
     if (!form.price || form.price <= 0) return "Falta el precio"
+    if (form.active === false && !form.blocked_from) return "Falta la fecha de inicio del bloqueo"
+    if (form.active === false && !form.blocked_until) return "Falta la fecha de fin del bloqueo"
+    if (
+      form.active === false &&
+      form.blocked_from &&
+      form.blocked_until &&
+      form.blocked_until < form.blocked_from
+    ) return "La fecha final del bloqueo no puede ser menor a la inicial"
     if (!form.type) return "Falta el tipo"
     if (!form.width_m || form.width_m <= 0) return "Falta el ancho"
     if (!form.height_m || form.height_m <= 0) return "Falta el alto"
@@ -251,6 +289,9 @@ export function SpaceForm({
         ...(isCreate || removedImageIds.length === 0
           ? {}
           : { remove_image_ids: removedImageIds }),
+        ...(!isCreate
+          ? { image_order_ids: retainedExistingImages.map((image) => image.id) }
+          : {}),
       }
       await onSubmit(payload)
       toast.success(isCreate ? "Espacio creado" : "Espacio actualizado", {
@@ -369,11 +410,42 @@ export function SpaceForm({
                   </span>
                   <Switch
                     checked={form.active !== false}
-                    onCheckedChange={(value) => setField("active", value)}
+                    onCheckedChange={(value) =>
+                      setForm((current) => ({
+                        ...current,
+                        active: value,
+                        blocked_from: value ? "" : current.blocked_from,
+                        blocked_until: value ? "" : current.blocked_until,
+                      }))
+                    }
                     aria-label="Disponibilidad comercial del espacio"
                   />
                 </div>
               </div>
+              {form.active === false ? (
+                <div className="grid gap-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 sm:col-span-2 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Inicio del bloqueo</Label>
+                    <Input
+                      type="date"
+                      value={form.blocked_from ?? ""}
+                      onChange={(event) => setField("blocked_from", event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fin del bloqueo</Label>
+                    <Input
+                      type="date"
+                      min={form.blocked_from || undefined}
+                      value={form.blocked_until ?? ""}
+                      onChange={(event) => setField("blocked_until", event.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-amber-800 sm:col-span-2">
+                    El espacio solo aparecerá bloqueado durante este periodo y volverá a estar disponible al finalizar.
+                  </p>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label>ID asignado</Label>
                 <Input
@@ -525,8 +597,11 @@ export function SpaceForm({
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {existingImages.map((image, index) => {
+                    {orderedExistingImages.map((image, index) => {
                       const removed = removedImageIds.includes(image.id)
+                      const visiblePosition = retainedExistingImages.findIndex(
+                        (retainedImage) => retainedImage.id === image.id
+                      ) + 1
 
                       return (
                         <div
@@ -542,10 +617,37 @@ export function SpaceForm({
                             alt={`Imagen actual ${index + 1}`}
                             className="h-32 w-full object-cover"
                           />
-                          {image.isCover && !removed ? (
+                          {!removed ? (
                             <span className="absolute left-2 top-2 rounded-full bg-violet-700 px-2 py-1 text-[10px] font-semibold text-white shadow">
-                              Portada
+                              {visiblePosition === 1
+                                ? "Principal 1 · Portada"
+                                : visiblePosition <= 4
+                                  ? `Principal ${visiblePosition}`
+                                  : `Imagen ${visiblePosition}`}
                             </span>
+                          ) : null}
+
+                          {!removed ? (
+                            <div className="absolute right-2 top-2 flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveExistingImage(index, index - 1)}
+                                disabled={index === 0 || isSubmitting || isPreparingImages}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 text-violet-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={`Mover imagen actual ${index + 1} a la izquierda`}
+                              >
+                                <ArrowLeft className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveExistingImage(index, index + 1)}
+                                disabled={index === orderedExistingImages.length - 1 || isSubmitting || isPreparingImages}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/95 text-violet-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                                aria-label={`Mover imagen actual ${index + 1} a la derecha`}
+                              >
+                                <ArrowRight className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           ) : null}
 
                           {removed ? (
@@ -593,7 +695,7 @@ export function SpaceForm({
                     onChange={handleReplacementChange}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Las eliminaciones y sustituciones se aplicarán hasta guardar los cambios.
+                    Ordena las imágenes con las flechas. Las posiciones 1 a 4 se mostrarán en el catálogo y PDF; las eliminaciones, sustituciones y cambios de orden se aplicarán al guardar.
                   </p>
                 </div>
               ) : null}
@@ -610,7 +712,7 @@ export function SpaceForm({
                 <p className="text-xs text-muted-foreground">
                   {isPreparingImages
                     ? "Optimizando imágenes..."
-                    : `${availableImageSlots} espacio${availableImageSlots === 1 ? "" : "s"} disponible${availableImageSlots === 1 ? "" : "s"}. Se corrigen y comprimen automáticamente.`}
+                    : `Puedes agregar hasta ${MAX_SPACE_IMAGES} imágenes y ordenarlas. Quedan ${availableImageSlots} espacios; la primera será la portada y el PDF mostrará la portada más las siguientes tres.`}
                 </p>
               </div>
 
@@ -618,9 +720,19 @@ export function SpaceForm({
                 <div className="space-y-2">
                   <Label>Imágenes nuevas por guardar</Label>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {imagePreviews.map((source, index) => (
+                  {imagePreviews.map((source, index) => {
+                    const finalPosition = retainedExistingImages.length + index + 1
+
+                    return (
                     <div key={source} className="relative overflow-hidden rounded-xl border border-violet-100">
-                      <img src={source} alt={`Imagen ${index + 1}`} className="h-28 w-full object-cover" />
+                      <img src={source} alt={`Imagen ${finalPosition}`} className="h-28 w-full object-cover" />
+                      <span className="absolute left-2 top-2 rounded-full bg-violet-700 px-2 py-1 text-[10px] font-semibold text-white shadow">
+                        {finalPosition === 1
+                          ? "Principal 1 · Portada"
+                          : finalPosition <= 4
+                            ? `Principal ${finalPosition}`
+                            : `Imagen ${finalPosition}`}
+                      </span>
                       <button
                         type="button"
                         onClick={() => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}
@@ -629,8 +741,29 @@ export function SpaceForm({
                       >
                         <X className="h-4 w-4" />
                       </button>
+                      <div className="absolute inset-x-2 bottom-2 flex justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => moveNewImage(index, index - 1)}
+                          disabled={index === 0}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-violet-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Mover imagen ${index + 1} a la izquierda`}
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveNewImage(index, index + 1)}
+                          disabled={index === images.length - 1}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/95 text-violet-700 shadow hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Mover imagen ${index + 1} a la derecha`}
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                    )
+                  })}
                   </div>
                 </div>
               ) : null}

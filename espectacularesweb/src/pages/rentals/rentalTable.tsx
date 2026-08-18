@@ -4,6 +4,8 @@ import { CircleCheckBig, CreditCard, Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { RentalRecord } from "@/types/Rental"
+import type { TableAction } from "@/types/TableAction"
+import { useRoles } from "@/hooks/useRoles"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
@@ -81,8 +83,42 @@ export function useRentalTable({
   onViewPayments: (row: RentalRecord) => void
   onConfirm: (row: RentalRecord) => void
 }) {
+  const { can } = useRoles()
+
   return React.useMemo<ColumnDef<RentalRecord>[]>(
-    () => [
+    () => {
+      const actions: TableAction<RentalRecord>[] = [
+        {
+          key: "payments",
+          label: "Ver plan de pagos",
+          icon: <CreditCard className="h-4 w-4" />,
+          onClick: onViewPayments,
+        },
+      ]
+      if (can("rentals.edit")) actions.push(
+        {
+          key: "confirm",
+          label: "Confirmar renta",
+          icon: <CircleCheckBig className="h-4 w-4" />,
+          onClick: onConfirm,
+          visible: (row) => row.status === "draft",
+        },
+        {
+          key: "edit",
+          label: "Editar",
+          icon: <Pencil className="h-4 w-4" />,
+          onClick: onEdit,
+        },
+      )
+      if (can("rentals.delete")) actions.push({
+        key: "delete",
+        label: "Eliminar",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: onDelete,
+        variant: "destructive",
+      })
+
+      return [
       {
         accessorKey: "id",
         header: "ID",
@@ -139,36 +175,9 @@ export function useRentalTable({
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<RentalRecord>({
-        actions: [
-          {
-            key: "confirm",
-            label: "Confirmar renta",
-            icon: <CircleCheckBig className="h-4 w-4" />,
-            onClick: onConfirm,
-            visible: (row) => row.status === "draft",
-          },
-          {
-            key: "payments",
-            label: "Ver plan de pagos",
-            icon: <CreditCard className="h-4 w-4" />,
-            onClick: onViewPayments,
-          },
-          {
-            key: "edit",
-            label: "Editar",
-            icon: <Pencil className="h-4 w-4" />,
-            onClick: onEdit,
-          },
-          {
-            key: "delete",
-            label: "Eliminar",
-            icon: <Trash2 className="h-4 w-4" />,
-            onClick: onDelete,
-            variant: "destructive",
-          },
-        ],
+        actions,
       }),
-    ],
-    [onConfirm, onDelete, onEdit, onViewPayments]
+    ]},
+    [onConfirm, onDelete, onEdit, onViewPayments, can]
   )
 }

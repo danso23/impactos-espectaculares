@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Entities\RentalItem;
+use App\Models\Entities\Space;
 use Illuminate\Support\Collection;
 
 class SpaceAvailability
@@ -23,7 +24,7 @@ class SpaceAvailability
 
         if ($periods->isEmpty()) return collect();
 
-        return RentalItem::query()
+        $rentalConflicts = RentalItem::query()
             ->where('status', 'active')
             ->whereHas('rental', fn ($query) => $query->where('status', 'active'))
             ->when($excludeRentalId, fn ($query) => $query->where('rental_id', '!=', $excludeRentalId))
@@ -37,6 +38,30 @@ class SpaceAvailability
                 }
             })
             ->pluck('space_id')
+            ->unique()
+            ->values();
+
+        $manualBlockConflicts = Space::query()
+            ->where('active', false)
+            ->where(function ($query) use ($periods) {
+                foreach ($periods as $period) {
+                    $query->orWhere(function ($overlap) use ($period) {
+                        $overlap->whereKey($period['space_id'])
+                            ->where(function ($start) use ($period) {
+                                $start->whereNull('blocked_from')
+                                    ->orWhereDate('blocked_from', '<=', $period['end_date']);
+                            })
+                            ->where(function ($end) use ($period) {
+                                $end->whereNull('blocked_until')
+                                    ->orWhereDate('blocked_until', '>=', $period['start_date']);
+                            });
+                    });
+                }
+            })
+            ->pluck('id');
+
+        return $rentalConflicts
+            ->merge($manualBlockConflicts)
             ->unique()
             ->values();
     }
