@@ -57,6 +57,11 @@ export function apiToUiSpace(r: SpaceApi): Space {
       r.active === 1 ||
       r.active === "1" ||
       r.active === "true",
+    is_rotating:
+      r.is_rotating === true ||
+      r.is_rotating === 1 ||
+      r.is_rotating === "1" ||
+      r.is_rotating === "true",
     createdAt: r.created_at ? r.created_at.slice(0, 10) : "",
     blocked_from: r.blocked_from?.slice(0, 10) ?? null,
     blocked_until: r.blocked_until?.slice(0, 10) ?? null,
@@ -112,6 +117,9 @@ export function buildSpacesParams(
 
   const conLuz = filters.selects?.conLuz
   if (conLuz === "1" || conLuz === "0") params.has_lights = conLuz
+
+  const rotativo = filters.checks?.rotativo
+  if (rotativo !== undefined) params.is_rotating = rotativo ? 1 : 0
 
   const estatus = filters.selects?.estatus
   if (estatus === "disponible") params.active = 1

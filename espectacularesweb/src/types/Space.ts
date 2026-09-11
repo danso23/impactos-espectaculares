@@ -18,6 +18,7 @@ export type Space = {
   description?: string | null;
   comments?: string | null;
   active?: boolean | null;
+  is_rotating?: boolean;
   blocked_from?: string | null;
   blocked_until?: string | null;
   is_blocked_now?: boolean | null;
@@ -41,6 +42,7 @@ export type SpaceImageApi = {
 
 export type SpaceFormValues = {
   active?: boolean;
+  is_rotating?: boolean;
   blocked_from?: string;
   blocked_until?: string;
   faces?: number;
@@ -87,6 +89,7 @@ export type SpaceApi = {
   price?: number | string | null;
 
   active?: boolean | number | string | null;
+  is_rotating?: boolean | number | string | null;
   blocked_from?: string | null;
   blocked_until?: string | null;
   is_blocked_now?: boolean | number | string | null;

@@ -1,6 +1,6 @@
 import type { ApiListResponse, ApiResponse } from "@/types/Api"
 
-export type PaymentFrequency = "single" | "weekly" | "biweekly" | "monthly"
+export type PaymentFrequency = "single" | "weekly" | "biweekly" | "monthly" | "annual"
 
 export type RentalInvoice = {
   id: number
@@ -24,11 +24,16 @@ export type RentalRecord = {
   issuer_company_id?: number | null
   created_by?: number | null
   status?: "draft" | "active" | "completed" | "cancelled" | string | null
+  is_rotating?: boolean | number | string | null
   starts_at?: string | null
   ends_at?: string | null
   payment_frequency?: PaymentFrequency | null
   first_payment_date?: string | null
   payment_installments?: number | null
+  commission_base?: number | string | null
+  commission_type?: import("@/types/Quote").QuoteAmountType | null
+  commission_value?: number | string | null
+  commission_amount?: number | string | null
   subtotal?: number | null
   tax?: number | null
   total?: number | null
@@ -46,6 +51,7 @@ export type RentalFormValues = {
   issuer_company_id: string
   created_by: string
   status: "draft" | "active" | "completed" | "cancelled"
+  is_rotating: boolean
   starts_at: string
   ends_at: string
   subtotal: string
@@ -69,14 +75,19 @@ export type RentalCreatePayload = {
   issuer_company_id: number
   agency_id?: number | null
   status: "draft" | "active"
+  is_rotating: boolean
   starts_at: string
-  ends_at: string
   includes_tax: boolean
   tax_rate: number
   notes?: string | null
   payment: {
     frequency: PaymentFrequency
     first_payment_date: string
+    renewals: number
+  }
+  commission: {
+    type: import("@/types/Quote").QuoteAmountType
+    value: number
   }
   items: RentalCreateItem[]
 }

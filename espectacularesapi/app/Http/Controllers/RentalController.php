@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Entities\Rental;
 use App\Models\Entities\RentalItem;
 use App\Models\Entities\Lead;
+use App\Models\Entities\Agency;
+use App\Services\RentalCommissionCalculator;
 use App\Services\RentalPaymentSchedule;
 use App\Services\SpaceAvailability;
 use Illuminate\Http\Request;
@@ -16,11 +18,13 @@ use Carbon\Carbon;
 class RentalController extends BaseCrudController
 {
     private RentalPaymentSchedule $paymentSchedule;
+    private RentalCommissionCalculator $commissionCalculator;
     private SpaceAvailability $spaceAvailability;
 
     public function __construct()
     {
         $this->paymentSchedule = new RentalPaymentSchedule();
+        $this->commissionCalculator = new RentalCommissionCalculator();
         $this->spaceAvailability = new SpaceAvailability();
     }
 
@@ -39,11 +43,16 @@ class RentalController extends BaseCrudController
             'issuer_company_id' => ['nullable', 'integer', 'exists:companies,id'],
             'created_by' => ['nullable', 'integer', 'exists:users,id'],
             'status' => ['nullable', 'in:draft,active,completed,cancelled'],
+            'is_rotating' => ['nullable', 'boolean'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date'],
-            'payment_frequency' => ['nullable', 'in:single,weekly,biweekly,monthly'],
+            'payment_frequency' => ['nullable', 'in:single,weekly,biweekly,monthly,annual'],
             'first_payment_date' => ['nullable', 'date'],
             'payment_installments' => ['nullable', 'integer', 'min:0'],
+            'commission_base' => ['nullable', 'numeric', 'min:0'],
+            'commission_type' => ['nullable', 'in:none,percent,fixed'],
+            'commission_value' => ['nullable', 'numeric', 'min:0'],
+            'commission_amount' => ['nullable', 'numeric', 'min:0'],
             'subtotal' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
             'total' => ['nullable', 'numeric', 'min:0'],
@@ -64,11 +73,16 @@ class RentalController extends BaseCrudController
             'issuer_company_id' => ['sometimes', 'nullable', 'integer', 'exists:companies,id'],
             'created_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'status' => ['sometimes', 'nullable', 'in:draft,active,completed,cancelled'],
+            'is_rotating' => ['sometimes', 'nullable', 'boolean'],
             'starts_at' => ['sometimes', 'nullable', 'date'],
             'ends_at' => ['sometimes', 'nullable', 'date'],
-            'payment_frequency' => ['sometimes', 'nullable', 'in:single,weekly,biweekly,monthly'],
+            'payment_frequency' => ['sometimes', 'nullable', 'in:single,weekly,biweekly,monthly,annual'],
             'first_payment_date' => ['sometimes', 'nullable', 'date'],
             'payment_installments' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'commission_base' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'commission_type' => ['sometimes', 'nullable', 'in:none,percent,fixed'],
+            'commission_value' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'commission_amount' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'subtotal' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'tax' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'total' => ['sometimes', 'nullable', 'numeric', 'min:0'],
@@ -85,6 +99,10 @@ class RentalController extends BaseCrudController
 
         if ($request->filled('customer_type')) {
             $query->where('customer_type', $request->get('customer_type'));
+        }
+
+        if ($request->filled('is_rotating')) {
+            $query->where('is_rotating', filter_var($request->get('is_rotating'), FILTER_VALIDATE_BOOLEAN));
         }
 
         if ($request->filled('q')) {
@@ -108,13 +126,16 @@ class RentalController extends BaseCrudController
             'issuer_company_id' => ['required', 'integer', 'exists:companies,id'],
             'agency_id' => ['nullable', 'integer', 'exists:agencies,id'],
             'status' => ['nullable', 'in:draft,active'],
+            'is_rotating' => ['nullable', 'boolean'],
             'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
             'includes_tax' => ['required', 'boolean'],
             'tax_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string'],
-            'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly'],
+            'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly,annual'],
             'payment.first_payment_date' => ['required', 'date'],
+            'payment.renewals' => ['required', 'integer', 'min:1', 'max:120'],
+            'commission.type' => ['nullable', 'in:none,percent,fixed'],
+            'commission.value' => ['nullable', 'numeric', 'min:0'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.space_id' => ['required', 'integer', 'distinct', 'exists:spaces,id'],
             'items.*.concept' => ['required', 'string', 'max:255'],
@@ -142,10 +163,25 @@ class RentalController extends BaseCrudController
         }
 
         $targetStatus = $data['status'] ?? 'draft';
+        $frequency = $data['payment']['frequency'];
+        $renewals = $frequency === 'single' ? 1 : (int) $data['payment']['renewals'];
+
+        try {
+            $endsAt = $this->paymentSchedule->endDate($data['starts_at'], $frequency, $renewals);
+            $schedule = $this->paymentSchedule->buildForRenewals(
+                $data['starts_at'],
+                $data['payment']['first_payment_date'],
+                $frequency,
+                $renewals
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
         $periods = collect($data['items'])->map(fn (array $item) => [
             'space_id' => $item['space_id'],
             'start_date' => $data['starts_at'],
-            'end_date' => $data['ends_at'],
+            'end_date' => $endsAt,
         ])->all();
         $conflictingSpaceIds = $targetStatus === 'active'
             ? $this->spaceAvailability->conflictingSpaceIds($periods)
@@ -160,17 +196,6 @@ class RentalController extends BaseCrudController
             ], 422);
         }
 
-        try {
-            $schedule = $this->paymentSchedule->build(
-                $data['starts_at'],
-                $data['ends_at'],
-                $data['payment']['first_payment_date'],
-                $data['payment']['frequency']
-            );
-        } catch (\InvalidArgumentException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 422);
-        }
-
         $subtotal = round(collect($data['items'])->sum(
             fn (array $item) => (int) $item['qty'] * (float) $item['unit_price']
         ), 2);
@@ -178,10 +203,12 @@ class RentalController extends BaseCrudController
             ? round($subtotal * ((float) $data['tax_rate'] / 100), 2)
             : 0.0;
         $total = round($subtotal + $tax, 2);
+        $agency = isset($data['agency_id']) ? Agency::query()->find($data['agency_id']) : null;
+        $commission = $this->commissionCalculator->calculate($data['commission'] ?? [], $subtotal, $agency);
         $user = $request->attributes->get('auth_user');
 
         try {
-            $rental = DB::transaction(function () use ($data, $customerType, $customerId, $subtotal, $tax, $total, $schedule, $user, $periods, $targetStatus) {
+            $rental = DB::transaction(function () use ($data, $customerType, $customerId, $subtotal, $tax, $total, $commission, $schedule, $user, $periods, $targetStatus, $endsAt, $frequency, $renewals) {
             if ($targetStatus === 'active') {
                 $spaceIds = collect($periods)->pluck('space_id')->unique()->sort()->values();
                 DB::table('spaces')->whereIn('id', $spaceIds)->lockForUpdate()->get();
@@ -199,18 +226,23 @@ class RentalController extends BaseCrudController
                 'issuer_company_id' => $data['issuer_company_id'],
                 'created_by' => $user ? (int) $user->id : null,
                 'status' => $data['status'] ?? 'draft',
+                'is_rotating' => (bool) ($data['is_rotating'] ?? false),
                 'starts_at' => $data['starts_at'],
-                'ends_at' => $data['ends_at'],
-                'payment_frequency' => $data['payment']['frequency'],
+                'ends_at' => $endsAt,
+                'payment_frequency' => $frequency,
                 'first_payment_date' => $data['payment']['first_payment_date'],
                 'payment_installments' => count($schedule),
+                ...$commission,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'total' => $total,
                 'notes' => $data['notes'] ?? null,
                 'snapshot_json' => [
                     'origin' => 'manual',
+                    'is_rotating' => (bool) ($data['is_rotating'] ?? false),
                     'customer' => ['type' => $customerType, 'id' => $customerId],
+                    'payment' => ['frequency' => $frequency, 'renewals' => $renewals],
+                    'commission' => $commission,
                     'items' => $data['items'],
                 ],
             ]);
@@ -221,7 +253,7 @@ class RentalController extends BaseCrudController
                     'quote_item_id' => null,
                     'space_id' => (int) $item['space_id'],
                     'start_date' => $data['starts_at'],
-                    'end_date' => $data['ends_at'],
+                    'end_date' => $endsAt,
                     'unit_price' => (float) $item['unit_price'],
                     'qty' => (int) $item['qty'],
                     'subtotal' => round((int) $item['qty'] * (float) $item['unit_price'], 2),

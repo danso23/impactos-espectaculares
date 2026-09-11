@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { NumericInput } from "@/components/ui/numeric-input"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -31,6 +32,7 @@ const EMPTY_FORM: RentalFormValues = {
   issuer_company_id: "",
   created_by: "",
   status: "draft",
+  is_rotating: false,
   starts_at: "",
   ends_at: "",
   subtotal: "",
@@ -47,6 +49,11 @@ function recordToForm(record: RentalRecord): RentalFormValues {
     issuer_company_id: record.issuer_company_id != null ? String(record.issuer_company_id) : "",
     created_by: record.created_by != null ? String(record.created_by) : "",
     status: (record.status as RentalFormValues["status"]) ?? "draft",
+    is_rotating:
+      record.is_rotating === true ||
+      record.is_rotating === 1 ||
+      record.is_rotating === "1" ||
+      record.is_rotating === "true",
     starts_at: record.starts_at ?? "",
     ends_at: record.ends_at ?? "",
     subtotal: record.subtotal != null ? String(record.subtotal) : "",
@@ -173,6 +180,14 @@ export function RentalForm({
           <div className="space-y-2">
             <Label>Fin</Label>
             <Input type="date" value={form.ends_at} onChange={(e) => updateField("ends_at", e.target.value)} />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2">
+            <Label>Es rotativa</Label>
+            <Switch
+              checked={form.is_rotating}
+              onCheckedChange={(value) => updateField("is_rotating", value)}
+              aria-label="Marcar renta como rotativa"
+            />
           </div>
           <div className="space-y-2">
             <Label>Subtotal</Label>

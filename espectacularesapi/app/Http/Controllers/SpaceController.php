@@ -34,6 +34,15 @@ class SpaceController extends BaseCrudController
                 : $query->currentlyBlocked();
         }
 
+        if ($request->filled('assigned_id')) {
+            $assignedId = trim((string) $request->get('assigned_id'));
+            $query->where('assigned_id', 'like', "%{$assignedId}%");
+        }
+
+        if ($request->filled('is_rotating')) {
+            $query->where('is_rotating', filter_var($request->get('is_rotating'), FILTER_VALIDATE_BOOLEAN));
+        }
+
         return $query;
     }
 
@@ -51,6 +60,7 @@ class SpaceController extends BaseCrudController
             'latitude'              => ['nullable', 'numeric', 'between:-90,90'],
             'longitude'             => ['nullable', 'numeric', 'between:-180,180'],
             'active'                => ['nullable', 'boolean'],
+            'is_rotating'           => ['nullable', 'boolean'],
             'blocked_from'          => ['nullable', 'date_format:Y-m-d', 'required_if:active,0'],
             'blocked_until'         => ['nullable', 'date_format:Y-m-d', 'after_or_equal:blocked_from', 'required_if:active,0'],
             'faces'                 => ['required', 'numeric', 'min:0'],
@@ -78,6 +88,7 @@ class SpaceController extends BaseCrudController
             'latitude'              => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude'             => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'active'                => ['sometimes', 'nullable', 'boolean'],
+            'is_rotating'           => ['sometimes', 'nullable', 'boolean'],
             'blocked_from'          => ['sometimes', 'nullable', 'date_format:Y-m-d', 'required_if:active,0'],
             'blocked_until'         => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:blocked_from', 'required_if:active,0'],
             'faces'                 => ['sometimes', 'nullable', 'integer', 'min:0'],

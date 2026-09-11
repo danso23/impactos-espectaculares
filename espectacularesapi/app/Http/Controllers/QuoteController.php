@@ -18,6 +18,7 @@ use App\Models\Entities\QuoteStatusHistory;
 use App\Models\Entities\ServiceCatalog;
 use App\Models\Entities\Space;
 use App\Services\QuoteCalculator;
+use App\Services\RentalCommissionCalculator;
 use App\Services\RentalPaymentSchedule;
 use App\Services\SpaceAvailability;
 use Carbon\Carbon;
@@ -32,12 +33,14 @@ class QuoteController extends Controller
 {
     private QuoteCalculator $calculator;
     private RentalPaymentSchedule $paymentSchedule;
+    private RentalCommissionCalculator $commissionCalculator;
     private SpaceAvailability $spaceAvailability;
 
     public function __construct()
     {
         $this->calculator = new QuoteCalculator();
         $this->paymentSchedule = new RentalPaymentSchedule();
+        $this->commissionCalculator = new RentalCommissionCalculator();
         $this->spaceAvailability = new SpaceAvailability();
     }
 
@@ -478,9 +481,12 @@ class QuoteController extends Controller
 
         $planValidator = Validator::make($request->all(), [
             'rental.starts_at' => ['required', 'date'],
-            'rental.ends_at' => ['required', 'date', 'after_or_equal:rental.starts_at'],
-            'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly'],
+            'rental.is_rotating' => ['nullable', 'boolean'],
+            'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly,annual'],
             'payment.first_payment_date' => ['required', 'date'],
+            'payment.renewals' => ['required', 'integer', 'min:1', 'max:120'],
+            'commission.type' => ['nullable', 'in:none,percent,fixed'],
+            'commission.value' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         if ($planValidator->fails()) {
@@ -492,9 +498,25 @@ class QuoteController extends Controller
 
         $planPayload = $planValidator->validated();
         $startsAt = $planPayload['rental']['starts_at'];
-        $endsAt = $planPayload['rental']['ends_at'];
         $paymentFrequency = $planPayload['payment']['frequency'];
+        $renewals = $paymentFrequency === 'single' ? 1 : (int) $planPayload['payment']['renewals'];
         $firstPaymentDate = $planPayload['payment']['first_payment_date'];
+        $isRotating = (bool) ($planPayload['rental']['is_rotating'] ?? false);
+        $commissionPayload = $planPayload['commission'] ?? [];
+
+        try {
+            $endsAt = $this->paymentSchedule->endDate($startsAt, $paymentFrequency, $renewals);
+            $paymentSchedule = $this->paymentSchedule->buildForRenewals(
+                $startsAt,
+                $firstPaymentDate,
+                $paymentFrequency,
+                $renewals
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
 
         $customerType = $quote->customer_type;
         $customerId = $quote->customer_id;
@@ -554,25 +576,14 @@ class QuoteController extends Controller
             ], 422);
         }
 
-        try {
-            $paymentSchedule = $this->paymentSchedule->build(
-                $startsAt,
-                $endsAt,
-                $firstPaymentDate,
-                $paymentFrequency
-            );
-        } catch (\InvalidArgumentException $exception) {
-            return response()->json([
-                'message' => $exception->getMessage(),
-            ], 422);
-        }
-
         $userId = $this->authUserId($request);
 
-        $rental = DB::transaction(function () use ($quote, $rentalItems, $conversionItems, $userId, $request, $customerType, $customerId, $customerSummary, $startsAt, $endsAt, $paymentFrequency, $firstPaymentDate, $paymentSchedule) {
+        $rental = DB::transaction(function () use ($quote, $rentalItems, $conversionItems, $userId, $request, $customerType, $customerId, $customerSummary, $startsAt, $endsAt, $paymentFrequency, $renewals, $firstPaymentDate, $paymentSchedule, $commissionPayload, $isRotating) {
             $subtotal = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->subtotal), 2);
             $tax = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->tax_amount), 2);
             $total = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->total), 2);
+            $commissionBase = round(max(0, $total - $tax), 2);
+            $commission = $this->commissionCalculator->calculate($commissionPayload, $commissionBase, $quote->agency);
 
             if (($quote->customer_type ?? null) === 'sin_cliente' || empty($quote->customer_id)) {
                 $snapshot = is_array($quote->snapshot_json) ? $quote->snapshot_json : [];
@@ -593,11 +604,13 @@ class QuoteController extends Controller
                 'issuer_company_id' => $quote->issuer_company_id,
                 'created_by' => $userId,
                 'status' => 'draft',
+                'is_rotating' => $isRotating,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'payment_frequency' => $paymentFrequency,
                 'first_payment_date' => $firstPaymentDate,
                 'payment_installments' => count($paymentSchedule),
+                ...$commission,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'total' => $total,
@@ -609,9 +622,12 @@ class QuoteController extends Controller
                         'version' => $quote->version,
                         'accepted_at' => optional($quote->accepted_at)->toDateTimeString(),
                     ],
+                    'is_rotating' => $isRotating,
                     'customer' => $quote->snapshot_json['customer'] ?? null,
                     'company' => $quote->snapshot_json['company'] ?? null,
                     'agency' => $quote->snapshot_json['agency'] ?? null,
+                    'payment' => ['frequency' => $paymentFrequency, 'renewals' => $renewals],
+                    'commission' => $commission,
                     'items' => $conversionItems->map(function (QuoteItem $item) {
                         return [
                             'quote_item_id' => $item->id,
@@ -689,8 +705,6 @@ class QuoteController extends Controller
             'tax_rate' => ['nullable', 'numeric', 'min:0'],
             'discount.type' => ['nullable', 'in:none,percent,fixed'],
             'discount.value' => ['nullable', 'numeric', 'min:0'],
-            'commission.type' => ['nullable', 'in:none,percent,fixed'],
-            'commission.value' => ['nullable', 'numeric', 'min:0'],
             'terms_html' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'images' => ['nullable', 'array', 'max:10'],
@@ -975,6 +989,8 @@ class QuoteController extends Controller
                 'id' => $quote->letterhead->id,
                 'name' => $quote->letterhead->name,
                 'template_key' => $quote->letterhead->template_key,
+                'primary_color' => $quote->letterhead->primary_color,
+                'secondary_color' => $quote->letterhead->secondary_color,
             ] : ($snapshot['letterhead'] ?? null),
             'agency' => $quote->agency ? [
                 'id' => $quote->agency->id,
@@ -994,10 +1010,10 @@ class QuoteController extends Controller
                 'discount_type' => $quote->discount_type,
                 'discount_value' => (float)$quote->discount_value,
                 'discount_amount' => (float)$quote->discount,
-                'commission_base' => (float)$quote->commission_base,
-                'commission_type' => $quote->commission_type,
-                'commission_value' => (float)$quote->commission_value,
-                'commission_amount' => (float)$quote->commission_amount,
+                'commission_base' => 0.0,
+                'commission_type' => 'none',
+                'commission_value' => 0.0,
+                'commission_amount' => 0.0,
                 'tax' => (float)$quote->tax,
                 'total' => (float)$quote->total,
             ],
@@ -1018,6 +1034,7 @@ class QuoteController extends Controller
             'rental' => $quote->rental ? [
                 'id' => $quote->rental->id,
                 'status' => $quote->rental->status,
+                'is_rotating' => (bool) $quote->rental->is_rotating,
                 'starts_at' => optional($quote->rental->starts_at)->format('Y-m-d'),
                 'ends_at' => optional($quote->rental->ends_at)->format('Y-m-d'),
                 'total' => (float) $quote->rental->total,

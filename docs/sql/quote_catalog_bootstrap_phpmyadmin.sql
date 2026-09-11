@@ -157,6 +157,45 @@ INSERT INTO `company_letterheads` (
   `company_id`, `name`, `code`, `description`, `template_key`,
   `primary_color`, `secondary_color`, `is_default`, `is_active`, `created_at`, `updated_at`
 )
+SELECT c.`id`, 'Looking Colors', 'LOOKING_COLORS', 'Hoja membretada Looking Colors',
+  'looking_colors', '#3F8EF7', '#DD4898', 0, 1, NOW(), NOW()
+FROM `companies` c
+WHERE c.`key` = 'espectaculares_principal'
+  AND NOT EXISTS (
+    SELECT 1 FROM `company_letterheads` cl
+    WHERE cl.`company_id` = c.`id` AND cl.`code` = 'LOOKING_COLORS'
+  );
+
+INSERT INTO `company_letterheads` (
+  `company_id`, `name`, `code`, `description`, `template_key`,
+  `primary_color`, `secondary_color`, `is_default`, `is_active`, `created_at`, `updated_at`
+)
+SELECT c.`id`, 'Impactos Espectaculares', 'IMPACTOS', 'Hoja membretada Impactos Espectaculares',
+  'impactos', '#5B4AA5', '#F36A32', 0, 1, NOW(), NOW()
+FROM `companies` c
+WHERE c.`key` = 'espectaculares_principal'
+  AND NOT EXISTS (
+    SELECT 1 FROM `company_letterheads` cl
+    WHERE cl.`company_id` = c.`id` AND cl.`code` = 'IMPACTOS'
+  );
+
+INSERT INTO `company_letterheads` (
+  `company_id`, `name`, `code`, `description`, `template_key`,
+  `primary_color`, `secondary_color`, `is_default`, `is_active`, `created_at`, `updated_at`
+)
+SELECT c.`id`, 'AG Espectaculares', 'AG_ESPECTACULARES', 'Hoja membretada AG Espectaculares',
+  'ag_espectaculares', '#54B5D0', '#342638', 0, 1, NOW(), NOW()
+FROM `companies` c
+WHERE c.`key` = 'espectaculares_principal'
+  AND NOT EXISTS (
+    SELECT 1 FROM `company_letterheads` cl
+    WHERE cl.`company_id` = c.`id` AND cl.`code` = 'AG_ESPECTACULARES'
+  );
+
+INSERT INTO `company_letterheads` (
+  `company_id`, `name`, `code`, `description`, `template_key`,
+  `primary_color`, `secondary_color`, `is_default`, `is_active`, `created_at`, `updated_at`
+)
 SELECT
   c.`id`,
   'Membretado Corporativo',
@@ -208,9 +247,26 @@ INSERT INTO `services` (
   `key`, `name`, `description`, `base_price`, `tax_rate`, `is_active`, `created_at`, `updated_at`
 )
 SELECT
+  'anuncio',
+  'Anuncio',
+  'Anuncio seleccionado por ID asignado',
+  0.00,
+  16.00,
+  1,
+  NOW(),
+  NOW()
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM `services` WHERE `key` = 'anuncio'
+);
+
+INSERT INTO `services` (
+  `key`, `name`, `description`, `base_price`, `tax_rate`, `is_active`, `created_at`, `updated_at`
+)
+SELECT
   'instalacion',
-  'Instalacion',
-  'Instalacion de lona o material publicitario',
+  'Instalación de lonas',
+  'Instalación de lonas',
   1500.00,
   16.00,
   1,
@@ -220,6 +276,13 @@ FROM DUAL
 WHERE NOT EXISTS (
   SELECT 1 FROM `services` WHERE `key` = 'instalacion'
 );
+
+UPDATE `services`
+SET
+  `name` = 'Instalación de lonas',
+  `description` = 'Instalación de lonas',
+  `updated_at` = NOW()
+WHERE `key` = 'instalacion';
 
 INSERT INTO `services` (
   `key`, `name`, `description`, `base_price`, `tax_rate`, `is_active`, `created_at`, `updated_at`
