@@ -40,14 +40,14 @@ export function useCreateSpace() {
 /**
  * Hook de listado: recibe params ya listos (page, per_page, q, filtros...)
  */
-export function useSpaces(params: QueryParams) {
+export function useSpaces(params: QueryParams, enabled = true) {
   const access = tokenStore.getAccess()
   const paramsKey = React.useMemo(() => JSON.stringify(params), [params])
 
   return useQuery({
     queryKey: ["spaces", "index", paramsKey],
     queryFn: () => getSpaces(params),
-    enabled: !!access,
+    enabled: !!access && enabled,
     staleTime: 10_000,
     placeholderData: (prev) => prev,
   })

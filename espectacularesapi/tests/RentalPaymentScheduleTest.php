@@ -47,4 +47,34 @@ class RentalPaymentScheduleTest extends TestCase
             'monthly'
         );
     }
+
+    public function testMonthlyRenewalsCalculateTheEndDateAndExactNumberOfPayments(): void
+    {
+        $service = new RentalPaymentSchedule();
+        $schedule = $service->buildForRenewals('2026-01-15', '2026-01-15', 'monthly', 12);
+
+        $this->assertCount(12, $schedule);
+        $this->assertSame('2027-01-14', $service->endDate('2026-01-15', 'monthly', 12));
+        $this->assertSame('2027-01-14', $schedule[11]['period_end']);
+    }
+
+    public function testSinglePaymentForcesOneRenewalAndSameEndDate(): void
+    {
+        $service = new RentalPaymentSchedule();
+        $schedule = $service->buildForRenewals('2026-04-08', '2026-04-08', 'single', 24);
+
+        $this->assertCount(1, $schedule);
+        $this->assertSame('2026-04-08', $service->endDate('2026-04-08', 'single', 24));
+        $this->assertSame('2026-04-08', $schedule[0]['period_end']);
+    }
+
+    public function testAnnualRenewalsAreSupported(): void
+    {
+        $service = new RentalPaymentSchedule();
+        $schedule = $service->buildForRenewals('2026-06-01', '2026-06-01', 'annual', 2);
+
+        $this->assertCount(2, $schedule);
+        $this->assertSame('2028-05-31', $service->endDate('2026-06-01', 'annual', 2));
+        $this->assertSame('2027-06-01', $schedule[1]['due_date']);
+    }
 }

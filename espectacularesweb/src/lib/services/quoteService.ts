@@ -59,7 +59,6 @@ function buildQuoteFormData(request: QuoteCreateRequest) {
   appendFormData(fd, "includes_tax", payload.includes_tax)
   appendFormData(fd, "tax_rate", payload.tax_rate)
   appendFormData(fd, "discount", payload.discount)
-  appendFormData(fd, "commission", payload.commission)
   appendFormData(fd, "terms_html", payload.terms_html)
   appendFormData(fd, "notes", payload.notes)
   appendFormData(fd, "items", payload.items)

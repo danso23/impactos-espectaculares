@@ -4,6 +4,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -12,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -21,11 +23,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useConvertQuoteToRental } from "@/lib/hooks/quoteHook"
-import { buildRentalPaymentSchedule } from "@/lib/helpers/rentalPaymentSchedule"
+import {
+  buildRentalPaymentSchedule,
+  calculateRentalEndDate,
+} from "@/lib/helpers/rentalPaymentSchedule"
 import { QuoteCustomerSelector } from "@/pages/quotes/quoteCustomerSelector"
 import type {
   CustomerType,
   QuoteCustomer,
+  QuoteAmountType,
   QuoteRecord,
   SearchableCustomerType,
 } from "@/types/Quote"
@@ -48,6 +54,7 @@ const FREQUENCY_LABELS: Record<PaymentFrequency, string> = {
   weekly: "Semanal",
   biweekly: "Quincenal",
   monthly: "Mensual",
+  annual: "Anual",
 }
 
 type QuoteConvertToRentalDialogProps = {
@@ -66,22 +73,33 @@ export function QuoteConvertToRentalDialog({
   const [customerType, setCustomerType] = React.useState<CustomerType>("cliente")
   const [selectedCustomer, setSelectedCustomer] = React.useState<QuoteCustomer | null>(null)
   const [startsAt, setStartsAt] = React.useState("")
-  const [endsAt, setEndsAt] = React.useState("")
   const [frequency, setFrequency] = React.useState<PaymentFrequency>("monthly")
+  const [renewalCount, setRenewalCount] = React.useState(1)
+  const [isRotating, setIsRotating] = React.useState(false)
   const [firstPaymentDate, setFirstPaymentDate] = React.useState("")
+  const [commissionType, setCommissionType] = React.useState<QuoteAmountType>("none")
+  const [commissionValue, setCommissionValue] = React.useState(0)
 
   const totalToConvert = quote?.totals.rentals_subtotal
     ? quote.totals.rentals_subtotal
     : quote?.totals.total ?? 0
 
+  const commissionBase = React.useMemo(() => {
+    const rentalItems = quote?.items.filter((item) => item.item_type === "rental") ?? []
+    const itemsToConvert = rentalItems.length ? rentalItems : quote?.items ?? []
+
+    return itemsToConvert.reduce(
+      (sum, item) => sum + Math.max(0, Number(item.total) - Number(item.tax_amount)),
+      0,
+    )
+  }, [quote?.items])
+
   const defaultRentalPeriod = React.useMemo(() => {
     const rentalItems = quote?.items.filter((item) => item.item_type === "rental") ?? []
     const startDates = rentalItems.map((item) => item.start_date).filter(Boolean).sort() as string[]
-    const endDates = rentalItems.map((item) => item.end_date).filter(Boolean).sort() as string[]
 
     return {
       startsAt: startDates[0] ?? "",
-      endsAt: endDates.at(-1) ?? "",
     }
   }, [quote?.items])
 
@@ -91,18 +109,39 @@ export function QuoteConvertToRentalDialog({
     setCustomerType("cliente")
     setSelectedCustomer(null)
     setStartsAt(defaultRentalPeriod.startsAt)
-    setEndsAt(defaultRentalPeriod.endsAt)
     setFrequency("monthly")
+    setRenewalCount(1)
+    setIsRotating(false)
     setFirstPaymentDate(defaultRentalPeriod.startsAt)
-  }, [defaultRentalPeriod, open, quote?.id])
+    setCommissionType(quote?.agency?.commission_type ?? "none")
+    setCommissionValue(Number(quote?.agency?.commission_value ?? 0))
+  }, [
+    defaultRentalPeriod,
+    open,
+    quote?.agency?.commission_type,
+    quote?.agency?.commission_value,
+    quote?.id,
+  ])
+
+  const commissionAmount = React.useMemo(() => {
+    if (commissionType === "none" || commissionValue <= 0) return 0
+    if (commissionType === "percent") return commissionBase * (commissionValue / 100)
+    return Math.min(commissionValue, commissionBase)
+  }, [commissionBase, commissionType, commissionValue])
+
+  const normalizedRenewalCount = frequency === "single" ? 1 : renewalCount
+  const endsAt = React.useMemo(
+    () => calculateRentalEndDate(startsAt, frequency, normalizedRenewalCount),
+    [frequency, normalizedRenewalCount, startsAt],
+  )
 
   const schedule = React.useMemo(() => buildRentalPaymentSchedule({
     startsAt,
-    endsAt,
     firstPaymentDate,
     frequency,
+    renewalCount: normalizedRenewalCount,
     total: totalToConvert,
-  }), [endsAt, firstPaymentDate, frequency, startsAt, totalToConvert])
+  }), [firstPaymentDate, frequency, normalizedRenewalCount, startsAt, totalToConvert])
 
   const handleConfirm = async () => {
     if (!quote) return
@@ -110,12 +149,8 @@ export function QuoteConvertToRentalDialog({
       toast.error("Selecciona un cliente o prospecto para continuar.")
       return
     }
-    if (!startsAt || !endsAt || !firstPaymentDate) {
-      toast.error("Completa la vigencia y la primera fecha de pago.")
-      return
-    }
-    if (endsAt < startsAt) {
-      toast.error("La fecha final no puede ser anterior a la fecha inicial.")
+    if (!startsAt || !endsAt || !firstPaymentDate || normalizedRenewalCount < 1) {
+      toast.error("Completa el inicio, las renovaciones y la primera fecha de pago.")
       return
     }
     if (schedule.length === 0) {
@@ -135,11 +170,16 @@ export function QuoteConvertToRentalDialog({
           } : {}),
           rental: {
             starts_at: startsAt,
-            ends_at: endsAt,
+            is_rotating: isRotating,
           },
           payment: {
             frequency,
             first_payment_date: firstPaymentDate,
+            renewals: normalizedRenewalCount,
+          },
+          commission: {
+            type: commissionType,
+            value: commissionValue,
           },
         },
       })
@@ -202,7 +242,7 @@ export function QuoteConvertToRentalDialog({
                 Vigencia de la renta
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Debe cubrir todas las fechas incluidas en las partidas cotizadas.
+                La fecha final se calcula con la frecuencia y las renovaciones.
               </p>
             </div>
 
@@ -220,15 +260,32 @@ export function QuoteConvertToRentalDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rental-ends-at">Fin</Label>
+                <Label htmlFor="rental-renewals">Renovaciones</Label>
                 <Input
-                  id="rental-ends-at"
-                  type="date"
-                  min={startsAt || undefined}
-                  value={endsAt}
-                  onChange={(event) => setEndsAt(event.target.value)}
+                  id="rental-renewals"
+                  type="number"
+                  min={1}
+                  max={120}
+                  step={1}
+                  disabled={frequency === "single"}
+                  value={normalizedRenewalCount}
+                  onChange={(event) => setRenewalCount(Math.min(120, Math.max(1, Math.trunc(Number(event.target.value)) || 1)))}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {endsAt ? `Vigencia calculada hasta ${formatDate(endsAt)}.` : "Se calcula según la frecuencia."}
+                </p>
               </div>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-violet-200 bg-white px-3 py-2">
+              <div>
+                <p className="text-sm font-medium">Renta rotativa</p>
+                <p className="text-xs text-muted-foreground">Uso interno para casos especiales.</p>
+              </div>
+              <Switch
+                checked={isRotating}
+                onCheckedChange={setIsRotating}
+                aria-label="Marcar renta como rotativa"
+              />
             </div>
           </div>
 
@@ -246,7 +303,14 @@ export function QuoteConvertToRentalDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Frecuencia</Label>
-                <Select value={frequency} onValueChange={(value) => setFrequency(value as PaymentFrequency)}>
+                <Select
+                  value={frequency}
+                  onValueChange={(value) => {
+                    const nextFrequency = value as PaymentFrequency
+                    setFrequency(nextFrequency)
+                    if (nextFrequency === "single") setRenewalCount(1)
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
@@ -263,6 +327,35 @@ export function QuoteConvertToRentalDialog({
                   value={firstPaymentDate}
                   onChange={(event) => setFirstPaymentDate(event.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Comisión</Label>
+                <Select
+                  value={commissionType}
+                  onValueChange={(value) => {
+                    const type = value as QuoteAmountType
+                    setCommissionType(type)
+                    if (type === "none") setCommissionValue(0)
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin comisión</SelectItem>
+                    <SelectItem value="percent">Porcentaje</SelectItem>
+                    <SelectItem value="fixed">Monto fijo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Valor de comisión</Label>
+                <NumericInput
+                  disabled={commissionType === "none"}
+                  value={commissionValue}
+                  onValueChange={setCommissionValue}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comisión calculada: {formatCurrency(commissionAmount)}
+                </p>
               </div>
             </div>
 
@@ -298,7 +391,7 @@ export function QuoteConvertToRentalDialog({
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-emerald-200 px-3 py-4 text-center text-xs text-muted-foreground">
-                Completa las fechas para visualizar las parcialidades.
+                Completa el inicio y las renovaciones para visualizar las parcialidades.
               </div>
             )}
           </div>

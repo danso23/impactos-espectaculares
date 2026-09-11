@@ -87,6 +87,7 @@ const initialFilters: FilterValues = {
   },
   checks: {
     activo: undefined,
+    rotativo: undefined,
   },
 };
 
@@ -540,7 +541,10 @@ export default function SpacePage() {
                 ],
               },
             ]}
-            checkboxes={[{ key: "activo", label: "Activo" }]}
+            checkboxes={[
+              { key: "activo", label: "Activo" },
+              { key: "rotativo", label: "Es rotativo" },
+            ]}
             onApply={handleApplyFilters}
             onReset={handleResetFilters}
             applyOnReset={true}

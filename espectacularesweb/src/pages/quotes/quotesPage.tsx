@@ -62,7 +62,7 @@ export default function QuotesPage() {
   const handleDownload = React.useCallback(async (quote: QuoteRecord) => {
     try {
       const response = await getQuote(quote.id)
-      downloadQuotePdf(response.data, `${response.data.folio}.pdf`)
+      await downloadQuotePdf(response.data, `${response.data.folio}.pdf`)
     } catch (error) {
       toast.error("No fue posible generar el PDF de la cotización.", {
         description: error instanceof Error ? error.message : "Intenta nuevamente.",

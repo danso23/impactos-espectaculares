@@ -70,6 +70,22 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->patch('providers/{id}', ['middleware' => 'permission:providers.edit', 'uses' => 'ProviderController@update']);
         $router->delete('providers/{id}', ['middleware' => 'permission:providers.delete', 'uses' => 'ProviderController@delete']);
 
+        /** SERVICES **/
+        $router->get('services', ['middleware' => 'permission:services.view', 'uses' => 'ServiceController@index']);
+        $router->get('services/{id}', ['middleware' => 'permission:services.view', 'uses' => 'ServiceController@find']);
+        $router->post('services', ['middleware' => 'permission:services.edit', 'uses' => 'ServiceController@store']);
+        $router->put('services/{id}', ['middleware' => 'permission:services.edit', 'uses' => 'ServiceController@update']);
+        $router->patch('services/{id}', ['middleware' => 'permission:services.edit', 'uses' => 'ServiceController@update']);
+        $router->delete('services/{id}', ['middleware' => 'permission:services.delete', 'uses' => 'ServiceController@delete']);
+
+        /** COLLABORATORS **/
+        $router->get('collaborators', ['middleware' => 'permission:collaborators.view', 'uses' => 'CollaboratorController@index']);
+        $router->get('collaborators/{id}', ['middleware' => 'permission:collaborators.view', 'uses' => 'CollaboratorController@find']);
+        $router->post('collaborators', ['middleware' => 'permission:collaborators.edit', 'uses' => 'CollaboratorController@store']);
+        $router->put('collaborators/{id}', ['middleware' => 'permission:collaborators.edit', 'uses' => 'CollaboratorController@update']);
+        $router->patch('collaborators/{id}', ['middleware' => 'permission:collaborators.edit', 'uses' => 'CollaboratorController@update']);
+        $router->delete('collaborators/{id}', ['middleware' => 'permission:collaborators.delete', 'uses' => 'CollaboratorController@delete']);
+
         /** RENTALS **/
         $router->get('rentals', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@index']);
         $router->get('rentals/{id}', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@find']);

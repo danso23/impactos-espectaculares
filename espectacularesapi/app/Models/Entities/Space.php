@@ -25,6 +25,7 @@ class Space extends Model
         'latitude',
         'longitude',
         'active',
+        'is_rotating',
         'blocked_from',
         'blocked_until',
     ];
@@ -38,6 +39,7 @@ class Space extends Model
         'has_lights' => 'boolean',
         'faces' => 'integer',
         'active' => 'boolean',
+        'is_rotating' => 'boolean',
         'blocked_from' => 'date:Y-m-d',
         'blocked_until' => 'date:Y-m-d',
     ];

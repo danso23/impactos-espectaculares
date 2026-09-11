@@ -21,7 +21,7 @@ class RentalPaymentSchedule
             throw new InvalidArgumentException('La fecha final no puede ser anterior a la fecha inicial.');
         }
 
-        if (!in_array($frequency, ['single', 'weekly', 'biweekly', 'monthly'], true)) {
+        if (!in_array($frequency, ['single', 'weekly', 'biweekly', 'monthly', 'annual'], true)) {
             throw new InvalidArgumentException('La frecuencia de pago no es válida.');
         }
 
@@ -53,6 +53,44 @@ class RentalPaymentSchedule
         }
 
         return $periods;
+    }
+
+    public function endDate(string $startsAt, string $frequency, int $renewals): string
+    {
+        $start = Carbon::parse($startsAt)->startOfDay();
+        $count = $frequency === 'single' ? 1 : $renewals;
+
+        if ($count < 1 || $count > self::MAX_INSTALLMENTS) {
+            throw new InvalidArgumentException('La cantidad de renovaciones debe estar entre 1 y 120.');
+        }
+
+        if (!in_array($frequency, ['single', 'weekly', 'biweekly', 'monthly', 'annual'], true)) {
+            throw new InvalidArgumentException('La frecuencia de pago no es válida.');
+        }
+
+        if ($frequency === 'single') return $start->format('Y-m-d');
+        if ($frequency === 'weekly') return $start->copy()->addWeeks($count)->subDay()->format('Y-m-d');
+        if ($frequency === 'biweekly') return $start->copy()->addDays($count * 14)->subDay()->format('Y-m-d');
+        if ($frequency === 'annual') return $start->copy()->addYearsNoOverflow($count)->subDay()->format('Y-m-d');
+
+        return $start->copy()->addMonthsNoOverflow($count)->subDay()->format('Y-m-d');
+    }
+
+    public function buildForRenewals(
+        string $startsAt,
+        string $firstPaymentDate,
+        string $frequency,
+        int $renewals
+    ): array {
+        $count = $frequency === 'single' ? 1 : $renewals;
+        $schedule = $this->build(
+            $startsAt,
+            $this->endDate($startsAt, $frequency, $count),
+            $firstPaymentDate,
+            $frequency
+        );
+
+        return array_slice($schedule, 0, $count);
     }
 
     public function createInvoices(Rental $rental, array $schedule): void
@@ -89,6 +127,10 @@ class RentalPaymentSchedule
             return $cursor->copy()->addDays(13)->min($end);
         }
 
+        if ($frequency === 'annual') {
+            return $anchor->copy()->addYearsNoOverflow($index + 1)->subDay()->min($end);
+        }
+
         return $anchor->copy()->addMonthsNoOverflow($index + 1)->subDay()->min($end);
     }
 
@@ -104,6 +146,10 @@ class RentalPaymentSchedule
 
         if ($frequency === 'monthly') {
             return $firstDueDate->copy()->addMonthsNoOverflow($index);
+        }
+
+        if ($frequency === 'annual') {
+            return $firstDueDate->copy()->addYearsNoOverflow($index);
         }
 
         return $firstDueDate->copy();

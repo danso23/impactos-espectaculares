@@ -69,6 +69,7 @@ function paymentFrequencyLabel(value?: string | null) {
   if (value === "weekly") return "Semanal"
   if (value === "biweekly") return "Quincenal"
   if (value === "monthly") return "Mensual"
+  if (value === "annual") return "Anual"
   return "Sin plan"
 }
 
@@ -141,6 +142,18 @@ export function useRentalTable({
             {statusLabel(row.original.status)}
           </span>
         ),
+      },
+      {
+        accessorKey: "is_rotating",
+        header: "Rotativa",
+        cell: ({ row }) => {
+          const rotating = row.original.is_rotating === true || row.original.is_rotating === 1 || row.original.is_rotating === "1"
+          return (
+            <span className={rotating ? "font-semibold text-violet-700" : "text-muted-foreground"}>
+              {rotating ? "Sí" : "No"}
+            </span>
+          )
+        },
       },
       {
         accessorKey: "payment_frequency",

@@ -1,13 +1,14 @@
 import * as React from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { ArrowLeft, FileDown, RefreshCw, Save, Trash2, ImagePlus, X } from "lucide-react"
+import { ArrowLeft, FileDown, RefreshCw, Save, Search, Trash2, ImagePlus, X } from "lucide-react"
 
 import {
   useCreateQuote,
   useQuoteCatalogs,
   useUpdateQuoteConfiguration,
 } from "@/lib/hooks/quoteHook"
+import { useSpaces } from "@/lib/hooks/spaceHook"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { previewQuote } from "@/lib/services/quoteService"
 import { Button } from "@/components/ui/button"
@@ -47,12 +48,14 @@ import type {
   QuotePreviewData,
   QuoteRecord,
 } from "@/types/Quote"
+import type { SpaceApi } from "@/types/Space"
 
 type QuoteLocationState = {
   spaces?: QuoteCreatePageSpaceSeed[]
 }
 
 const CURRENCY = "MXN"
+const ADVERTISEMENT_SERVICE_KEY = "anuncio"
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("es-MX", {
@@ -145,11 +148,11 @@ export default function QuoteCreatePage() {
   const [taxRate, setTaxRate] = React.useState(16)
   const [discountType, setDiscountType] = React.useState<QuoteAmountType>("none")
   const [discountValue, setDiscountValue] = React.useState(0)
-  const [commissionType, setCommissionType] = React.useState<QuoteAmountType>("none")
-  const [commissionValue, setCommissionValue] = React.useState(0)
   const [termsHtml, setTermsHtml] = React.useState("")
   const [notes, setNotes] = React.useState("")
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>("")
+  const [advertisementIdSearch, setAdvertisementIdSearch] = React.useState("")
+  const [debouncedAdvertisementId, setDebouncedAdvertisementId] = React.useState("")
   const [squareMeterPrice, setSquareMeterPrice] = React.useState(0)
   const [quoteImages, setQuoteImages] = React.useState<File[]>([])
   const [quoteImageUrls, setQuoteImageUrls] = React.useState<string[]>([])
@@ -173,6 +176,27 @@ export default function QuoteCreatePage() {
   const services = React.useMemo(() => catalogs?.services ?? [], [catalogs])
   const letterheads = React.useMemo(() => catalogs?.letterheads ?? [], [catalogs])
   const showRentalDates = React.useMemo(() => items.some((item) => item.item_type === "rental"), [items])
+  const selectedAdvertisementService = React.useMemo(
+    () => services.find(
+      (service) => service.id === Number(selectedServiceId) && service.key === ADVERTISEMENT_SERVICE_KEY,
+    ) ?? null,
+    [selectedServiceId, services],
+  )
+  const advertisementSearchQuery = useSpaces({
+    page: 1,
+    per_page: 10,
+    assigned_id: debouncedAdvertisementId,
+  }, Boolean(selectedAdvertisementService && debouncedAdvertisementId))
+  const advertisementMatches = advertisementSearchQuery.data?.data ?? []
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedAdvertisementId(advertisementIdSearch.trim()),
+      300,
+    )
+
+    return () => window.clearTimeout(timer)
+  }, [advertisementIdSearch])
 
   React.useEffect(() => {
     if (catalogs?.configuration?.price_per_square_meter === undefined) return
@@ -196,6 +220,11 @@ export default function QuoteCreatePage() {
   const companyLetterheads = React.useMemo(
     () => letterheads.filter((letterhead) => letterhead.company_id === companyId),
     [letterheads, companyId]
+  )
+
+  const selectedLetterhead = React.useMemo(
+    () => companyLetterheads.find((letterhead) => letterhead.id === letterheadId) ?? null,
+    [companyLetterheads, letterheadId]
   )
 
   const selectedAgency = React.useMemo(
@@ -235,8 +264,6 @@ export default function QuoteCreatePage() {
       taxRate,
       discountType,
       discountValue,
-      commissionType,
-      commissionValue,
       termsHtml,
       notes,
       items,
@@ -248,8 +275,6 @@ export default function QuoteCreatePage() {
     }),
     [
       agencyId,
-      commissionType,
-      commissionValue,
       companyId,
       customerType,
       discountType,
@@ -362,10 +387,6 @@ export default function QuoteCreatePage() {
         type: discountType,
         value: discountValue,
       },
-      commission: {
-        type: commissionType,
-        value: commissionValue,
-      },
       terms_html: termsHtml || null,
       notes: notes || null,
       items: items.map((item, index) => ({
@@ -380,8 +401,6 @@ export default function QuoteCreatePage() {
   }, [
     agencyId,
     companyId,
-    commissionType,
-    commissionValue,
     customerType,
     discountType,
     discountValue,
@@ -477,6 +496,34 @@ export default function QuoteCreatePage() {
     setSelectedServiceId("")
   }
 
+  const addAdvertisement = (service: QuoteCatalogService, advertisement: SpaceApi) => {
+    const assignedId = advertisement.assigned_id?.trim() || String(advertisement.id)
+    const width = toNumber(advertisement.width_m)
+    const height = toNumber(advertisement.height_m)
+    const squareMeters = width > 0 && height > 0 ? width * height : 1
+
+    setItems((prev) => [
+      ...prev,
+      {
+        item_type: "service",
+        service_id: service.id,
+        space_id: advertisement.id,
+        concept: `Anuncio ${assignedId}`,
+        description: advertisement.title,
+        qty: 1,
+        square_meters: squareMeters,
+        unit_price: squareMeterPrice || toNumber(service.base_price),
+        faces: toNumber(advertisement.faces) || null,
+        sort_order: prev.length,
+        discount_applies: false,
+        tax_rate: toNumber(service.tax_rate),
+      },
+    ])
+    setSelectedServiceId("")
+    setAdvertisementIdSearch("")
+    setDebouncedAdvertisementId("")
+  }
+
   const addManualService = () => {
     setItems((prev) => [
       ...prev,
@@ -536,15 +583,11 @@ export default function QuoteCreatePage() {
     if (!nextAgency) {
       setDiscountType("none")
       setDiscountValue(0)
-      setCommissionType("none")
-      setCommissionValue(0)
       return
     }
 
     setDiscountType(nextAgency.discount_type)
     setDiscountValue(toNumber(nextAgency.discount_value))
-    setCommissionType(nextAgency.commission_type)
-    setCommissionValue(toNumber(nextAgency.commission_value))
   }
 
   const handleSaveSquareMeterPrice = async () => {
@@ -585,32 +628,37 @@ export default function QuoteCreatePage() {
     }
   }
 
-  const handleDownloadPdf = () => {
-    if (savedQuote) {
-      downloadQuotePdf(savedQuote, `${savedQuote.folio}.pdf`)
-      return
-    }
+  const handleDownloadPdf = async () => {
+    try {
+      if (savedQuote) {
+        await downloadQuotePdf(savedQuote, `${savedQuote.folio}.pdf`)
+        return
+      }
 
-    if (!preview) {
-      toast.error("Genera primero la vista previa para descargar el PDF.")
-      return
-    }
+      if (!preview) {
+        toast.error("Genera primero la vista previa para descargar el PDF.")
+        return
+      }
 
-    downloadQuotePdf(
-      {
-        quote_kind: quoteKind,
-        customer: preview.customer,
-        company: preview.company,
-        agency: preview.agency,
-        items: preview.items,
-        totals: preview.totals,
-        notes: notes || null,
-        terms_html: preview.resolved.terms_html ?? termsHtml ?? null,
-        includes_tax: preview.resolved.includes_tax,
-        valid_until: validUntil || null,
-      },
-      "cotizacion-preliminar.pdf"
-    )
+      await downloadQuotePdf(
+        {
+          quote_kind: quoteKind,
+          customer: preview.customer,
+          company: preview.company,
+          letterhead: selectedLetterhead ?? preview.letterhead,
+          agency: preview.agency,
+          items: preview.items,
+          totals: preview.totals,
+          notes: notes || null,
+          terms_html: preview.resolved.terms_html ?? termsHtml ?? null,
+          includes_tax: preview.resolved.includes_tax,
+          valid_until: validUntil || null,
+        },
+        "cotizacion-preliminar.pdf"
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible generar el PDF.")
+    }
   }
 
   const localSubtotal = React.useMemo(
@@ -786,35 +834,6 @@ export default function QuoteCreatePage() {
                 </div>
               </QuoteField>
 
-              <QuoteField label="Comisión">
-                <div className="grid grid-cols-[140px_1fr] gap-2">
-                  <Select
-                    value={commissionType}
-                    onValueChange={(value) => {
-                      if (!isQuoteAmountType(value)) return
-                      setCommissionType(value)
-                      if (value === "none") {
-                        setCommissionValue(0)
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin comisión</SelectItem>
-                      <SelectItem value="percent">Porcentaje</SelectItem>
-                      <SelectItem value="fixed">Monto fijo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <NumericInput
-                    disabled={commissionType === "none"}
-                    value={commissionValue}
-                    onValueChange={setCommissionValue}
-                  />
-                </div>
-              </QuoteField>
-
               <div className="md:col-span-2">
                 <div className="rounded-lg border bg-muted/20 p-4">
                   <div className="mb-3">
@@ -857,7 +876,7 @@ export default function QuoteCreatePage() {
                   onValueChange={(value) => {
                     setSelectedServiceId(value)
                     const service = services.find((entry) => entry.id === Number(value))
-                    if (service) addService(service)
+                    if (service && service.key !== ADVERTISEMENT_SERVICE_KEY) addService(service)
                   }}
                 >
                   <SelectTrigger className="md:max-w-sm">
@@ -876,6 +895,57 @@ export default function QuoteCreatePage() {
                   Agregar servicio libre
                 </Button>
               </div>
+
+              {selectedAdvertisementService ? (
+                <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50/50 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-sky-950">Seleccionar anuncio</h3>
+                    <p className="text-xs text-sky-800">
+                      Busca el ID asignado manualmente al anuncio, no el ID interno del sistema.
+                    </p>
+                  </div>
+
+                  <div className="relative max-w-md">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      className="bg-white pl-9"
+                      value={advertisementIdSearch}
+                      onChange={(event) => setAdvertisementIdSearch(event.target.value)}
+                      placeholder="Ej. AN-001"
+                    />
+                  </div>
+
+                  {debouncedAdvertisementId ? (
+                    <div className="max-h-56 space-y-2 overflow-y-auto">
+                      {advertisementSearchQuery.isFetching ? (
+                        <p className="text-sm text-muted-foreground">Buscando anuncios...</p>
+                      ) : advertisementMatches.length ? (
+                        advertisementMatches.map((advertisement) => (
+                          <button
+                            key={advertisement.id}
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-sky-100 bg-white px-3 py-2 text-left transition-colors hover:border-sky-300 hover:bg-sky-50"
+                            onClick={() => addAdvertisement(selectedAdvertisementService, advertisement)}
+                          >
+                            <span>
+                              <span className="block text-sm font-semibold text-slate-900">
+                                ID {advertisement.assigned_id || "sin ID asignado"}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">{advertisement.title}</span>
+                            </span>
+                            <span className="text-xs font-medium text-sky-700">Agregar</span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No se encontró un anuncio con ese ID.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="overflow-x-auto">
                 <table className={`w-full text-sm ${showRentalDates ? "min-w-[1040px]" : "min-w-[920px]"}`}>
@@ -1092,10 +1162,6 @@ export default function QuoteCreatePage() {
                 <span>IVA</span>
                 <span>{formatCurrency(preview?.totals.tax ?? 0)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Comisión agencia</span>
-                <span>{formatCurrency(preview?.totals.commission_amount ?? 0)}</span>
-              </div>
               <div className="flex justify-between border-t pt-3 text-base font-semibold">
                 <span>Total</span>
                 <span>{formatCurrency(preview?.totals.total ?? 0)}</span>
@@ -1116,6 +1182,7 @@ export default function QuoteCreatePage() {
               <div className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
                 <div>Cliente: {customerDisplayName}</div>
                 <div>Empresa: {selectedCompany?.name ?? "Pendiente"}</div>
+                <div>Membretado: {selectedLetterhead?.name ?? "Sin membrete"}</div>
                 <div>Agencia: {selectedAgency?.name ?? "Sin agencia"}</div>
               </div>
 
@@ -1123,7 +1190,7 @@ export default function QuoteCreatePage() {
                 <Button
                   variant="outline"
                   onClick={handleDownloadPdf}
-                  disabled={!preview && !savedQuote}
+                  disabled={(!preview && !savedQuote) || isPreviewLoading}
                 >
                   <FileDown className="mr-2 h-4 w-4" />
                   Descargar cotización PDF

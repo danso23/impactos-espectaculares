@@ -21,6 +21,8 @@ export type QuoteCatalogLetterhead = {
   name: string
   code?: string | null
   template_key: string
+  primary_color?: string | null
+  secondary_color?: string | null
   is_default: boolean
 }
 
@@ -82,6 +84,7 @@ export type QuoteImage = {
 export type QuoteRentalSummary = {
   id: number
   status: string
+  is_rotating?: boolean
   starts_at?: string | null
   ends_at?: string | null
   total: number
@@ -147,10 +150,6 @@ export type QuotePayload = {
     type: QuoteAmountType
     value: number
   }
-  commission: {
-    type: QuoteAmountType
-    value: number
-  }
   terms_html?: string | null
   notes?: string | null
   items: QuoteItemInput[]
@@ -196,10 +195,6 @@ export type QuotePreviewData = {
     includes_tax: boolean
     tax_rate: number
     discount: {
-      type: QuoteAmountType
-      value: number
-    }
-    commission: {
       type: QuoteAmountType
       value: number
     }
@@ -270,11 +265,16 @@ export type QuoteConvertToRentalPayload = {
   } | null
   rental: {
     starts_at: string
-    ends_at: string
+    is_rotating: boolean
   }
   payment: {
     frequency: import("@/types/Rental").PaymentFrequency
     first_payment_date: string
+    renewals: number
+  }
+  commission: {
+    type: QuoteAmountType
+    value: number
   }
 }
 

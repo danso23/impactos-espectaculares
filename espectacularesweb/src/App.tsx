@@ -43,6 +43,8 @@ import ProviderPage from "@/pages/providers/providerPage";
 import RentalPage from "@/pages/rentals/rentalPage";
 import PaymentPage from "@/pages/payments/paymentPage";
 import PublicCatalogPage from "@/pages/public/PublicCatalogPage";
+import ServicePage from "@/pages/services/servicePage";
+import CollaboratorPage from "@/pages/collaborators/collaboratorPage";
 
 type NavItem = {
   to: string;
@@ -296,10 +298,10 @@ export default function AppRoot() {
           <Route path="clientes" element={<PermissionRoute permission="clients.view"><ClientsPage /></PermissionRoute>} />
           <Route path="proveedores" element={<PermissionRoute permission="providers.view"><ProviderPage /></PermissionRoute>} />
           <Route path="caseros" element={<PermissionRoute permission="caseros.view"><CaseroPage /></PermissionRoute>} />
-          <Route path="servicios" element={<PermissionRoute permission="services.view"><RouteStub title="Servicios" badge="Catálogo de servicios" icon={Settings} /></PermissionRoute>} />
+          <Route path="servicios" element={<PermissionRoute permission="services.view"><ServicePage /></PermissionRoute>} />
           <Route
             path="colaboradores"
-            element={<PermissionRoute permission="collaborators.view"><RouteStub title="Colaboradores" badge="Control de colaboradores" icon={Users} /></PermissionRoute>}
+            element={<PermissionRoute permission="collaborators.view"><CollaboratorPage /></PermissionRoute>}
           />
           <Route path="sin-acceso" element={<PermissionRoute permission="__none__"><span /></PermissionRoute>} />
           <Route path="*" element={<RouteStub title="No encontrado" />} />

@@ -6,6 +6,13 @@ import { DataTable } from "@/components/generic/data-table"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -56,6 +63,7 @@ function paymentFrequencyLabel(value?: string | null) {
   if (value === "weekly") return "Semanal"
   if (value === "biweekly") return "Quincenal"
   if (value === "monthly") return "Mensual"
+  if (value === "annual") return "Anual"
   return "Sin plan definido"
 }
 
@@ -77,6 +85,7 @@ export default function RentalPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
+  const [rotatingFilter, setRotatingFilter] = React.useState("all")
   const perPage = 10
 
   const [editRecord, setEditRecord] = React.useState<RentalRecord | null>(null)
@@ -100,8 +109,9 @@ export default function RentalPage() {
       page,
       per_page: perPage,
       q: search || undefined,
+      is_rotating: rotatingFilter === "all" ? undefined : rotatingFilter,
     }),
-    [page, perPage, search]
+    [page, perPage, rotatingFilter, search]
   )
 
   const rentalsQuery = useRentals(params)
@@ -253,8 +263,24 @@ export default function RentalPage() {
               </CardDescription>
             </div>
 
-            <div className="w-full lg:max-w-md">
-              <div className="relative">
+            <div className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl">
+              <Select
+                value={rotatingFilter}
+                onValueChange={(value) => {
+                  setRotatingFilter(value)
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger className="sm:w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="1">Rotativas</SelectItem>
+                  <SelectItem value="0">No rotativas</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={searchInput}
@@ -301,7 +327,7 @@ export default function RentalPage() {
 
           {paymentPlanRecord ? (
             <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-3">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <CalendarDays className="h-4 w-4 text-violet-600" />
@@ -323,6 +349,10 @@ export default function RentalPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">Total contratado</div>
                   <div className="mt-2 text-lg font-bold">{formatCurrency(paymentPlanRecord.total)}</div>
+                </div>
+                <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3">
+                  <div className="text-xs text-muted-foreground">Comisión de la renta</div>
+                  <div className="mt-2 text-lg font-bold">{formatCurrency(paymentPlanRecord.commission_amount)}</div>
                 </div>
               </div>
 

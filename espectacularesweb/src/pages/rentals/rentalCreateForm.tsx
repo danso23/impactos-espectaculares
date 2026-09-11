@@ -25,10 +25,13 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { buildRentalPaymentSchedule } from "@/lib/helpers/rentalPaymentSchedule"
+import {
+  buildRentalPaymentSchedule,
+  calculateRentalEndDate,
+} from "@/lib/helpers/rentalPaymentSchedule"
 import { useQuoteCatalogs } from "@/lib/hooks/quoteHook"
 import { useSpaces } from "@/lib/hooks/spaceHook"
-import type { CustomerType, QuoteCustomer } from "@/types/Quote"
+import type { CustomerType, QuoteAmountType, QuoteCustomer } from "@/types/Quote"
 import type { PaymentFrequency, RentalCreatePayload } from "@/types/Rental"
 
 const EMPTY_AGENCY = "__none__"
@@ -68,6 +71,7 @@ const PAYMENT_FREQUENCIES: Array<{ value: PaymentFrequency; label: string }> = [
   { value: "weekly", label: "Semanal" },
   { value: "biweekly", label: "Quincenal" },
   { value: "monthly", label: "Mensual" },
+  { value: "annual", label: "Anual" },
 ]
 
 export function RentalCreateForm({
@@ -83,10 +87,13 @@ export function RentalCreateForm({
   const [companyId, setCompanyId] = React.useState("")
   const [agencyId, setAgencyId] = React.useState(EMPTY_AGENCY)
   const [status, setStatus] = React.useState<"draft" | "active">("draft")
+  const [isRotating, setIsRotating] = React.useState(false)
   const [startsAt, setStartsAt] = React.useState("")
-  const [endsAt, setEndsAt] = React.useState("")
   const [frequency, setFrequency] = React.useState<PaymentFrequency>("monthly")
+  const [renewalCount, setRenewalCount] = React.useState(1)
   const [firstPaymentDate, setFirstPaymentDate] = React.useState("")
+  const [commissionType, setCommissionType] = React.useState<QuoteAmountType>("none")
+  const [commissionValue, setCommissionValue] = React.useState(0)
   const [includesTax, setIncludesTax] = React.useState(true)
   const [taxRate, setTaxRate] = React.useState(16)
   const [notes, setNotes] = React.useState("")
@@ -104,13 +111,23 @@ export function RentalCreateForm({
   )
   const tax = includesTax ? subtotal * (taxRate / 100) : 0
   const total = subtotal + tax
+  const commissionAmount = commissionType === "percent"
+    ? subtotal * (commissionValue / 100)
+    : commissionType === "fixed"
+      ? Math.min(commissionValue, subtotal)
+      : 0
+  const normalizedRenewalCount = frequency === "single" ? 1 : renewalCount
+  const endsAt = React.useMemo(
+    () => calculateRentalEndDate(startsAt, frequency, normalizedRenewalCount),
+    [frequency, normalizedRenewalCount, startsAt],
+  )
   const schedule = React.useMemo(() => buildRentalPaymentSchedule({
     startsAt,
-    endsAt,
     firstPaymentDate,
     frequency,
+    renewalCount: normalizedRenewalCount,
     total,
-  }), [endsAt, firstPaymentDate, frequency, startsAt, total])
+  }), [firstPaymentDate, frequency, normalizedRenewalCount, startsAt, total])
 
   React.useEffect(() => {
     if (!open) return
@@ -119,10 +136,13 @@ export function RentalCreateForm({
     setCompanyId(catalogs?.companies[0] ? String(catalogs.companies[0].id) : "")
     setAgencyId(EMPTY_AGENCY)
     setStatus("draft")
+    setIsRotating(false)
     setStartsAt("")
-    setEndsAt("")
     setFrequency("monthly")
+    setRenewalCount(1)
     setFirstPaymentDate("")
+    setCommissionType("none")
+    setCommissionValue(0)
     setIncludesTax(true)
     setTaxRate(16)
     setNotes("")
@@ -145,8 +165,8 @@ export function RentalCreateForm({
       toast.error("Selecciona la empresa emisora.")
       return
     }
-    if (!startsAt || !endsAt || endsAt < startsAt) {
-      toast.error("Define una vigencia válida.")
+    if (!startsAt || !endsAt || normalizedRenewalCount < 1 || normalizedRenewalCount > 120) {
+      toast.error("Define la fecha de inicio y una cantidad válida de renovaciones.")
       return
     }
     if (!firstPaymentDate || schedule.length === 0) {
@@ -168,14 +188,19 @@ export function RentalCreateForm({
         issuer_company_id: Number(companyId),
         agency_id: agencyId === EMPTY_AGENCY ? null : Number(agencyId),
         status,
+        is_rotating: isRotating,
         starts_at: startsAt,
-        ends_at: endsAt,
         includes_tax: includesTax,
         tax_rate: includesTax ? taxRate : 0,
         notes: notes || null,
         payment: {
           frequency,
           first_payment_date: firstPaymentDate,
+          renewals: normalizedRenewalCount,
+        },
+        commission: {
+          type: commissionType,
+          value: commissionValue,
         },
         items: items.map((item) => ({
           space_id: Number(item.spaceId),
@@ -237,7 +262,15 @@ export function RentalCreateForm({
 
               <div className="space-y-2">
                 <Label>Agencia</Label>
-                <Select value={agencyId} onValueChange={setAgencyId}>
+                <Select
+                  value={agencyId}
+                  onValueChange={(value) => {
+                    setAgencyId(value)
+                    const agency = catalogs?.agencies.find((candidate) => String(candidate.id) === value)
+                    setCommissionType(agency?.commission_type ?? "none")
+                    setCommissionValue(Number(agency?.commission_value ?? 0))
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={EMPTY_AGENCY}>Sin agencia</SelectItem>
@@ -257,6 +290,18 @@ export function RentalCreateForm({
                     <SelectItem value="active">Confirmar al crear</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 md:col-span-2 lg:col-span-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Renta rotativa</p>
+                  <p className="text-xs text-muted-foreground">Clasificación interna para casos especiales.</p>
+                </div>
+                <Switch
+                  checked={isRotating}
+                  onCheckedChange={setIsRotating}
+                  aria-label="Marcar renta como rotativa"
+                />
               </div>
             </CardContent>
           </Card>
@@ -282,8 +327,19 @@ export function RentalCreateForm({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Fin</Label>
-                  <Input type="date" min={startsAt || undefined} value={endsAt} onChange={(event) => setEndsAt(event.target.value)} />
+                  <Label>Renovaciones</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={120}
+                    step={1}
+                    disabled={frequency === "single"}
+                    value={normalizedRenewalCount}
+                    onChange={(event) => setRenewalCount(Math.min(120, Math.max(1, Math.trunc(Number(event.target.value)) || 1)))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {endsAt ? `Vigencia calculada hasta ${formatDate(endsAt)}.` : "Se calcula según la frecuencia."}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -298,7 +354,14 @@ export function RentalCreateForm({
               <CardContent className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Frecuencia</Label>
-                  <Select value={frequency} onValueChange={(value) => setFrequency(value as PaymentFrequency)}>
+                  <Select
+                    value={frequency}
+                    onValueChange={(value) => {
+                      const nextFrequency = value as PaymentFrequency
+                      setFrequency(nextFrequency)
+                      if (nextFrequency === "single") setRenewalCount(1)
+                    }}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {PAYMENT_FREQUENCIES.map((option) => (
@@ -310,6 +373,36 @@ export function RentalCreateForm({
                 <div className="space-y-2">
                   <Label>Primer vencimiento</Label>
                   <Input type="date" value={firstPaymentDate} onChange={(event) => setFirstPaymentDate(event.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Comisión</Label>
+                  <Select
+                    value={commissionType}
+                    onValueChange={(value) => {
+                      const type = value as QuoteAmountType
+                      setCommissionType(type)
+                      if (type === "none") setCommissionValue(0)
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin comisión</SelectItem>
+                      <SelectItem value="percent">Porcentaje</SelectItem>
+                      <SelectItem value="fixed">Monto fijo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor de comisión</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    disabled={commissionType === "none"}
+                    value={commissionValue}
+                    onChange={(event) => setCommissionValue(Math.max(0, Number(event.target.value)))}
+                  />
+                  <p className="text-xs text-muted-foreground">Comisión calculada: {formatCurrency(commissionAmount)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -402,6 +495,7 @@ export function RentalCreateForm({
                 <div className="space-y-2 border-t border-slate-100 pt-3 text-sm">
                   <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
                   <div className="flex justify-between"><span>IVA</span><span>{formatCurrency(tax)}</span></div>
+                  <div className="flex justify-between"><span>Comisión</span><span>{formatCurrency(commissionAmount)}</span></div>
                   <div className="flex justify-between text-base font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
                 </div>
               </CardContent>

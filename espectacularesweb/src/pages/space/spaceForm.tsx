@@ -52,6 +52,7 @@ type SpaceFormProps = {
 
 const baseForm: SpaceFormValues = {
   active: true,
+  is_rotating: false,
   blocked_from: "",
   blocked_until: "",
   faces: undefined,
@@ -421,6 +422,19 @@ export function SpaceForm({
                     aria-label="Disponibilidad comercial del espacio"
                   />
                 </div>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 sm:col-span-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Espacio rotativo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Marca esta opción para identificar y filtrar casos internos especiales.
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(form.is_rotating)}
+                  onCheckedChange={(value) => setField("is_rotating", value)}
+                  aria-label="Marcar espacio como rotativo"
+                />
               </div>
               {form.active === false ? (
                 <div className="grid gap-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4 sm:col-span-2 sm:grid-cols-2">

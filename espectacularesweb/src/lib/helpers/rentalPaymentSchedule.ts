@@ -35,6 +35,31 @@ function addMonthsNoOverflow(value: Date, months: number) {
   ))
 }
 
+function addYearsNoOverflow(value: Date, years: number) {
+  const targetYear = value.getUTCFullYear() + years
+  const month = value.getUTCMonth()
+  const lastDay = new Date(Date.UTC(targetYear, month + 1, 0)).getUTCDate()
+
+  return new Date(Date.UTC(targetYear, month, Math.min(value.getUTCDate(), lastDay)))
+}
+
+export function calculateRentalEndDate(
+  startsAt: string,
+  frequency: PaymentFrequency,
+  renewalCount: number,
+) {
+  if (!startsAt) return ""
+  const start = parseDate(startsAt)
+  if (Number.isNaN(start.getTime())) return ""
+  if (frequency === "single") return startsAt
+
+  const count = Math.min(120, Math.max(1, Math.trunc(renewalCount)))
+  if (frequency === "weekly") return formatDate(addDays(start, count * 7 - 1))
+  if (frequency === "biweekly") return formatDate(addDays(start, count * 14 - 1))
+  if (frequency === "annual") return formatDate(addDays(addYearsNoOverflow(start, count), -1))
+  return formatDate(addDays(addMonthsNoOverflow(start, count), -1))
+}
+
 function splitAmount(amount: number, parts: number) {
   const totalCents = Math.round(amount * 100)
   const base = Math.floor(totalCents / parts)
@@ -47,17 +72,21 @@ function splitAmount(amount: number, parts: number) {
 
 export function buildRentalPaymentSchedule({
   startsAt,
-  endsAt,
   firstPaymentDate,
   frequency,
+  renewalCount,
   total,
 }: {
   startsAt: string
-  endsAt: string
   firstPaymentDate: string
   frequency: PaymentFrequency
+  renewalCount: number
   total: number
 }): PaymentScheduleRow[] {
+  const normalizedRenewalCount = frequency === "single"
+    ? 1
+    : Math.min(120, Math.max(1, Math.trunc(renewalCount)))
+  const endsAt = calculateRentalEndDate(startsAt, frequency, normalizedRenewalCount)
   if (!startsAt || !endsAt || !firstPaymentDate) return []
 
   const start = parseDate(startsAt)
@@ -69,7 +98,7 @@ export function buildRentalPaymentSchedule({
   let cursor = start
   let index = 0
 
-  while (cursor <= end && periods.length < 120) {
+  while (cursor <= end && periods.length < normalizedRenewalCount) {
     let periodEnd: Date
     let dueDate: Date
 
@@ -82,6 +111,9 @@ export function buildRentalPaymentSchedule({
     } else if (frequency === "biweekly") {
       periodEnd = addDays(cursor, 13)
       dueDate = addDays(firstDueDate, index * 14)
+    } else if (frequency === "annual") {
+      periodEnd = addDays(addYearsNoOverflow(start, index + 1), -1)
+      dueDate = addYearsNoOverflow(firstDueDate, index)
     } else {
       periodEnd = addDays(addMonthsNoOverflow(start, index + 1), -1)
       dueDate = addMonthsNoOverflow(firstDueDate, index)

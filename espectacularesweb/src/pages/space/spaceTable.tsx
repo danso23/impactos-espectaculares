@@ -231,6 +231,15 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         ),
       },
       {
+        accessorKey: "is_rotating",
+        header: "Rotativo",
+        cell: ({ row }) => (
+          <span className={row.original.is_rotating ? "font-semibold text-violet-700" : "text-muted-foreground"}>
+            {row.original.is_rotating ? "Sí" : "No"}
+          </span>
+        ),
+      },
+      {
         accessorKey: "price",
         header: ({ column }) => (
           <Button

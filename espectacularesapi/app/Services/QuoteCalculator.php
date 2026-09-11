@@ -15,10 +15,6 @@ class QuoteCalculator
         $discountType = $payload['discount']['type'] ?? ($agency->discount_type ?? 'none');
         $discountValue = $this->toFloat($payload['discount']['value'] ?? ($agency->discount_value ?? 0));
 
-        $commissionType = $payload['commission']['type'] ?? ($agency->commission_type ?? 'none');
-        $commissionValue = $this->toFloat($payload['commission']['value'] ?? ($agency->commission_value ?? 0));
-        $commissionAppliesTo = $agency->commission_applies_to ?? 'subtotal_after_discount';
-
         $items = [];
         $rentalsSubtotal = 0.0;
         $servicesSubtotal = 0.0;
@@ -77,16 +73,10 @@ class QuoteCalculator
 
         $tax = 0.0;
         $postDiscountSubtotal = 0.0;
-        $discountAllocatedToRentals = 0.0;
-
         foreach ($items as $index => $item) {
             $taxableBase = round(max(0, $item['subtotal'] - $item['discount_allocated']), 2);
             $taxAmount = $includesTax ? round($taxableBase * ($item['tax_rate'] / 100), 2) : 0.0;
             $total = round($taxableBase + $taxAmount, 2);
-
-            if ($item['item_type'] === 'rental') {
-                $discountAllocatedToRentals += $item['discount_allocated'];
-            }
 
             $items[$index]['tax_amount'] = $taxAmount;
             $items[$index]['total'] = $total;
@@ -97,11 +87,6 @@ class QuoteCalculator
 
         $subtotal = round($rentalsSubtotal + $servicesSubtotal, 2);
 
-        $commissionBase = $commissionAppliesTo === 'rentals_only'
-            ? round(max(0, $rentalsSubtotal - $discountAllocatedToRentals), 2)
-            : round(max(0, $postDiscountSubtotal), 2);
-
-        $commissionAmount = $this->calculateAmount($commissionType, $commissionValue, $commissionBase);
         $total = round($postDiscountSubtotal + $tax, 2);
 
         return [
@@ -114,10 +99,12 @@ class QuoteCalculator
                 'discount_type' => $discountType,
                 'discount_value' => round($discountValue, 2),
                 'discount_amount' => round($discountAmount, 2),
-                'commission_base' => round($commissionBase, 2),
-                'commission_type' => $commissionType,
-                'commission_value' => round($commissionValue, 2),
-                'commission_amount' => round($commissionAmount, 2),
+                // Se conservan las llaves por compatibilidad con cotizaciones
+                // existentes, pero la comisión se define únicamente en la renta.
+                'commission_base' => 0.0,
+                'commission_type' => 'none',
+                'commission_value' => 0.0,
+                'commission_amount' => 0.0,
                 'tax' => round($tax, 2),
                 'total' => round($total, 2),
             ],
@@ -127,10 +114,6 @@ class QuoteCalculator
                 'discount' => [
                     'type' => $discountType,
                     'value' => round($discountValue, 2),
-                ],
-                'commission' => [
-                    'type' => $commissionType,
-                    'value' => round($commissionValue, 2),
                 ],
                 'terms_html' => $payload['terms_html'] ?? ($company->default_terms_html ?? null),
             ],
