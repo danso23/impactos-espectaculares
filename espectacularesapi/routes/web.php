@@ -21,6 +21,12 @@ $router->post('/password/reset', 'AuthController@resetPassword');
 
 $router->post('/auth/refresh', 'AuthController@refresh');
 
+// Rutas explícitas para Apache/cPanel, donde el directorio estático puede ser
+// redirigido al front controller de Lumen.
+$router->get('/api-docs', 'ApiDocumentationController@index');
+$router->get('/api-docs/', 'ApiDocumentationController@index');
+$router->get('/api-docs/openapi.json', 'ApiDocumentationController@spec');
+
 $router->group(['prefix' => 'api'], function () use ($router) {
 
     $router->post('login', ['uses' => 'AuthController@login']);

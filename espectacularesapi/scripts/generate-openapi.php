@@ -37,6 +37,9 @@ foreach ($lines as $line) {
     $route = '/' . ltrim($routeMatch[2], '/');
     $path = $insideApiGroup ? '/api' . $route : $route;
     $path = $path === '//' ? '/' : $path;
+    if (str_starts_with($path, '/api-docs')) {
+        continue;
+    }
     preg_match("/'uses'\\s*=>\\s*'([^']+)'/", $line, $controllerMatch);
     $controllerAction = $controllerMatch[1] ?? null;
     $controller = $controllerAction ? explode('@', $controllerAction)[0] : 'General';
