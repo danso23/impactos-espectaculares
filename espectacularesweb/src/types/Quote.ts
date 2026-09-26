@@ -124,6 +124,8 @@ export type QuoteItemInput = {
   start_date?: string | null
   end_date?: string | null
   qty: number
+  width_m?: number | null
+  height_m?: number | null
   square_meters?: number
   unit_price: number
   faces?: number | null

@@ -23,7 +23,11 @@ class QuoteCalculator
         foreach (($payload['items'] ?? []) as $index => $item) {
             $itemType = $item['item_type'] ?? 'rental';
             $qty = max(1, (int)($item['qty'] ?? 1));
-            $squareMeters = max(0.01, $this->toFloat($item['square_meters'] ?? 1));
+            $width = isset($item['width_m']) ? max(0.01, $this->toFloat($item['width_m'])) : null;
+            $height = isset($item['height_m']) ? max(0.01, $this->toFloat($item['height_m'])) : null;
+            $squareMeters = $itemType === 'service' && $width !== null && $height !== null
+                ? round($width * $height, 2)
+                : max(0.01, $this->toFloat($item['square_meters'] ?? 1));
             $unitPrice = $this->toFloat($item['unit_price'] ?? 0);
             $lineMultiplier = $itemType === 'service' ? $qty * $squareMeters : $qty;
             $subtotal = round($lineMultiplier * $unitPrice, 2);
@@ -41,6 +45,8 @@ class QuoteCalculator
                 'start_date' => $item['start_date'] ?? null,
                 'end_date' => $item['end_date'] ?? null,
                 'qty' => $qty,
+                'width_m' => $itemType === 'service' ? $width : null,
+                'height_m' => $itemType === 'service' ? $height : null,
                 'unit_price' => $unitPrice,
                 'subtotal' => $subtotal,
                 'faces' => isset($item['faces']) ? (int)$item['faces'] : null,

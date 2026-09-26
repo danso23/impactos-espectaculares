@@ -98,7 +98,7 @@ function normalizeSpaceSeed(space: QuoteCreatePageSpaceSeed, index: number): Quo
 
 function calculateItemSubtotal(item: QuoteItemInput) {
   const quantity = Math.max(1, item.qty)
-  const squareMeters = Math.max(0.01, toNumber(item.square_meters ?? 1))
+  const squareMeters = calculateSquareMeters(item)
   const unitPrice = toNumber(item.unit_price)
 
   if (item.item_type === "service") {
@@ -106,6 +106,17 @@ function calculateItemSubtotal(item: QuoteItemInput) {
   }
 
   return quantity * unitPrice
+}
+
+function calculateSquareMeters(item: QuoteItemInput) {
+  const width = toNumber(item.width_m)
+  const height = toNumber(item.height_m)
+
+  if (item.item_type === "service" && width > 0 && height > 0) {
+    return Math.round(width * height * 100) / 100
+  }
+
+  return Math.max(0.01, toNumber(item.square_meters ?? 1))
 }
 
 function isQuoteAmountType(value: string): value is QuoteAmountType {
@@ -392,7 +403,9 @@ export default function QuoteCreatePage() {
       items: items.map((item, index) => ({
         ...item,
         qty: Math.max(1, item.qty),
-        square_meters: Math.max(0.01, toNumber(item.square_meters ?? 1)),
+        width_m: item.item_type === "service" ? Math.max(0.01, toNumber(item.width_m ?? 1)) : null,
+        height_m: item.item_type === "service" ? Math.max(0.01, toNumber(item.height_m ?? 1)) : null,
+        square_meters: calculateSquareMeters(item),
         unit_price: toNumber(item.unit_price),
         tax_rate: toNumber(item.tax_rate ?? taxRate),
         sort_order: index,
@@ -477,6 +490,24 @@ export default function QuoteCreatePage() {
     setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
   }
 
+  const updateServiceDimension = (index: number, dimension: "width_m" | "height_m", value: number) => {
+    setItems((prev) =>
+      prev.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+
+        const nextItem = {
+          ...item,
+          [dimension]: Math.max(0.01, value),
+        }
+
+        return {
+          ...nextItem,
+          square_meters: calculateSquareMeters(nextItem),
+        }
+      })
+    )
+  }
+
   const addService = (service: QuoteCatalogService) => {
     setItems((prev) => [
       ...prev,
@@ -486,6 +517,8 @@ export default function QuoteCreatePage() {
         concept: service.name,
         description: service.description ?? null,
         qty: 1,
+        width_m: 1,
+        height_m: 1,
         square_meters: 1,
         unit_price: squareMeterPrice,
         sort_order: prev.length,
@@ -511,6 +544,8 @@ export default function QuoteCreatePage() {
         concept: `Anuncio ${assignedId}`,
         description: advertisement.title,
         qty: 1,
+        width_m: width > 0 ? width : 1,
+        height_m: height > 0 ? height : 1,
         square_meters: squareMeters,
         unit_price: squareMeterPrice || toNumber(service.base_price),
         faces: toNumber(advertisement.faces) || null,
@@ -532,6 +567,8 @@ export default function QuoteCreatePage() {
         concept: "",
         description: null,
         qty: 1,
+        width_m: 1,
+        height_m: 1,
         square_meters: 1,
         unit_price: squareMeterPrice,
         sort_order: prev.length,
@@ -948,14 +985,16 @@ export default function QuoteCreatePage() {
               ) : null}
 
               <div className="overflow-x-auto">
-                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1040px]" : "min-w-[920px]"}`}>
+                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1240px]" : "min-w-[1080px]"}`}>
                   <thead className="border-b text-muted-foreground">
                     <tr>
                       <th className="py-3 text-left">Tipo</th>
                       <th className="text-left">Concepto</th>
                       {showRentalDates ? <th className="text-left">Desde</th> : null}
                       {showRentalDates ? <th className="text-left">Hasta</th> : null}
-                      <th className="text-left">Metros cuadrados</th>
+                      <th className="text-left">Ancho (m)</th>
+                      <th className="text-left">Altura (m)</th>
+                      <th className="text-right">Total m²</th>
                       <th className="text-left">Precio / m2</th>
                       <th className="text-right">Subtotal</th>
                       <th className="text-right">Acciones</th>
@@ -1015,14 +1054,25 @@ export default function QuoteCreatePage() {
                           <td className="py-4">
                             {item.item_type === "service" ? (
                               <NumericInput
-                                value={item.square_meters ?? 1}
-                                onValueChange={(value) =>
-                                  updateItem(index, { square_meters: Math.max(0.01, value) })
-                                }
+                                value={item.width_m ?? 1}
+                                onValueChange={(value) => updateServiceDimension(index, "width_m", value)}
                               />
                             ) : (
                               <div className="py-2 text-center text-muted-foreground">—</div>
                             )}
+                          </td>
+                          <td className="py-4">
+                            {item.item_type === "service" ? (
+                              <NumericInput
+                                value={item.height_m ?? 1}
+                                onValueChange={(value) => updateServiceDimension(index, "height_m", value)}
+                              />
+                            ) : (
+                              <div className="py-2 text-center text-muted-foreground">—</div>
+                            )}
+                          </td>
+                          <td className="py-4 text-right font-medium">
+                            {item.item_type === "service" ? calculateSquareMeters(item).toFixed(2) : "—"}
                           </td>
                           <td className="py-4">
                             <NumericInput
