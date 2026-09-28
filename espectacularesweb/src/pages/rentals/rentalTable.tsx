@@ -131,6 +131,11 @@ export function useRentalTable({
         cell: ({ row }) => formatCustomerType(row.original.customer_type),
       },
       {
+        accessorKey: "manual_invoice_id",
+        header: "ID factura",
+        cell: ({ row }) => row.original.manual_invoice_id || "—",
+      },
+      {
         accessorKey: "status",
         header: "Estatus",
         cell: ({ row }) => (

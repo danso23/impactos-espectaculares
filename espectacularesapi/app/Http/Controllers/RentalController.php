@@ -57,6 +57,7 @@ class RentalController extends BaseCrudController
             'tax' => ['nullable', 'numeric', 'min:0'],
             'total' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
+            'manual_invoice_id' => ['nullable', 'string', 'max:30'],
             'snapshot_json' => ['nullable'],
         ];
     }
@@ -87,6 +88,7 @@ class RentalController extends BaseCrudController
             'tax' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'total' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'notes' => ['sometimes', 'nullable', 'string'],
+            'manual_invoice_id' => ['sometimes', 'nullable', 'string', 'max:30'],
             'snapshot_json' => ['sometimes', 'nullable'],
         ];
     }
@@ -131,6 +133,7 @@ class RentalController extends BaseCrudController
             'includes_tax' => ['required', 'boolean'],
             'tax_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'notes' => ['nullable', 'string'],
+            'manual_invoice_id' => ['nullable', 'string', 'max:30'],
             'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly,annual'],
             'payment.first_payment_date' => ['required', 'date'],
             'payment.renewals' => ['required', 'integer', 'min:1', 'max:120'],
@@ -237,6 +240,7 @@ class RentalController extends BaseCrudController
                 'tax' => $tax,
                 'total' => $total,
                 'notes' => $data['notes'] ?? null,
+                'manual_invoice_id' => $data['manual_invoice_id'] ?? null,
                 'snapshot_json' => [
                     'origin' => 'manual',
                     'is_rotating' => (bool) ($data['is_rotating'] ?? false),

@@ -38,6 +38,7 @@ export type RentalRecord = {
   tax?: number | null
   total?: number | null
   notes?: string | null
+  manual_invoice_id?: string | null
   snapshot_json?: Record<string, unknown> | null
   created_at?: string | null
   updated_at?: string | null
@@ -58,6 +59,7 @@ export type RentalFormValues = {
   tax: string
   total: string
   notes: string
+  manual_invoice_id: string
 }
 
 export type RentalCreateItem = {
@@ -80,6 +82,7 @@ export type RentalCreatePayload = {
   includes_tax: boolean
   tax_rate: number
   notes?: string | null
+  manual_invoice_id?: string | null
   payment: {
     frequency: PaymentFrequency
     first_payment_date: string

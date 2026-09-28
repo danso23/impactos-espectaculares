@@ -7,6 +7,7 @@ export type PaymentEntry = {
   amount: number
   method: PaymentMethod
   reference?: string | null
+  requires_invoice: boolean
   paid_at: string
 }
 
@@ -47,5 +48,6 @@ export type RegisterPaymentPayload = {
   amount: number
   method: PaymentMethod
   reference?: string | null
+  requires_invoice: boolean
   paid_at: string
 }

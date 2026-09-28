@@ -97,6 +97,7 @@ export function RentalCreateForm({
   const [includesTax, setIncludesTax] = React.useState(true)
   const [taxRate, setTaxRate] = React.useState(16)
   const [notes, setNotes] = React.useState("")
+  const [manualInvoiceId, setManualInvoiceId] = React.useState("")
   const [items, setItems] = React.useState<EditableItem[]>(() => [newItem()])
   const submitLockRef = React.useRef(false)
 
@@ -146,6 +147,7 @@ export function RentalCreateForm({
     setIncludesTax(true)
     setTaxRate(16)
     setNotes("")
+    setManualInvoiceId("")
     setItems([newItem()])
   }, [catalogs?.companies, open])
 
@@ -193,6 +195,7 @@ export function RentalCreateForm({
         includes_tax: includesTax,
         tax_rate: includesTax ? taxRate : 0,
         notes: notes || null,
+        manual_invoice_id: manualInvoiceId.trim() || null,
         payment: {
           frequency,
           first_payment_date: firstPaymentDate,
@@ -290,6 +293,17 @@ export function RentalCreateForm({
                     <SelectItem value="active">Confirmar al crear</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="rental-create-manual-invoice-id">ID de factura</Label>
+                <Input
+                  id="rental-create-manual-invoice-id"
+                  value={manualInvoiceId}
+                  maxLength={30}
+                  onChange={(event) => setManualInvoiceId(event.target.value)}
+                  placeholder="Captura manual (máx. 30)"
+                />
               </div>
 
               <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 md:col-span-2 lg:col-span-3">

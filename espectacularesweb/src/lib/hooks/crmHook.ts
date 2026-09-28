@@ -6,9 +6,11 @@ import {
   convertLeadToClient,
   createClient,
   createLead,
+  deleteClient,
   getClients,
   getLeadCatalogs,
   getLeads,
+  updateClient,
 } from "@/lib/services/crmService"
 import type { ClientFormValues, LeadFormValues } from "@/types/Crm"
 import type { QueryParams } from "@/types/QueryParam"
@@ -67,6 +69,28 @@ export function useCreateClient() {
 
   return useMutation({
     mutationFn: (payload: ClientFormValues) => createClient(payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["crm", "clients"] })
+    },
+  })
+}
+
+export function useUpdateClient() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: ClientFormValues }) => updateClient(id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["crm", "clients"] })
+    },
+  })
+}
+
+export function useDeleteClient() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => deleteClient(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["crm", "clients"] })
     },

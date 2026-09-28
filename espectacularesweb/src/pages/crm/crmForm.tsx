@@ -27,6 +27,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { isValidCurp, isValidRfc } from "@/lib/helpers/mexicanId"
 import type {
   ClientFormValues,
+  ClientRecord,
   CrmUser,
   LeadFormValues,
   LeadPriority,
@@ -43,6 +44,10 @@ type Props = {
   users?: CrmUser[]
   isSubmitting?: boolean
   onSubmit: (payload: LeadFormValues | ClientFormValues) => Promise<void> | void
+  editRecord?: ClientRecord | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  showTrigger?: boolean
 }
 
 const baseForm = {
@@ -78,6 +83,17 @@ const initialLeadForm: LeadFormValues = {
 
 const initialClientForm: ClientFormValues = {
   ...baseForm,
+}
+
+function clientRecordToForm(client: ClientRecord): ClientFormValues {
+  return {
+    nombre: client.nombre || "", apellido_paterno: client.apellido_paterno || "", apellido_materno: client.apellido_materno || "",
+    curp: client.curp || "", rfc: client.rfc || "", negocio: client.negocio || "", razon_social: client.razon_social || "", giro: client.giro || "",
+    email: client.email || "", telefono: client.telefono || "", telefono_2: client.telefono_2 || "", direccion: client.direccion || "",
+    colonia: client.colonia || "", ciudad: client.ciudad || "", estado: client.estado || "", cp: client.cp || "",
+    nombre_aval: client.nombre_aval || "", telefono_aval: client.telefono_aval || "", direccion_aval: client.direccion_aval || "",
+    source: client.source || "", notes: client.notes || "",
+  }
 }
 
 function cleanString(value: string) {
@@ -161,9 +177,16 @@ export function CrmForm({
   users = [],
   isSubmitting = false,
   onSubmit,
+  editRecord = null,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  showTrigger = true,
 }: Props) {
   const isLead = mode === "lead"
-  const [open, setOpen] = React.useState(false)
+  const isEdit = mode === "client" && !!editRecord
+  const [internalOpen, setInternalOpen] = React.useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = controlledOnOpenChange ?? setInternalOpen
   const [leadForm, setLeadForm] = React.useState<LeadFormValues>(initialLeadForm)
   const [clientForm, setClientForm] = React.useState<ClientFormValues>(initialClientForm)
 
@@ -171,6 +194,15 @@ export function CrmForm({
     setLeadForm(initialLeadForm)
     setClientForm(initialClientForm)
   }, [])
+
+  React.useEffect(() => {
+    if (!open) return
+    if (isEdit && editRecord) {
+      setClientForm(clientRecordToForm(editRecord))
+    } else {
+      resetForm()
+    }
+  }, [editRecord, isEdit, open, resetForm])
 
   const setLeadField = <K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) => {
     setLeadForm((prev) => ({ ...prev, [key]: value }))
@@ -203,10 +235,10 @@ export function CrmForm({
       if (isLead) {
         await onSubmit(buildLeadPayload(leadForm))
       } else {
-        await onSubmit(buildClientPayload(clientForm))
+        await onSubmit(isEdit ? clientForm : buildClientPayload(clientForm))
       }
 
-      toast.success(isLead ? "Prospecto creado" : "Cliente creado")
+      toast.success(isLead ? "Prospecto creado" : isEdit ? "Cliente actualizado" : "Cliente creado")
       resetForm()
       setOpen(false)
     } catch (err) {
@@ -216,10 +248,10 @@ export function CrmForm({
     }
   }
 
-  const title = isLead ? "Nuevo prospecto" : "Nuevo cliente"
+  const title = isLead ? "Nuevo prospecto" : isEdit ? "Editar cliente" : "Nuevo cliente"
   const description = isLead
     ? "Registra un prospecto para seguimiento comercial."
-    : "Registra un cliente disponible para cotizaciones."
+    : isEdit ? "Modifica los datos del cliente." : "Registra un cliente disponible para cotizaciones."
 
   const activeForm = isLead ? leadForm : clientForm
 
@@ -227,16 +259,18 @@ export function CrmForm({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) resetForm()
+        if (!nextOpen && !isEdit) resetForm()
         setOpen(nextOpen)
       }}
     >
-      <DialogTrigger asChild>
-        <Button className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-6 text-white shadow-lg transition-all hover:from-purple-700 hover:to-indigo-700 hover:-translate-y-0.5 border-none">
-          <Plus className="mr-2 h-5 w-5" />
-          {isLead ? "Agregar prospecto" : "Agregar cliente"}
-        </Button>
-      </DialogTrigger>
+      {showTrigger && !isEdit ? (
+        <DialogTrigger asChild>
+          <Button className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-6 text-white shadow-lg transition-all hover:from-purple-700 hover:to-indigo-700 hover:-translate-y-0.5 border-none">
+            <Plus className="mr-2 h-5 w-5" />
+            {isLead ? "Agregar prospecto" : "Agregar cliente"}
+          </Button>
+        </DialogTrigger>
+      ) : null}
 
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
@@ -578,7 +612,7 @@ export function CrmForm({
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={isSubmitting}>
-            {isSubmitting ? "Guardando..." : "Guardar"}
+            {isSubmitting ? "Guardando..." : isEdit ? "Guardar cambios" : "Guardar"}
           </Button>
         </DialogFooter>
       </DialogContent>
