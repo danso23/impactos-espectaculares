@@ -16,13 +16,16 @@ import {
 } from "@/lib/hooks/caseroHook"
 import { CaseroForm } from "@/pages/caseros/caseroForm"
 import { useCaseroTable } from "@/pages/caseros/caseroTable"
+import { GroundRentalsDialog } from "@/pages/caseros/groundRentalsDialog"
 import type { CaseroFormValues, CaseroRecord } from "@/types/Casero"
 import { Can } from "@/components/auth/Can"
+import { useRoles } from "@/hooks/useRoles"
 
 export default function CaseroPage() {
   const createMutation = useCreateCasero()
   const updateMutation = useUpdateCasero()
   const deleteMutation = useDeleteCasero()
+  const { can } = useRoles()
 
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
@@ -33,6 +36,7 @@ export default function CaseroPage() {
   const [editRecord, setEditRecord] = React.useState<CaseroRecord | null>(null)
   const [editOpen, setEditOpen] = React.useState(false)
   const [deleteRecord, setDeleteRecord] = React.useState<CaseroRecord | null>(null)
+  const [groundRentRecord, setGroundRentRecord] = React.useState<CaseroRecord | null>(null)
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -61,7 +65,7 @@ export default function CaseroPage() {
     setEditOpen(true)
   }, [])
 
-  const columns = useCaseroTable({ onEdit: handleEdit, onDelete: setDeleteRecord })
+  const columns = useCaseroTable({ onEdit: handleEdit, onDelete: setDeleteRecord, onGroundRentals: setGroundRentRecord })
   const totalCaseros = meta?.total ?? 0
   const visibleWithEmail = caseros.filter((casero) => !!casero.email).length
   const activeCaseros = caseros.filter((casero) => casero.active !== false).length
@@ -153,6 +157,13 @@ export default function CaseroPage() {
             onError: (error) => toast.error("No se pudo eliminar el casero", { description: error instanceof Error ? error.message : "Intenta nuevamente." }),
           })
         }}
+      />
+
+      <GroundRentalsDialog
+        casero={groundRentRecord}
+        open={!!groundRentRecord}
+        onOpenChange={(open) => { if (!open) setGroundRentRecord(null) }}
+        canEdit={can("caseros.edit")}
       />
     </div>
   )

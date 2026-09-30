@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Pencil, Trash2 } from "lucide-react"
+import { Landmark, Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { CaseroRecord } from "@/types/Casero"
@@ -29,15 +29,23 @@ function formatCurrency(value?: number | null) {
 export function useCaseroTable({
   onEdit,
   onDelete,
+  onGroundRentals,
 }: {
   onEdit: (row: CaseroRecord) => void
   onDelete: (row: CaseroRecord) => Promise<void> | void
+  onGroundRentals: (row: CaseroRecord) => void
 }) {
   const { can } = useRoles()
 
   return React.useMemo<ColumnDef<CaseroRecord>[]>(
     () => {
       const actions = []
+      if (can("caseros.view")) actions.push({
+        key: "ground-rentals",
+        label: "Predios y rentas de piso",
+        icon: <Landmark className="h-4 w-4" />,
+        onClick: onGroundRentals,
+      })
       if (can("caseros.edit")) actions.push({
         key: "edit",
         label: "Editar",
@@ -119,6 +127,6 @@ export function useCaseroTable({
         actions,
       }),
     ]},
-    [onEdit, onDelete, can]
+    [onEdit, onDelete, onGroundRentals, can]
   )
 }

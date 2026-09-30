@@ -11,6 +11,7 @@ class Space extends Model
 
     protected $fillable = [
         'title',
+        'ground_property_id',
         'price',
         'type',
         'socioeconomic_level',
@@ -99,5 +100,10 @@ class Space extends Model
             ->orderByDesc('is_cover')
             ->orderBy('position')
             ->orderBy('id');
+    }
+
+    public function groundProperty()
+    {
+        return $this->belongsTo(GroundProperty::class, 'ground_property_id');
     }
 }
