@@ -4,6 +4,8 @@ import {
   Banknote,
   CalendarClock,
   CircleDollarSign,
+  Download,
+  FileText,
   Search,
   TriangleAlert,
   WalletCards,
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -35,6 +38,7 @@ import {
 import { useReceivables, useRegisterPayment } from "@/lib/hooks/paymentHook"
 import type { PaymentMethod, ReceivableRecord } from "@/types/Payment"
 import { useRoles } from "@/hooks/useRoles"
+import { downloadRemissionNotePdf } from "@/lib/pdf/downloadRemissionNotePdf"
 
 const ALL_STATUSES = "all"
 
@@ -87,9 +91,11 @@ export default function PaymentPage() {
   const [search, setSearch] = React.useState("")
   const [status, setStatus] = React.useState(ALL_STATUSES)
   const [selectedReceivable, setSelectedReceivable] = React.useState<ReceivableRecord | null>(null)
+  const [detailReceivable, setDetailReceivable] = React.useState<ReceivableRecord | null>(null)
   const [amount, setAmount] = React.useState("")
   const [method, setMethod] = React.useState<PaymentMethod>("Transferencia")
   const [reference, setReference] = React.useState("")
+  const [requiresInvoice, setRequiresInvoice] = React.useState(false)
   const [paidAt, setPaidAt] = React.useState(localDateTimeValue)
   const perPage = 10
   const registerMutation = useRegisterPayment()
@@ -107,6 +113,7 @@ export default function PaymentPage() {
     setAmount(selectedReceivable.balance.toFixed(2))
     setMethod("Transferencia")
     setReference("")
+    setRequiresInvoice(false)
     setPaidAt(localDateTimeValue())
   }, [selectedReceivable])
 
@@ -205,13 +212,21 @@ export default function PaymentPage() {
       },
     },
     createActionsColumn<ReceivableRecord>({
-      actions: can("payments.edit") ? [{
-        key: "register-payment",
-        label: "Registrar pago",
-        icon: <Banknote className="h-4 w-4" />,
-        visible: (row) => row.balance > 0 && row.status !== "cancelled",
-        onClick: setSelectedReceivable,
-      }] : [],
+      actions: [
+        {
+          key: "view-detail",
+          label: "Ver detalle",
+          icon: <FileText className="h-4 w-4" />,
+          onClick: setDetailReceivable,
+        },
+        ...(can("payments.edit") ? [{
+          key: "register-payment",
+          label: "Registrar pago",
+          icon: <Banknote className="h-4 w-4" />,
+          visible: (row: ReceivableRecord) => row.balance > 0 && row.status !== "cancelled",
+          onClick: setSelectedReceivable,
+        }] : []),
+      ],
     }),
   ], [can])
 
@@ -235,6 +250,7 @@ export default function PaymentPage() {
           amount: numericAmount,
           method,
           reference: reference || null,
+          requires_invoice: requiresInvoice,
           paid_at: paidAt,
         },
       })
@@ -365,6 +381,13 @@ export default function PaymentPage() {
                   <Label>Referencia</Label>
                   <Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Folio o referencia bancaria" />
                 </div>
+                <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 sm:col-span-2">
+                  <div>
+                    <Label htmlFor="payment-requires-invoice">Requiere factura</Label>
+                    <p className="text-xs text-muted-foreground">Marca si el cliente solicita factura por este pago.</p>
+                  </div>
+                  <Switch id="payment-requires-invoice" checked={requiresInvoice} onCheckedChange={setRequiresInvoice} />
+                </div>
               </div>
 
               {validEnteredAmount && enteredAmount <= selectedReceivable.balance ? (
@@ -410,6 +433,62 @@ export default function PaymentPage() {
                 </Button>
               </DialogFooter>
             </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={detailReceivable !== null} onOpenChange={(open) => { if (!open) setDetailReceivable(null) }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Detalle de pago</DialogTitle>
+            <DialogDescription>
+              Renta #{detailReceivable?.rental_id} · parcialidad #{detailReceivable?.id}
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailReceivable ? (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:grid-cols-4">
+                <div><div className="text-xs text-muted-foreground">Estatus</div><div className="font-semibold">{statusPresentation(detailReceivable).label}</div></div>
+                <div><div className="text-xs text-muted-foreground">Total</div><div className="font-semibold">{formatCurrency(detailReceivable.total)}</div></div>
+                <div><div className="text-xs text-muted-foreground">Pagado</div><div className="font-semibold text-emerald-700">{formatCurrency(detailReceivable.paid)}</div></div>
+                <div><div className="text-xs text-muted-foreground">Saldo</div><div className="font-semibold">{formatCurrency(detailReceivable.balance)}</div></div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Historial de movimientos</Label>
+                {detailReceivable.payments.length ? (
+                  <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-slate-200 p-3">
+                    {detailReceivable.payments.map((payment) => (
+                      <div key={payment.id} className="grid gap-1 rounded-lg border border-slate-100 bg-white p-3 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
+                        <div>
+                          <div className="font-medium">{payment.method} · {formatDate(payment.paid_at)}</div>
+                          <div className="text-xs text-muted-foreground">Referencia: {payment.reference || "—"}</div>
+                          <div className="mt-1 text-xs font-medium text-violet-700">{payment.requires_invoice ? "Factura solicitada" : "Nota de remisión"}</div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                          <div className="font-semibold text-emerald-700">{formatCurrency(payment.amount)}</div>
+                          <Button type="button" variant="outline" size="sm" onClick={() => downloadRemissionNotePdf(detailReceivable, payment)}>
+                            <Download className="h-3.5 w-3.5" />
+                            Remisión
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-muted-foreground">Aún no hay pagos registrados.</div>
+                )}
+              </div>
+
+              {detailReceivable.status === "paid" || detailReceivable.balance <= 0 ? (
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Esta parcialidad está pagada. Su información se muestra sólo para consulta.</p>
+              ) : null}
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDetailReceivable(null)}>Cerrar</Button>
+              </DialogFooter>
+            </div>
           ) : null}
         </DialogContent>
       </Dialog>

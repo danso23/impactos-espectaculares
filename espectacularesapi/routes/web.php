@@ -115,6 +115,9 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->post('leads/{id}/convert-to-client', ['middleware' => 'permission:leads.edit', 'uses' => 'LeadController@convertToClient']);
         $router->get('clientes', ['middleware' => 'permission:clients.view', 'uses' => 'ClientController@index']);
         $router->post('clientes', ['middleware' => 'permission:clients.edit', 'uses' => 'ClientController@store']);
+        $router->put('clientes/{id}', ['middleware' => 'permission:clients.edit', 'uses' => 'ClientController@update']);
+        $router->patch('clientes/{id}', ['middleware' => 'permission:clients.edit', 'uses' => 'ClientController@update']);
+        $router->delete('clientes/{id}', ['middleware' => 'permission:clients.delete', 'uses' => 'ClientController@destroy']);
         $router->get('customers/search', ['middleware' => 'permission:quotes.view', 'uses' => 'QuoteController@searchCustomers']);
         $router->get('quotes', ['middleware' => 'permission:quotes.view', 'uses' => 'QuoteController@index']);
         $router->post('quotes/preview', ['middleware' => 'permission:quotes.edit', 'uses' => 'QuoteController@preview']);
@@ -131,5 +134,11 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->put('caseros/{id}', ['middleware' => 'permission:caseros.edit', 'uses' => 'CaseroController@update']);
         $router->patch('caseros/{id}', ['middleware' => 'permission:caseros.edit', 'uses' => 'CaseroController@update']);
         $router->delete('caseros/{id}', ['middleware' => 'permission:caseros.delete', 'uses' => 'CaseroController@delete']);
+        $router->get('caseros/{id}/ground-rentals', ['middleware' => 'permission:caseros.view', 'uses' => 'GroundRentController@indexForCasero']);
+        $router->get('ground-rent-available-spaces', ['middleware' => 'permission:caseros.view', 'uses' => 'GroundRentController@availableSpaces']);
+        $router->post('caseros/{id}/ground-properties', ['middleware' => 'permission:caseros.edit', 'uses' => 'GroundRentController@storeProperty']);
+        $router->patch('ground-properties/{id}', ['middleware' => 'permission:caseros.edit', 'uses' => 'GroundRentController@updateProperty']);
+        $router->post('ground-rent-contracts', ['middleware' => 'permission:caseros.edit', 'uses' => 'GroundRentController@storeContract']);
+        $router->post('ground-rent-payments/{id}/mark-paid', ['middleware' => 'permission:caseros.edit', 'uses' => 'GroundRentController@markPaymentPaid']);
     });
 });

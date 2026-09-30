@@ -75,6 +75,7 @@ class PaymentController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01'],
             'method' => ['required', 'in:Efectivo,Transferencia,Tarjeta,Paypal,Otro'],
             'reference' => ['nullable', 'string', 'max:100'],
+            'requires_invoice' => ['nullable', 'boolean'],
             'paid_at' => ['required', 'date'],
         ]);
 
@@ -116,6 +117,7 @@ class PaymentController extends Controller
                     'amount' => $amount,
                     'method' => $data['method'],
                     'reference' => $data['reference'] ?? null,
+                    'requires_invoice' => (bool) ($data['requires_invoice'] ?? false),
                     'paid_at' => Carbon::parse($data['paid_at']),
                 ]);
 
@@ -227,6 +229,7 @@ class PaymentController extends Controller
                 'amount' => (float) $payment->amount,
                 'method' => $payment->method,
                 'reference' => $payment->reference,
+                'requires_invoice' => (bool) $payment->requires_invoice,
                 'paid_at' => optional($payment->paid_at)->toDateTimeString(),
             ])->values(),
         ];

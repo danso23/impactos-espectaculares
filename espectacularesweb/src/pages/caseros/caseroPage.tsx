@@ -1,10 +1,13 @@
 import * as React from "react"
-import { MapPinned } from "lucide-react"
+import { BadgeDollarSign, MailCheck, MapPinned, Search, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import {
   useCaseros,
   useCreateCasero,
@@ -13,13 +16,16 @@ import {
 } from "@/lib/hooks/caseroHook"
 import { CaseroForm } from "@/pages/caseros/caseroForm"
 import { useCaseroTable } from "@/pages/caseros/caseroTable"
+import { GroundRentalsDialog } from "@/pages/caseros/groundRentalsDialog"
 import type { CaseroFormValues, CaseroRecord } from "@/types/Casero"
 import { Can } from "@/components/auth/Can"
+import { useRoles } from "@/hooks/useRoles"
 
 export default function CaseroPage() {
   const createMutation = useCreateCasero()
   const updateMutation = useUpdateCasero()
   const deleteMutation = useDeleteCasero()
+  const { can } = useRoles()
 
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
@@ -29,6 +35,8 @@ export default function CaseroPage() {
   // Edit dialog state
   const [editRecord, setEditRecord] = React.useState<CaseroRecord | null>(null)
   const [editOpen, setEditOpen] = React.useState(false)
+  const [deleteRecord, setDeleteRecord] = React.useState<CaseroRecord | null>(null)
+  const [groundRentRecord, setGroundRentRecord] = React.useState<CaseroRecord | null>(null)
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -57,30 +65,10 @@ export default function CaseroPage() {
     setEditOpen(true)
   }, [])
 
-  const handleDelete = React.useCallback(
-    async (row: CaseroRecord) => {
-      const fullName = [row.nombre, row.apellido_paterno, row.apellido_materno]
-        .filter(Boolean)
-        .join(" ")
-
-      const confirmDelete = window.confirm(
-        `¿Eliminar al casero "${fullName}"? Esta acción no se puede deshacer.`
-      )
-      if (!confirmDelete) return
-
-      try {
-        await deleteMutation.mutateAsync(row.id)
-        toast.success("Casero eliminado correctamente")
-      } catch (error) {
-        toast.error("No se pudo eliminar el casero", {
-          description: error instanceof Error ? error.message : "Intenta nuevamente.",
-        })
-      }
-    },
-    [deleteMutation]
-  )
-
-  const columns = useCaseroTable({ onEdit: handleEdit, onDelete: handleDelete })
+  const columns = useCaseroTable({ onEdit: handleEdit, onDelete: setDeleteRecord, onGroundRentals: setGroundRentRecord })
+  const totalCaseros = meta?.total ?? 0
+  const visibleWithEmail = caseros.filter((casero) => !!casero.email).length
+  const activeCaseros = caseros.filter((casero) => casero.active !== false).length
 
   async function handleCreate(payload: CaseroFormValues) {
     try {
@@ -125,33 +113,22 @@ export default function CaseroPage() {
         </Can>}
       />
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
-          <div className="flex-1">
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Buscar por nombre, teléfono, email, RFC..."
-              className="rounded-lg border-gray-300 focus:ring-purple-500"
-            />
-          </div>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Card className="border-gray-200 shadow-md"><CardHeader className="pb-3"><CardDescription>Total registrados</CardDescription><CardTitle className="flex items-center gap-2 text-3xl"><UsersRound className="h-5 w-5 text-purple-600" />{totalCaseros}</CardTitle></CardHeader></Card>
+        <Card className="border-gray-200 shadow-md"><CardHeader className="pb-3"><CardDescription>Con email visible</CardDescription><CardTitle className="flex items-center gap-2 text-3xl"><MailCheck className="h-5 w-5 text-emerald-600" />{visibleWithEmail}</CardTitle></CardHeader></Card>
+        <Card className="border-gray-200 shadow-md"><CardHeader className="pb-3"><CardDescription>Activos visibles</CardDescription><CardTitle className="flex items-center gap-2 text-3xl"><BadgeDollarSign className="h-5 w-5 text-slate-500" />{activeCaseros}</CardTitle></CardHeader></Card>
       </div>
 
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={caseros}
-        enableSearch={false}
-        pageSize={perPage}
-        enablePagination
-        manualPagination
-        pageIndex={(meta?.page ?? page) - 1}
-        pageCount={meta?.totalPages ?? 1}
-        onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
-        isLoading={caserosQuery.isFetching}
-      />
+      <Card className="border-gray-200 shadow-lg">
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div><CardTitle className="text-xl">Búsqueda rápida</CardTitle><CardDescription>Filtra por nombre, teléfono, email, RFC, ciudad o banco.</CardDescription></div>
+            <div className="w-full lg:max-w-md"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar casero..." className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500" /></div></div>
+          </div>
+          <Separator />
+        </CardHeader>
+        <CardContent className="pt-0"><DataTable columns={columns} data={caseros} enableSearch={false} pageSize={perPage} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)} isLoading={caserosQuery.isFetching} /></CardContent>
+      </Card>
 
       {/* Edit dialog */}
       <CaseroForm
@@ -164,6 +141,29 @@ export default function CaseroPage() {
           if (!open) setEditRecord(null)
         }}
         showTrigger={false}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deleteRecord}
+        onOpenChange={(open) => { if (!open) setDeleteRecord(null) }}
+        title="Eliminar casero"
+        description="Esta acción no se puede deshacer."
+        itemName={deleteRecord ? [deleteRecord.nombre, deleteRecord.apellido_paterno, deleteRecord.apellido_materno].filter(Boolean).join(" ") : undefined}
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (!deleteRecord) return
+          deleteMutation.mutate(deleteRecord.id, {
+            onSuccess: () => { toast.success("Casero eliminado correctamente"); setDeleteRecord(null) },
+            onError: (error) => toast.error("No se pudo eliminar el casero", { description: error instanceof Error ? error.message : "Intenta nuevamente." }),
+          })
+        }}
+      />
+
+      <GroundRentalsDialog
+        casero={groundRentRecord}
+        open={!!groundRentRecord}
+        onOpenChange={(open) => { if (!open) setGroundRentRecord(null) }}
+        canEdit={can("caseros.edit")}
       />
     </div>
   )

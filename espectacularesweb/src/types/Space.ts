@@ -1,6 +1,7 @@
 // Para el DataTable cuando se le da click
 export type Space = {
   id: number;
+  ground_property_id?: number | null;
   title: string;
   price?: number;
   coords: { lat: number; lng: number };
@@ -83,6 +84,7 @@ export type CreateSpaceInput = {
 // PARA DATATABLE
 export type SpaceApi = {
   id: number;
+  ground_property_id?: number | null;
   title: string;
 
   type?: string | null;

@@ -7,6 +7,8 @@ import SpaceEditorPage from "@/pages/space/spaceEditorPage"
 import ProviderPage from "@/pages/providers/providerPage"
 import RentalPage from "@/pages/rentals/rentalPage"
 import PaymentPage from "@/pages/payments/paymentPage"
+import ClientsPage from "@/pages/crm/clientsPage"
+import CaseroPage from "@/pages/caseros/caseroPage"
 import { ProtectedRoute } from "@/routes/ProtectedRoute"
 import AppLayout from "@/layouts/AppLayout"
 
@@ -37,9 +39,9 @@ export default function AppRoutes() {
                     <Route path="usuarios" element={<UsersPage />} />
                     <Route path="pagos" element={<PaymentPage />} />
                     <Route path="prospectos" element={<RouteStub title="Prospectos" />} />
-                    <Route path="clientes" element={<RouteStub title="Clientes" />} />
+                    <Route path="clientes" element={<ClientsPage />} />
                     <Route path="proveedores" element={<ProviderPage />} />
-                    <Route path="caseros" element={<RouteStub title="Caseros" />} />
+                    <Route path="caseros" element={<CaseroPage />} />
                     <Route path="servicios" element={<RouteStub title="Servicios" />} />
                     <Route path="colaboradores" element={<RouteStub title="Colaboradores" />} />
                     <Route path="*" element={<RouteStub title="No encontrado" />} />

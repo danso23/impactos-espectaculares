@@ -1,6 +1,6 @@
 import * as React from "react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { ArrowRightLeft } from "lucide-react"
+import { ArrowRightLeft, Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { ClientRecord, LeadRecord, LeadStatus } from "@/types/Crm"
@@ -125,7 +125,8 @@ export function useLeadTable({
   )
 }
 
-export function useClientTable() {
+export function useClientTable({ onEdit, onDelete }: { onEdit: (row: ClientRecord) => void; onDelete: (row: ClientRecord) => void }) {
+  const { can } = useRoles()
   return React.useMemo<ColumnDef<ClientRecord>[]>(
     () => [
       {
@@ -172,7 +173,13 @@ export function useClientTable() {
         header: "Alta",
         cell: ({ row }) => formatDate(row.original.created_at),
       },
+      createActionsColumn<ClientRecord>({
+        actions: [
+          { key: "edit", label: "Editar", icon: <Pencil className="h-4 w-4" />, onClick: onEdit, visible: () => can("clients.edit") },
+          { key: "delete", label: "Eliminar", icon: <Trash2 className="h-4 w-4" />, onClick: onDelete, variant: "destructive", visible: () => can("clients.delete") },
+        ],
+      }),
     ],
-    []
+    [can, onDelete, onEdit]
   )
 }

@@ -63,3 +63,17 @@ export function createClient(payload: ClientFormValues) {
     body: JSON.stringify(payload),
   })
 }
+
+export function updateClient(id: number, payload: ClientFormValues) {
+  return apiFetch<ClientResponse>(`/api/clientes/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteClient(id: number) {
+  return apiFetch<{ message: string }>(`/api/clientes/${id}`, {
+    method: "DELETE",
+  })
+}

@@ -39,6 +39,7 @@ const EMPTY_FORM: RentalFormValues = {
   tax: "",
   total: "",
   notes: "",
+  manual_invoice_id: "",
 }
 
 function recordToForm(record: RentalRecord): RentalFormValues {
@@ -60,6 +61,7 @@ function recordToForm(record: RentalRecord): RentalFormValues {
     tax: record.tax != null ? String(record.tax) : "",
     total: record.total != null ? String(record.total) : "",
     notes: record.notes ?? "",
+    manual_invoice_id: record.manual_invoice_id ?? "",
   }
 }
 
@@ -200,6 +202,16 @@ export function RentalForm({
           <div className="space-y-2">
             <Label>Total</Label>
             <NumericInput value={form.total} onValueChange={(value) => updateField("total", String(value))} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="rental-manual-invoice-id">ID de factura</Label>
+            <Input
+              id="rental-manual-invoice-id"
+              value={form.manual_invoice_id}
+              maxLength={30}
+              onChange={(e) => updateField("manual_invoice_id", e.target.value)}
+              placeholder="Captura manual (máx. 30)"
+            />
           </div>
         </div>
 

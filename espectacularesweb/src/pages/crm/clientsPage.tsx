@@ -11,13 +11,21 @@ import { CrmForm } from "@/pages/crm/crmForm"
 import { useClientTable } from "@/pages/crm/crmTable"
 import type { ClientFormValues } from "@/types/Crm"
 import { Can } from "@/components/auth/Can"
+import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import { toast } from "sonner"
+import { useDeleteClient, useUpdateClient } from "@/lib/hooks/crmHook"
+import type { ClientRecord } from "@/types/Crm"
 
 export default function ClientsPage() {
   const createClientMutation = useCreateClient()
+  const updateClientMutation = useUpdateClient()
+  const deleteClientMutation = useDeleteClient()
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const perPage = 10
+  const [editRecord, setEditRecord] = React.useState<ClientRecord | null>(null)
+  const [deleteRecord, setDeleteRecord] = React.useState<ClientRecord | null>(null)
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -40,7 +48,10 @@ export default function ClientsPage() {
   const clientsQuery = useClients(params)
   const clients = clientsQuery.data?.data ?? []
   const meta = clientsQuery.data?.meta
-  const columns = useClientTable()
+  const columns = useClientTable({
+    onEdit: setEditRecord,
+    onDelete: setDeleteRecord,
+  })
   const totalClients = meta?.total ?? 0
   const visibleWithEmail = clients.filter((client) => !!client.email).length
   const visibleWithRfc = clients.filter((client) => !!client.rfc).length
@@ -136,6 +147,54 @@ export default function ClientsPage() {
           />
         </CardContent>
       </Card>
+
+      <CrmForm
+        mode="client"
+        editRecord={editRecord}
+        open={!!editRecord}
+        onOpenChange={(open) => {
+          if (!open) setEditRecord(null)
+        }}
+        showTrigger={false}
+        isSubmitting={updateClientMutation.isPending}
+        onSubmit={async (payload) => {
+          if (!editRecord) return
+          try {
+            await updateClientMutation.mutateAsync({ id: editRecord.id, payload: payload as ClientFormValues })
+            setEditRecord(null)
+          } catch (error) {
+            toast.error("No se pudo actualizar el cliente", {
+              description: error instanceof Error ? error.message : "Intenta nuevamente.",
+            })
+            throw error
+          }
+        }}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deleteRecord}
+        onOpenChange={(open) => {
+          if (!open) setDeleteRecord(null)
+        }}
+        title="Eliminar cliente"
+        description="Esta acción no se puede deshacer."
+        itemName={deleteRecord?.display_name}
+        loading={deleteClientMutation.isPending}
+        onConfirm={() => {
+          if (!deleteRecord) return
+          deleteClientMutation.mutate(deleteRecord.id, {
+            onSuccess: () => {
+              toast.success("Cliente eliminado correctamente")
+              setDeleteRecord(null)
+            },
+            onError: (error) => {
+              toast.error("No se pudo eliminar el cliente", {
+                description: error instanceof Error ? error.message : "Intenta nuevamente.",
+              })
+            },
+          })
+        }}
+      />
     </div>
   )
 }
