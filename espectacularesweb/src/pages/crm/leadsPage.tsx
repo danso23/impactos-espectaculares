@@ -3,15 +3,10 @@ import { UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { Filter } from "@/components/generic/filter"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useConvertLeadToClient, useCreateLead, useLeadCatalogs, useLeads } from "@/lib/hooks/crmHook"
 import { CrmForm } from "@/pages/crm/crmForm"
 import { useLeadTable } from "@/pages/crm/crmTable"
@@ -97,29 +92,8 @@ export default function LeadsPage() {
 
       <Card>
         <CardContent className="space-y-4 pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full sm:w-64">
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => {
-                  setStatusFilter(value)
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Filtrar por estatus" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>Todos los estatus</SelectItem>
-                  {statuses.map((status) => (
-                    <SelectItem key={status.id} value={String(status.id)}>
-                      {status.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <div className="flex justify-end"><ExcelExportButton columns={columns} data={leads} filename="prospectos" disabled={leadsQuery.isFetching} /></div>
+          <Filter title="Filtros avanzados" enableDateRange={false} defaultOpen={false} dropdowns={[{ key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) }]} initialValues={{ selects: { estatus: statusFilter === ALL ? undefined : statusFilter }, checks: {} }} onApply={(values) => { setStatusFilter(values.selects.estatus ?? ALL); setPage(1) }} onReset={() => { setStatusFilter(ALL); setPage(1) }} />
 
           <DataTable
             title={`Prospectos (${meta?.total ?? leads.length})`}
@@ -127,6 +101,7 @@ export default function LeadsPage() {
             columns={columns}
             data={leads}
             enableSearch
+            enableExport={false}
             searchPlaceholder="Buscar prospecto..."
             searchValue={searchInput}
             onSearchChange={setSearchInput}

@@ -4,16 +4,12 @@ import { Plus, ReceiptText } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { Filter } from "@/components/generic/filter"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { useQuoteCatalogs, useQuotes } from "@/lib/hooks/quoteHook"
 import { QuoteConvertToRentalDialog } from "@/pages/quotes/quoteConvertToRentalDialog"
@@ -31,6 +27,8 @@ export default function QuotesPage() {
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL)
+  const [dateFrom, setDateFrom] = React.useState<string | undefined>()
+  const [dateTo, setDateTo] = React.useState<string | undefined>()
   const [selectedQuote, setSelectedQuote] = React.useState<QuoteRecord | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false)
   const [convertDialogOpen, setConvertDialogOpen] = React.useState(false)
@@ -51,8 +49,10 @@ export default function QuotesPage() {
       per_page: perPage,
       q: search || undefined,
       status: statusFilter === ALL ? undefined : statusFilter,
+      date_from: dateFrom,
+      date_to: dateTo,
     }),
-    [page, perPage, search, statusFilter]
+    [dateFrom, dateTo, page, perPage, search, statusFilter]
   )
 
   const quotesQuery = useQuotes(params)
@@ -101,53 +101,45 @@ export default function QuotesPage() {
         </Can>}
       />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
-          <div className="w-full sm:w-72">
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value)
-                setPage(1)
-              }}
-            >
-              <SelectTrigger className="rounded-lg border-gray-300">
-                <SelectValue placeholder="Filtrar por estatus" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                <SelectItem value={ALL}>Todos los estatus</SelectItem>
-                {statuses.map((status) => (
-                  <SelectItem key={status.id} value={String(status.id)}>
-                    {status.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex-1">
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por folio, nota, estatus o fecha de alta."
+        search={
+          <div className="relative w-full xl:w-96">
             <Input
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Buscar por folio o nota..."
-              className="rounded-lg border-gray-300 focus:ring-purple-500"
+              className="rounded-xl border-gray-300 bg-white shadow-sm focus:border-purple-500 focus:ring-purple-500"
             />
           </div>
-        </div>
-      </div>
-
-      <DataTable
-        columns={columns}
-        data={quotes}
-        enableSearch={false}
-        pageSize={perPage}
-        enablePagination
-        manualPagination
-        pageIndex={(meta?.page ?? page) - 1}
-        pageCount={meta?.totalPages ?? 1}
-        onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
-        isLoading={quotesQuery.isFetching}
-      />
+        }
+        actions={<ExcelExportButton columns={columns} data={quotes} filename="cotizaciones" disabled={quotesQuery.isFetching} />}
+        filters={<Filter
+          title="Filtros avanzados"
+          defaultOpen={false}
+          className="border-gray-200 bg-slate-50/60 shadow-none"
+          dropdowns={[{ key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) }]}
+          initialValues={{ dateFrom, dateTo, selects: { estatus: statusFilter === ALL ? undefined : statusFilter }, checks: {} }}
+          onApply={(values) => { setStatusFilter(values.selects.estatus ?? ALL); setDateFrom(values.dateFrom); setDateTo(values.dateTo); setPage(1) }}
+          onReset={() => { setStatusFilter(ALL); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
+          applyOnReset
+        />}
+      >
+        <DataTable
+          columns={columns}
+          data={quotes}
+          enableSearch={false}
+          enableExport={false}
+          pageSize={perPage}
+          enablePagination
+          manualPagination
+          pageIndex={(meta?.page ?? page) - 1}
+          pageCount={meta?.totalPages ?? 1}
+          onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
+          isLoading={quotesQuery.isFetching}
+        />
+      </ListingPanel>
 
       <QuoteStatusDialog
         open={statusDialogOpen}

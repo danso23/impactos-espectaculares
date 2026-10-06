@@ -77,6 +77,9 @@ type DataTableProps<TData> = {
   /** Toolbar extra (botones, etc.) */
   renderToolbar?: (table: TanstackTable<TData>) => React.ReactNode;
 
+  /** @deprecated La exportación se muestra en la barra superior del módulo. */
+  enableExport?: boolean;
+
   className?: string;
 };
 

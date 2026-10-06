@@ -3,6 +3,8 @@ import { Search, UserCheck2, UserX, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { Filter } from "@/components/generic/filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
@@ -27,6 +29,7 @@ export default function ProviderPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
+  const [activeFilter, setActiveFilter] = React.useState("all")
   const perPage = 10
 
   const [editRecord, setEditRecord] = React.useState<ProviderRecord | null>(null)
@@ -48,8 +51,9 @@ export default function ProviderPage() {
       page,
       per_page: perPage,
       q: search || undefined,
+      active: activeFilter === "all" ? undefined : activeFilter,
     }),
-    [page, perPage, search]
+    [activeFilter, page, perPage, search]
   )
 
   const providersQuery = useProviders(params)
@@ -169,16 +173,19 @@ export default function ProviderPage() {
               </CardDescription>
             </div>
 
-            <div className="w-full lg:max-w-md">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar proveedor..."
-                  className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
+            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
+              <div className="w-full lg:w-80">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Buscar proveedor..."
+                    className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                  />
+                </div>
               </div>
+              <ExcelExportButton columns={columns} data={providers} filename="proveedores" disabled={providersQuery.isFetching} />
             </div>
           </div>
 
@@ -186,10 +193,20 @@ export default function ProviderPage() {
         </CardHeader>
 
         <CardContent className="pt-0">
+          <Filter
+            title="Filtros avanzados"
+            enableDateRange={false}
+            defaultOpen={false}
+            dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]}
+            initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }}
+            onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }}
+            onReset={() => { setActiveFilter("all"); setPage(1) }}
+          />
           <DataTable
             columns={columns}
             data={providers}
             enableSearch={false}
+            enableExport={false}
             pageSize={perPage}
             enablePagination
             manualPagination
