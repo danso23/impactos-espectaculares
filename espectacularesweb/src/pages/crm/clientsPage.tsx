@@ -2,6 +2,7 @@ import * as React from "react"
 import { MailCheck, Search, FileText, UsersRound } from "lucide-react"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -127,6 +128,7 @@ export default function ClientsPage() {
                 />
               </div>
             </div>
+            <ExcelExportButton columns={columns} data={clients} filename="clientes" disabled={clientsQuery.isFetching} />
           </div>
 
           <Separator />
@@ -137,6 +139,7 @@ export default function ClientsPage() {
             columns={columns}
             data={clients}
             enableSearch={false}
+            enableExport={false}
             pageSize={perPage}
             enablePagination
             manualPagination

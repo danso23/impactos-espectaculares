@@ -14,6 +14,8 @@ import { toast } from "sonner"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import { DataTable } from "@/components/generic/data-table"
+import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { Filter } from "@/components/generic/filter"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -90,6 +92,8 @@ export default function PaymentPage() {
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const [status, setStatus] = React.useState(ALL_STATUSES)
+  const [dateFrom, setDateFrom] = React.useState<string | undefined>()
+  const [dateTo, setDateTo] = React.useState<string | undefined>()
   const [selectedReceivable, setSelectedReceivable] = React.useState<ReceivableRecord | null>(null)
   const [detailReceivable, setDetailReceivable] = React.useState<ReceivableRecord | null>(null)
   const [amount, setAmount] = React.useState("")
@@ -122,7 +126,9 @@ export default function PaymentPage() {
     per_page: perPage,
     q: search || undefined,
     status: status === ALL_STATUSES ? undefined : status,
-  }), [page, search, status])
+    date_from: dateFrom,
+    date_to: dateTo,
+  }), [dateFrom, dateTo, page, search, status])
 
   const receivablesQuery = useReceivables(params)
   const rows = receivablesQuery.data?.data ?? []
@@ -311,24 +317,24 @@ export default function PaymentPage() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Buscar renta o cliente..." className="pl-10" />
               </div>
-              <Select value={status} onValueChange={(value) => { setStatus(value); setPage(1) }}>
-                <SelectTrigger className="sm:w-44"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_STATUSES}>Todos</SelectItem>
-                  <SelectItem value="pending">Pendientes</SelectItem>
-                  <SelectItem value="overdue">Vencidos</SelectItem>
-                  <SelectItem value="paid">Pagados</SelectItem>
-                  <SelectItem value="cancelled">Cancelados</SelectItem>
-                </SelectContent>
-              </Select>
+              <ExcelExportButton columns={columns} data={rows} filename="pagos" disabled={receivablesQuery.isFetching} />
             </div>
           </div>
         </CardHeader>
         <div className="px-6 pb-6">
+          <Filter
+            title="Filtros avanzados"
+            defaultOpen={false}
+            dropdowns={[{ key: "estatus", label: "Estatus", options: [{ label: "Pendientes", value: "pending" }, { label: "Vencidos", value: "overdue" }, { label: "Pagados", value: "paid" }, { label: "Cancelados", value: "cancelled" }] }]}
+            initialValues={{ dateFrom, dateTo, selects: { estatus: status === ALL_STATUSES ? undefined : status }, checks: {} }}
+            onApply={(values) => { setStatus(values.selects.estatus ?? ALL_STATUSES); setDateFrom(values.dateFrom); setDateTo(values.dateTo); setPage(1) }}
+            onReset={() => { setStatus(ALL_STATUSES); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
+          />
           <DataTable
             columns={columns}
             data={rows}
             enableSearch={false}
+            enableExport={false}
             pageSize={perPage}
             enablePagination
             manualPagination

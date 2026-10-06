@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { Plus, Pencil, Trash2, ShieldCheck } from "lucide-react"
+import { FileSpreadsheet, Plus, Pencil, Search, Trash2, ShieldCheck } from "lucide-react"
 import {
   roleService,
   type PermissionAction,
@@ -30,6 +30,7 @@ import { Can } from "@/components/auth/Can"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { cn } from "@/lib/utils"
+import { exportRowsToExcel } from "@/lib/exportExcel"
 
 const RolePage = () => {
   const [roles, setRoles] = useState<Role[]>([])
@@ -45,6 +46,7 @@ const RolePage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [search, setSearch] = useState("")
 
   const fetchRoles = async () => {
     try {
@@ -176,6 +178,24 @@ const RolePage = () => {
     }
   }
 
+  const filteredRoles = roles.filter((role) => role.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+
+  const exportRoles = () => exportRowsToExcel({
+    filename: "roles",
+    columns: [
+      { id: "id", label: "ID" },
+      { id: "name", label: "Nombre del rol" },
+      { id: "permissions", label: "Permisos" },
+    ],
+    rows: filteredRoles.map((role) => ({
+      getValue: (column: string) => ({
+        id: role.id,
+        name: role.name,
+        permissions: role.permissions?.join(", ") ?? "",
+      })[column],
+    })),
+  })
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
@@ -196,6 +216,16 @@ const RolePage = () => {
 
       {/* Tabla Estilo Figma */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filtrar roles..." className="pl-10" />
+          </div>
+          <Button type="button" variant="outline" onClick={exportRoles} disabled={loading || filteredRoles.length === 0} className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+            <FileSpreadsheet className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
         <Table>
           <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             <TableRow className="hover:bg-transparent border-none">
@@ -212,14 +242,14 @@ const RolePage = () => {
                   Cargando roles...
                 </TableCell>
               </TableRow>
-            ) : roles.length === 0 ? (
+            ) : filteredRoles.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-48 text-center text-gray-500 italic">
                   No se encontraron roles registrados.
                 </TableCell>
               </TableRow>
             ) : (
-              roles.map((role, index) => (
+              filteredRoles.map((role, index) => (
                 <TableRow 
                   key={role.id}
                   className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-colors"

@@ -3,16 +3,11 @@ import { CalendarDays, CreditCard, Search, ReceiptText, CircleCheckBig, CircleDa
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { Filter } from "@/components/generic/filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -85,6 +80,7 @@ export default function RentalPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
+  const [statusFilter, setStatusFilter] = React.useState("all")
   const [rotatingFilter, setRotatingFilter] = React.useState("all")
   const perPage = 10
 
@@ -109,9 +105,10 @@ export default function RentalPage() {
       page,
       per_page: perPage,
       q: search || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
       is_rotating: rotatingFilter === "all" ? undefined : rotatingFilter,
     }),
-    [page, perPage, rotatingFilter, search]
+    [page, perPage, rotatingFilter, search, statusFilter]
   )
 
   const rentalsQuery = useRentals(params)
@@ -264,22 +261,6 @@ export default function RentalPage() {
             </div>
 
             <div className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl">
-              <Select
-                value={rotatingFilter}
-                onValueChange={(value) => {
-                  setRotatingFilter(value)
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger className="sm:w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="1">Rotativas</SelectItem>
-                  <SelectItem value="0">No rotativas</SelectItem>
-                </SelectContent>
-              </Select>
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -289,6 +270,7 @@ export default function RentalPage() {
                   className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                 />
               </div>
+              <ExcelExportButton columns={columns} data={rentals} filename="rentas" disabled={rentalsQuery.isFetching} />
             </div>
           </div>
 
@@ -296,10 +278,23 @@ export default function RentalPage() {
         </CardHeader>
 
         <CardContent className="pt-0">
+          <Filter
+            title="Filtros avanzados"
+            enableDateRange={false}
+            defaultOpen={false}
+            dropdowns={[
+              { key: "estatus", label: "Estatus", options: [{ label: "Borrador", value: "draft" }, { label: "Confirmada", value: "active" }, { label: "Completada", value: "completed" }, { label: "Cancelada", value: "cancelled" }] },
+              { key: "rotativa", label: "Tipo de renta", options: [{ label: "Rotativa", value: "1" }, { label: "No rotativa", value: "0" }] },
+            ]}
+            initialValues={{ selects: { estatus: statusFilter === "all" ? undefined : statusFilter, rotativa: rotatingFilter === "all" ? undefined : rotatingFilter }, checks: {} }}
+            onApply={(values) => { setStatusFilter(values.selects.estatus ?? "all"); setRotatingFilter(values.selects.rotativa ?? "all"); setPage(1) }}
+            onReset={() => { setStatusFilter("all"); setRotatingFilter("all"); setPage(1) }}
+          />
           <DataTable
             columns={columns}
             data={rentals}
             enableSearch={false}
+            enableExport={false}
             pageSize={perPage}
             enablePagination
             manualPagination

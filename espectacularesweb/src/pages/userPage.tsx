@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { userService } from "@/lib/services/userService"
 import type { Role } from "@/lib/services/userService"
 import type { AuthUser } from "@/types/AuthUser"
-import { Plus, Pencil, Trash2, UsersRound } from "lucide-react"
+import { FileSpreadsheet, Plus, Pencil, Search, Trash2, UsersRound } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -27,6 +27,7 @@ import { toast } from "sonner"
 import { Can } from "@/components/auth/Can"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
+import { exportRowsToExcel } from "@/lib/exportExcel"
 
 type UserWithRoles = AuthUser & { roles_array: string[] }
 
@@ -41,6 +42,7 @@ export default function UsersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<UserWithRoles | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [search, setSearch] = useState("")
 
   // Form state
   const [formData, setFormData] = useState({
@@ -172,6 +174,31 @@ export default function UsersPage() {
     }
   }
 
+  const filteredUsers = users.filter((user) => {
+    const term = search.trim().toLocaleLowerCase()
+    if (!term) return true
+    return [user.name, user.username, user.email, ...(user.roles_array ?? [])]
+      .some((value) => String(value ?? "").toLocaleLowerCase().includes(term))
+  })
+
+  const exportUsers = () => exportRowsToExcel({
+    filename: "usuarios",
+    columns: [
+      { id: "name", label: "Nombre" },
+      { id: "username", label: "Usuario" },
+      { id: "email", label: "Correo electrónico" },
+      { id: "roles", label: "Roles" },
+    ],
+    rows: filteredUsers.map((user) => ({
+      getValue: (column: string) => ({
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        roles: user.roles_array.join(", "),
+      })[column],
+    })),
+  })
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
@@ -191,6 +218,16 @@ export default function UsersPage() {
       />
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filtrar usuarios..." className="pl-10" />
+          </div>
+          <Button type="button" variant="outline" onClick={exportUsers} disabled={filteredUsers.length === 0} className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+            <FileSpreadsheet className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
         <Table>
           <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             <TableRow className="hover:bg-transparent border-none">
@@ -202,14 +239,14 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-gray-100">
-            {users.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-48 text-center text-gray-500 italic">
                   No hay usuarios registrados.
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow 
                   key={user.id}
                   className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-colors"

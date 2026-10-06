@@ -4,6 +4,7 @@ import type { Space } from "@/types/Space";
 import { useNavigate } from "react-router-dom";
 
 import { DataTable } from "@/components/generic/data-table";
+import { ExcelExportButton } from "@/components/generic/excel-export-button";
 import { Filter } from "@/components/generic/filter";
 import { ModuleHeader } from "@/components/generic/module-header";
 
@@ -435,6 +436,7 @@ export default function SpacePage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <ExcelExportButton columns={columns} data={data} filename="espacios" disabled={spacesQuery.isFetching} />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -554,6 +556,7 @@ export default function SpacePage() {
             columns={columns}
             data={data}
             enableSearch={false}
+            enableExport={false}
             getRowId={(row) => String(row.id)}
             rowSelection={rowSelection}
             onRowSelectionChange={setRowSelection}
