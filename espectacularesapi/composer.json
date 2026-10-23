@@ -46,6 +46,9 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "scripts": {
+        "openapi": [
+            "php scripts/generate-openapi.php"
+        ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],

@@ -3,8 +3,7 @@ import { refreshAccessToken } from "../refreshToken"
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ""
 
-let isRefreshing = false
-let queue: Array<(token: string) => void> = []
+let refreshPromise: Promise<string> | null = null
 
 function isJsonResponse(res: Response) {
   return (res.headers.get("content-type") || "").includes("application/json")
@@ -55,38 +54,27 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     return (await parseBody(res)) as T
   }
 
-  // 2) llegó 401 => refresh single-flight
-  if (!isRefreshing) {
-    isRefreshing = true
-    try {
-      const newToken = await refreshAccessToken()
-      queue.forEach((cb) => cb(newToken))
-      queue = []
-    } catch (e) {
-      queue = []
-      logoutHard()
-      throw e
-    } finally {
-      isRefreshing = false
-    }
+  // 2) llegó 401 => todas las peticiones comparten la misma renovación.
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null
+    })
   }
 
-  // 3) esperar token nuevo y reintentar
-  return await new Promise<T>((resolve, reject) => {
-    queue.push(async (newToken) => {
-      try {
-        res = await doFetch(newToken)
+  let newToken: string
+  try {
+    newToken = await refreshPromise
+  } catch (error) {
+    logoutHard()
+    throw error
+  }
 
-        if (!res.ok) {
-          const body = await parseBody(res).catch(() => "")
-          reject(new Error(body?.message ? body.message : String(body || `Request failed: ${res.status}`)))
-          return
-        }
+  // 3) reintentar una sola vez con el token renovado.
+  res = await doFetch(newToken)
+  if (!res.ok) {
+    const body = await parseBody(res).catch(() => "")
+    throw new Error(body?.message ? body.message : String(body || `Request failed: ${res.status}`))
+  }
 
-        resolve((await parseBody(res)) as T)
-      } catch (err) {
-        reject(err)
-      }
-    })
-  })
+  return (await parseBody(res)) as T
 }

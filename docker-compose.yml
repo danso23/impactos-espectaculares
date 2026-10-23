@@ -67,7 +67,7 @@ services:
       pnpm install &&
       pnpm run vite:devlocal"
     ports:
-      - "5173:5173"
+      - "${WEB_PORT:-5174}:5173"
     networks:
       - especta_net
 

@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -13,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { NumericInput } from "@/components/ui/numeric-input"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -24,36 +26,42 @@ import {
 import type { RentalFormValues, RentalRecord } from "@/types/Rental"
 
 const EMPTY_FORM: RentalFormValues = {
-  quote_id: "",
   customer_type: "lead",
   customer_id: "",
   agency_id: "",
   issuer_company_id: "",
   created_by: "",
   status: "draft",
+  is_rotating: false,
   starts_at: "",
   ends_at: "",
   subtotal: "",
   tax: "",
   total: "",
   notes: "",
+  manual_invoice_id: "",
 }
 
 function recordToForm(record: RentalRecord): RentalFormValues {
   return {
-    quote_id: record.quote_id != null ? String(record.quote_id) : "",
     customer_type: record.customer_type ?? "lead",
     customer_id: record.customer_id != null ? String(record.customer_id) : "",
     agency_id: record.agency_id != null ? String(record.agency_id) : "",
     issuer_company_id: record.issuer_company_id != null ? String(record.issuer_company_id) : "",
     created_by: record.created_by != null ? String(record.created_by) : "",
     status: (record.status as RentalFormValues["status"]) ?? "draft",
+    is_rotating:
+      record.is_rotating === true ||
+      record.is_rotating === 1 ||
+      record.is_rotating === "1" ||
+      record.is_rotating === "true",
     starts_at: record.starts_at ?? "",
     ends_at: record.ends_at ?? "",
     subtotal: record.subtotal != null ? String(record.subtotal) : "",
     tax: record.tax != null ? String(record.tax) : "",
     total: record.total != null ? String(record.total) : "",
     notes: record.notes ?? "",
+    manual_invoice_id: record.manual_invoice_id ?? "",
   }
 }
 
@@ -103,14 +111,15 @@ export function RentalForm({
         <DialogDescription>
           {isEdit ? "Ajusta la información de la renta." : "Registra una renta manualmente."}
         </DialogDescription>
+        {isEdit ? (
+          <div className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1.5 text-xs text-violet-700">
+            ID de renta: <span className="font-bold text-violet-900">#{editRecord.id}</span>
+          </div>
+        ) : null}
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Quote ID</Label>
-            <Input value={form.quote_id} onChange={(e) => updateField("quote_id", e.target.value)} />
-          </div>
           <div className="space-y-2">
             <Label>Tipo de cliente</Label>
             <Select
@@ -159,10 +168,10 @@ export function RentalForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="draft">Borrador</SelectItem>
+                <SelectItem value="active">Activa / confirmada</SelectItem>
+                <SelectItem value="completed">Completada</SelectItem>
+                <SelectItem value="cancelled">Cancelada</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -173,6 +182,14 @@ export function RentalForm({
           <div className="space-y-2">
             <Label>Fin</Label>
             <Input type="date" value={form.ends_at} onChange={(e) => updateField("ends_at", e.target.value)} />
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2">
+            <Label>Es rotativa</Label>
+            <Switch
+              checked={form.is_rotating}
+              onCheckedChange={(value) => updateField("is_rotating", value)}
+              aria-label="Marcar renta como rotativa"
+            />
           </div>
           <div className="space-y-2">
             <Label>Subtotal</Label>
@@ -186,6 +203,16 @@ export function RentalForm({
             <Label>Total</Label>
             <NumericInput value={form.total} onValueChange={(value) => updateField("total", String(value))} />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="rental-manual-invoice-id">ID de factura</Label>
+            <Input
+              id="rental-manual-invoice-id"
+              value={form.manual_invoice_id}
+              maxLength={30}
+              onChange={(e) => updateField("manual_invoice_id", e.target.value)}
+              placeholder="Captura manual (máx. 30)"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -197,14 +224,14 @@ export function RentalForm({
           />
         </div>
 
-        <div className="flex justify-end gap-2">
+        <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Guardando..." : "Guardar"}
           </Button>
-        </div>
+        </DialogFooter>
       </form>
     </DialogContent>
   )

@@ -95,6 +95,77 @@ class ClientController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, int $id)
+    {
+        if (!Schema::hasTable('clientes')) {
+            return response()->json(['message' => 'La tabla clientes no existe.'], 409);
+        }
+
+        $client = Cliente::query()->findOrFail($id);
+        $validated = $this->validate($request, $this->clientRules($client->id));
+
+        $client->update($validated);
+
+        return response()->json([
+            'message' => 'Cliente actualizado correctamente.',
+            'data' => self::serializeClientRow((array) DB::table('clientes')->where('id', $client->id)->first()),
+        ]);
+    }
+
+    public function destroy(int $id)
+    {
+        if (!Schema::hasTable('clientes')) {
+            return response()->json(['message' => 'La tabla clientes no existe.'], 409);
+        }
+
+        $client = Cliente::query()->findOrFail($id);
+
+        $hasQuotes = Schema::hasTable('quotes')
+            && DB::table('quotes')->where('customer_type', 'cliente')->where('customer_id', $client->id)->exists();
+        $hasRentals = Schema::hasTable('rentals')
+            && DB::table('rentals')->where('customer_type', 'cliente')->where('customer_id', $client->id)->exists();
+
+        if ($hasQuotes || $hasRentals) {
+            return response()->json([
+                'message' => 'No se puede eliminar el cliente porque tiene cotizaciones o rentas asociadas.',
+            ], 422);
+        }
+
+        $client->delete();
+
+        return response()->json(['message' => 'Cliente eliminado correctamente.']);
+    }
+
+    private function clientRules(?int $clientId = null): array
+    {
+        $curpRule = 'unique:clientes,curp' . ($clientId ? ",{$clientId}" : '');
+        $rfcRule = 'unique:clientes,rfc' . ($clientId ? ",{$clientId}" : '');
+
+        return [
+            'nombre' => 'required|string|max:100',
+            'apellido_paterno' => 'nullable|string|max:100',
+            'apellido_materno' => 'nullable|string|max:100',
+            'curp' => "nullable|string|max:18|{$curpRule}",
+            'rfc' => "nullable|string|max:13|{$rfcRule}",
+            'negocio' => 'nullable|string|max:150',
+            'razon_social' => 'nullable|string|max:200',
+            'giro' => 'nullable|string|max:150',
+            'email' => 'nullable|email|max:150',
+            'telefono' => 'nullable|string|max:30',
+            'telefono_2' => 'nullable|string|max:30',
+            'direccion' => 'nullable|string|max:255',
+            'colonia' => 'nullable|string|max:120',
+            'ciudad' => 'nullable|string|max:120',
+            'estado' => 'nullable|string|max:120',
+            'cp' => 'nullable|string|max:10',
+            'nombre_aval' => 'nullable|string|max:150',
+            'telefono_aval' => 'nullable|string|max:30',
+            'direccion_aval' => 'nullable|string|max:255',
+            'source' => 'nullable|string|max:80',
+            'notes' => 'nullable|string',
+        ];
+    }
+
     public static function serializeClientRow(array $row): array
     {
         $fullName = trim(implode(' ', array_filter([

@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/services/clientService"
 import type { QueryParams } from "@/types/QueryParam"
-import type { RentalFormValues, RentalResponse, RentalsResponse } from "@/types/Rental"
+import type { RentalCreatePayload, RentalFormValues, RentalResponse, RentalsResponse } from "@/types/Rental"
 
 function toQueryString(params?: QueryParams) {
   if (!params) return ""
@@ -21,7 +21,7 @@ export function getRentals(params?: QueryParams) {
   return apiFetch<RentalsResponse>(`/api/rentals${toQueryString(params)}`)
 }
 
-export function createRental(payload: RentalFormValues) {
+export function createRental(payload: RentalCreatePayload) {
   return apiFetch<RentalResponse>("/api/rentals", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,6 +34,12 @@ export function updateRental(id: number, payload: Partial<RentalFormValues>) {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  })
+}
+
+export function confirmRental(id: number) {
+  return apiFetch<RentalResponse>(`/api/rentals/${id}/confirm`, {
+    method: "POST",
   })
 }
 

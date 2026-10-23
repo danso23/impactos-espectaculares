@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
-import { roleService, type Role } from "@/lib/services/roleService"
+import { FileSpreadsheet, Plus, Pencil, Search, Trash2, ShieldCheck } from "lucide-react"
+import {
+  roleService,
+  type PermissionAction,
+  type PermissionCatalog,
+  type Role,
+} from "@/lib/services/roleService"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -19,10 +24,13 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { Can } from "@/components/auth/Can"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import { ModuleHeader } from "@/components/generic/module-header"
 import { cn } from "@/lib/utils"
+import { exportRowsToExcel } from "@/lib/exportExcel"
 
 const RolePage = () => {
   const [roles, setRoles] = useState<Role[]>([])
@@ -30,18 +38,25 @@ const RolePage = () => {
   const [openModal, setOpenModal] = useState(false)
   const [currentRole, setCurrentRole] = useState<Role | null>(null)
   const [roleName, setRoleName] = useState("")
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
+  const [permissionCatalog, setPermissionCatalog] = useState<PermissionCatalog | null>(null)
   const [saving, setSaving] = useState(false)
 
   // Deletion state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [search, setSearch] = useState("")
 
   const fetchRoles = async () => {
     try {
       setLoading(true)
-      const data = await roleService.getAll()
+      const [data, catalog] = await Promise.all([
+        roleService.getAll(),
+        roleService.getPermissionCatalog(),
+      ])
       setRoles(data)
+      setPermissionCatalog(catalog)
     } catch {
       toast.error("No se pudieron cargar los roles.")
     } finally {
@@ -56,7 +71,67 @@ const RolePage = () => {
   const handleOpenModal = (role: Role | null = null) => {
     setCurrentRole(role)
     setRoleName(role ? role.name : "")
+    setSelectedPermissions(role?.permissions ?? [])
     setOpenModal(true)
+  }
+
+  const handleTogglePermission = (
+    permission: string,
+    checked: boolean,
+    action: PermissionAction,
+    viewPermission: string,
+    modulePermissions: string[],
+  ) => {
+    setSelectedPermissions((current) => {
+      const next = new Set(current)
+
+      if (checked) {
+        next.add(permission)
+        if (action !== "view") next.add(viewPermission)
+      } else {
+        next.delete(permission)
+        if (action === "view") modulePermissions.forEach((item) => next.delete(item))
+      }
+
+      return Array.from(next)
+    })
+  }
+
+  const actionSelectionState = (action: PermissionAction): boolean | "indeterminate" => {
+    const permissions = permissionCatalog?.modules.map(
+      (module) => module.permissions[action],
+    ) ?? []
+    const selectedCount = permissions.filter((permission) =>
+      selectedPermissions.includes(permission),
+    ).length
+
+    if (permissions.length > 0 && selectedCount === permissions.length) return true
+    if (selectedCount > 0) return "indeterminate"
+    return false
+  }
+
+  const handleToggleActionPermissions = (action: PermissionAction, checked: boolean) => {
+    if (!permissionCatalog) return
+
+    setSelectedPermissions((current) => {
+      const next = new Set(current)
+
+      permissionCatalog.modules.forEach((module) => {
+        if (checked) {
+          next.add(module.permissions[action])
+          if (action !== "view") next.add(module.permissions.view)
+          return
+        }
+
+        next.delete(module.permissions[action])
+        if (action === "view") {
+          next.delete(module.permissions.edit)
+          next.delete(module.permissions.delete)
+        }
+      })
+
+      return Array.from(next)
+    })
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -66,10 +141,10 @@ const RolePage = () => {
     try {
       setSaving(true)
       if (currentRole) {
-        await roleService.update(currentRole.id, roleName)
+        await roleService.update(currentRole.id, roleName.trim(), selectedPermissions)
         toast.success("Rol actualizado correctamente.")
       } else {
-        await roleService.create(roleName)
+        await roleService.create(roleName.trim(), selectedPermissions)
         toast.success("Rol creado correctamente.")
       }
       setOpenModal(false)
@@ -103,15 +178,32 @@ const RolePage = () => {
     }
   }
 
+  const filteredRoles = roles.filter((role) => role.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+
+  const exportRoles = () => exportRowsToExcel({
+    filename: "roles",
+    columns: [
+      { id: "id", label: "ID" },
+      { id: "name", label: "Nombre del rol" },
+      { id: "permissions", label: "Permisos" },
+    ],
+    rows: filteredRoles.map((role) => ({
+      getValue: (column: string) => ({
+        id: role.id,
+        name: role.name,
+        permissions: role.permissions?.join(", ") ?? "",
+      })[column],
+    })),
+  })
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      {/* Header Estilo Figma */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Roles</h1>
-          <p className="text-gray-600">Administra los roles disponibles en el sistema.</p>
-        </div>
-        <Can role="admin">
+      <ModuleHeader
+        title="Roles"
+        badge="Control de permisos"
+        description="Administra los roles disponibles en el sistema."
+        icon={ShieldCheck}
+        actions={<Can permission="roles.edit">
           <Button 
             onClick={() => handleOpenModal()}
             className="flex items-center gap-2 px-6 py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border-none"
@@ -119,34 +211,45 @@ const RolePage = () => {
             <Plus className="w-5 h-5" />
             <span>Nuevo rol</span>
           </Button>
-        </Can>
-      </div>
+        </Can>}
+      />
 
       {/* Tabla Estilo Figma */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filtrar roles..." className="pl-10" />
+          </div>
+          <Button type="button" variant="outline" onClick={exportRoles} disabled={loading || filteredRoles.length === 0} className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+            <FileSpreadsheet className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
         <Table>
           <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             <TableRow className="hover:bg-transparent border-none">
               <TableHead className="px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs">ID</TableHead>
               <TableHead className="px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs">Nombre del Rol</TableHead>
+              <TableHead className="px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs">Permisos</TableHead>
               <TableHead className="px-6 py-4 text-right text-white font-semibold uppercase tracking-wider text-xs">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-gray-100">
             {loading ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-48 text-center text-gray-500 italic">
+                <TableCell colSpan={4} className="h-48 text-center text-gray-500 italic">
                   Cargando roles...
                 </TableCell>
               </TableRow>
-            ) : roles.length === 0 ? (
+            ) : filteredRoles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="h-48 text-center text-gray-500 italic">
+                <TableCell colSpan={4} className="h-48 text-center text-gray-500 italic">
                   No se encontraron roles registrados.
                 </TableCell>
               </TableRow>
             ) : (
-              roles.map((role, index) => (
+              filteredRoles.map((role, index) => (
                 <TableRow 
                   key={role.id}
                   className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-colors"
@@ -161,9 +264,18 @@ const RolePage = () => {
                       <span className="text-gray-800 font-semibold">{role.name}</span>
                     </div>
                   </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {(role.permissions?.length ?? 0) > 0 ? (
+                      <span className="inline-flex rounded-full border border-purple-200 bg-purple-50 px-3 py-1 font-medium text-purple-700">
+                        {role.permissions.length} asignados
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">Sin permisos</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <Can role="admin">
+                      <Can permission="roles.edit">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -172,14 +284,16 @@ const RolePage = () => {
                         >
                           <Pencil className="w-5 h-5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          onClick={() => handleDeleteClick(role)}
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </Button>
+                        <Can permission="roles.delete">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            onClick={() => handleDeleteClick(role)}
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </Button>
+                        </Can>
                       </Can>
                     </div>
                   </td>
@@ -192,13 +306,13 @@ const RolePage = () => {
 
       {/* Modal Estilo Shadcn Refinado */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
-        <DialogContent className="sm:max-w-[425px] rounded-xl border-none shadow-2xl overflow-hidden">
-           <DialogHeader className="p-6 pb-0">
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[760px]">
+           <DialogHeader>
+              <DialogTitle>
                 {currentRole ? "Editar Rol" : "Nuevo Rol"}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSave} className="p-6 pt-4 space-y-6">
+            <form onSubmit={handleSave} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-semibold text-gray-700">
                   Nombre del rol
@@ -208,23 +322,88 @@ const RolePage = () => {
                   value={roleName}
                   onChange={(e) => setRoleName(e.target.value)}
                   placeholder="Ej: Editor, Supervisor..."
-                  className="rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500 bg-white h-11"
                   required
                 />
               </div>
-              <DialogFooter className="gap-2 sm:justify-end pt-2">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700">
+                    Permisos por módulo
+                  </Label>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Editar o eliminar activa también el permiso para ver el módulo.
+                  </p>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <div className="grid grid-cols-[minmax(180px,1fr)_repeat(3,90px)] bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    <span>Módulo</span>
+                    {(Object.keys(permissionCatalog?.actions ?? {}) as PermissionAction[]).map((action) => (
+                      <label
+                        key={action}
+                        htmlFor={`all-${action}`}
+                        className="flex cursor-pointer flex-col items-center gap-2 text-center"
+                      >
+                        <span>{permissionCatalog?.actions[action]}</span>
+                        <Checkbox
+                          id={`all-${action}`}
+                          checked={actionSelectionState(action)}
+                          onCheckedChange={(value) =>
+                            handleToggleActionPermissions(action, value === true)
+                          }
+                          aria-label={`Seleccionar todos los permisos para ${permissionCatalog?.actions[action]}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {permissionCatalog?.modules.map((module) => {
+                      const actions = Object.keys(permissionCatalog.actions) as PermissionAction[]
+                      const modulePermissions = actions.map((action) => module.permissions[action])
+
+                      return (
+                        <div
+                          key={module.key}
+                          className="grid grid-cols-[minmax(180px,1fr)_repeat(3,90px)] items-center px-4 py-3 hover:bg-purple-50/50"
+                        >
+                          <span className="text-sm font-medium text-gray-700">{module.label}</span>
+                          {actions.map((action) => {
+                            const permission = module.permissions[action]
+                            return (
+                              <div key={permission} className="flex justify-center">
+                                <Checkbox
+                                  id={`${module.key}-${action}`}
+                                  checked={selectedPermissions.includes(permission)}
+                                  onCheckedChange={(value) =>
+                                    handleTogglePermission(
+                                      permission,
+                                      value === true,
+                                      action,
+                                      module.permissions.view,
+                                      modulePermissions,
+                                    )
+                                  }
+                                  aria-label={`${permissionCatalog.actions[action]} ${module.label}`}
+                                />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setOpenModal(false)}
-                  className="rounded-lg px-6 h-11 border-gray-300"
                 >
                   Cancelar
                 </Button>
                 <Button 
                   type="submit" 
                   disabled={saving}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-8 h-11 shadow-md"
                 >
                   {saving ? "Guardando..." : "Guardar Cambios"}
                 </Button>

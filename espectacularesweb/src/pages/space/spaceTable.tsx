@@ -18,37 +18,43 @@ type BuildSpaceTableOptions = {
 };
 
 export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
-  const { hasRole } = useRoles();
+  const { can } = useRoles();
 
   /** ACCIONES DEL DATATABLE */
   const actions = React.useMemo<TableAction<Space>[]>(() => {
-    const baseActions: TableAction<Space>[] = [
-      {
+    const baseActions: TableAction<Space>[] = [];
+
+    if (can("quotes.edit")) {
+      baseActions.push({
         key: "quote",
         label: "Cotizar",
         icon: <FileText className="h-4 w-4" />,
+        disabled: (row) => row.status !== "Disponible",
         onClick: (row) =>
           opts.onQuote ? opts.onQuote(row) : console.log("Cotizar", row.id),
-      },
-      {
+      });
+    }
+
+    baseActions.push({
         key: "view",
         label: "Ver",
         icon: <Eye className="h-4 w-4" />,
         onClick: (row) =>
           opts.onView ? opts.onView(row) : console.log("Ver", row.id),
-      },
-    ];
+      });
 
-    if (hasRole("admin")) {
-      baseActions.push(
-        {
+    if (can("spaces.edit")) {
+      baseActions.push({
           key: "edit",
           label: "Editar",
           icon: <Pencil className="h-4 w-4" />,
           onClick: (row) =>
             opts.onEdit ? opts.onEdit(row) : console.log("Editar", row.id),
-        },
-        {
+        });
+    }
+
+    if (can("spaces.delete")) {
+      baseActions.push({
           key: "delete",
           label: "Eliminar",
           variant: "destructive",
@@ -58,12 +64,11 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
             if (opts.onDelete) return opts.onDelete(row);
             console.log("Eliminar", row.id);
           },
-        }
-      );
+        });
     }
 
     return baseActions;
-  }, [opts, hasRole]);
+  }, [opts, can]);
 
   const columns = React.useMemo<ColumnDef<Space>[]>(() => {
     return [
@@ -75,6 +80,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
             onCheckedChange={(value) =>
               table.toggleAllPageRowsSelected(!!value)
             }
+            className="h-5 w-5 rounded-md border-2 border-white bg-white/15 text-violet-700 shadow-sm data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-violet-700 focus-visible:ring-white/70"
             aria-label="Seleccionar todo"
           />
         ),
@@ -82,6 +88,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
+            disabled={!row.getCanSelect()}
             aria-label="Seleccionar fila"
           />
         ),
@@ -117,6 +124,34 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("title")}</div>
         ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            className="-ml-3"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Estatus
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const status = row.original.status;
+          const available = status === "Disponible";
+
+          return (
+            <span
+              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
+                available
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
+            >
+              {status}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "type",
@@ -196,6 +231,15 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         ),
       },
       {
+        accessorKey: "is_rotating",
+        header: "Rotativo",
+        cell: ({ row }) => (
+          <span className={row.original.is_rotating ? "font-semibold text-violet-700" : "text-muted-foreground"}>
+            {row.original.is_rotating ? "Sí" : "No"}
+          </span>
+        ),
+      },
+      {
         accessorKey: "price",
         header: ({ column }) => (
           <Button
@@ -264,18 +308,6 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
           const c = row.getValue("coords") as Space["coords"];
           return `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
         },
-      },
-      {
-        accessorKey: "status",
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Estatus
-          </Button>
-        ),
       },
       {
         accessorKey: "createdAt",

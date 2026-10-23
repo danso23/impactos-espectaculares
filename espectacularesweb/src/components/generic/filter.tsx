@@ -102,7 +102,13 @@ export function Filter({
 
     React.useEffect(() => {
         setValues(buildInitialState({ dropdowns, checkboxes, initialValues }))
-    }, [depsKey, dropdowns, checkboxes, initialValues])
+    // Los consumidores suelen construir estos arreglos/objetos en JSX. Sus
+    // referencias cambian en cada render aunque sus valores no cambien; usar
+    // esas referencias aquí provocaba un setState continuo.
+    // depsKey representa sus valores serializados, por lo que es la dependencia
+    // intencional para reinicializar el estado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [depsKey])
 
     const setSelect = (key: string, val?: string) => {
         setValues((prev) => ({
@@ -155,7 +161,7 @@ export function Filter({
     return (
         <Card className={cn("rounded-xl shadow-md border-gray-200 overflow-hidden bg-white/80 backdrop-blur-sm", className)}>
             <Collapsible open={open} onOpenChange={setOpen}>
-                <CardHeader className="pb-3 px-6 pt-6">
+                <CardHeader className="px-5 py-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-center gap-3">
                             <CardTitle className="text-xl font-bold text-gray-800">{title}</CardTitle>

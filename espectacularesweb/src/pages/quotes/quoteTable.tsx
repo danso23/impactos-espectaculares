@@ -5,6 +5,8 @@ import { FileDown, PencilLine, ReceiptText } from "lucide-react"
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { QuoteRecord } from "@/types/Quote"
 import { canChangeQuoteStatus, canConvertQuoteToRental, toneClass } from "@/pages/quotes/quoteStatus"
+import type { TableAction } from "@/types/TableAction"
+import { useRoles } from "@/hooks/useRoles"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
@@ -33,8 +35,34 @@ export function useQuoteTable({
   onChangeStatus: (quote: QuoteRecord) => void
   onConvertToRental: (quote: QuoteRecord) => void
 }) {
+  const { can } = useRoles()
+
   return React.useMemo<ColumnDef<QuoteRecord>[]>(
-    () => [
+    () => {
+      const actions: TableAction<QuoteRecord>[] = [{
+        key: "download-pdf",
+        label: "Descargar PDF",
+        icon: <FileDown className="h-4 w-4" />,
+        onClick: onDownload,
+      }]
+      if (can("quotes.edit")) actions.push(
+        {
+          key: "change-status",
+          label: "Cambiar estatus",
+          icon: <PencilLine className="h-4 w-4" />,
+          onClick: onChangeStatus,
+          visible: canChangeQuoteStatus,
+        },
+        {
+          key: "convert-to-rental",
+          label: "Convertir a renta",
+          icon: <ReceiptText className="h-4 w-4" />,
+          onClick: onConvertToRental,
+          visible: canConvertQuoteToRental,
+        },
+      )
+
+      return [
       {
         accessorKey: "folio",
         header: "Folio",
@@ -67,6 +95,15 @@ export function useQuoteTable({
             </div>
           )
         },
+      },
+      {
+        accessorKey: "quote_kind",
+        header: "Tipo",
+        cell: ({ row }) => (
+          <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-medium text-violet-700">
+            {row.original.quote_kind === "advertisement" ? "Anuncio" : "Espacio"}
+          </span>
+        ),
       },
       {
         accessorKey: "company",
@@ -106,30 +143,9 @@ export function useQuoteTable({
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<QuoteRecord>({
-        actions: [
-          {
-            key: "download-pdf",
-            label: "Descargar PDF",
-            icon: <FileDown className="h-4 w-4" />,
-            onClick: onDownload,
-          },
-          {
-            key: "change-status",
-            label: "Cambiar estatus",
-            icon: <PencilLine className="h-4 w-4" />,
-            onClick: onChangeStatus,
-            visible: canChangeQuoteStatus,
-          },
-          {
-            key: "convert-to-rental",
-            label: "Convertir a renta",
-            icon: <ReceiptText className="h-4 w-4" />,
-            onClick: onConvertToRental,
-            visible: canConvertQuoteToRental,
-          },
-        ],
+        actions,
       }),
-    ],
-    [onChangeStatus, onConvertToRental, onDownload]
+    ]},
+    [onChangeStatus, onConvertToRental, onDownload, can]
   )
 }

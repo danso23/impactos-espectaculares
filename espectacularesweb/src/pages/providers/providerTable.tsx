@@ -4,6 +4,7 @@ import { Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { ProviderRecord } from "@/types/Provider"
+import { useRoles } from "@/hooks/useRoles"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
@@ -23,8 +24,26 @@ export function useProviderTable({
   onEdit: (row: ProviderRecord) => void
   onDelete: (row: ProviderRecord) => Promise<void> | void
 }) {
+  const { can } = useRoles()
+
   return React.useMemo<ColumnDef<ProviderRecord>[]>(
-    () => [
+    () => {
+      const actions = []
+      if (can("providers.edit")) actions.push({
+        key: "edit",
+        label: "Editar",
+        icon: <Pencil className="h-4 w-4" />,
+        onClick: onEdit,
+      })
+      if (can("providers.delete")) actions.push({
+        key: "delete",
+        label: "Eliminar",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: onDelete,
+        variant: "destructive" as const,
+      })
+
+      return [
       {
         accessorKey: "name",
         header: "Proveedor",
@@ -73,23 +92,9 @@ export function useProviderTable({
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<ProviderRecord>({
-        actions: [
-          {
-            key: "edit",
-            label: "Editar",
-            icon: <Pencil className="h-4 w-4" />,
-            onClick: onEdit,
-          },
-          {
-            key: "delete",
-            label: "Eliminar",
-            icon: <Trash2 className="h-4 w-4" />,
-            onClick: onDelete,
-            variant: "destructive",
-          },
-        ],
+        actions,
       }),
-    ],
-    [onEdit, onDelete]
+    ]},
+    [onEdit, onDelete, can]
   )
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Validator;
 
 abstract class BaseCrudController extends Controller
 {
@@ -85,7 +86,7 @@ abstract class BaseCrudController extends Controller
         $q = $this->applyIndexQuery($q, $request);
         $q = $this->indexOrder($q, $request);
 
-        $perPage = (int) $request->get('perPage', 10);
+        $perPage = (int) $request->get('perPage', $request->get('per_page', 10));
         $page = (int) $request->get('page', 1);
 
         $items = $q->select($this->indexSelect())->paginate($perPage, ['*'], 'page', $page);
@@ -113,7 +114,15 @@ abstract class BaseCrudController extends Controller
     /** POST /resource */
     public function store(Request $request)
     {
-        $data = $request->validate($this->rulesStore($request));
+        $validator = Validator::make($request->all(), $this->rulesStore($request));
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
         $data = $this->beforeStore($data, $request);
 
         $modelClass = $this->model();
@@ -131,7 +140,15 @@ abstract class BaseCrudController extends Controller
         $modelClass = $this->model();
         $item = $modelClass::findOrFail($id);
 
-        $data = $request->validate($this->rulesUpdate($request));
+        $validator = Validator::make($request->all(), $this->rulesUpdate($request));
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
         $data = $this->beforeUpdate($data, $request, $item);
 
         $item->update($data);

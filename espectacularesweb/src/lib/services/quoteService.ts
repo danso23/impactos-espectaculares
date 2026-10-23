@@ -50,6 +50,7 @@ function buildQuoteFormData(request: QuoteCreateRequest) {
   const fd = new FormData()
   const { payload, images } = request
 
+  appendFormData(fd, "quote_kind", payload.quote_kind)
   appendFormData(fd, "customer", payload.customer)
   appendFormData(fd, "issuer_company_id", payload.issuer_company_id)
   appendFormData(fd, "letterhead_id", payload.letterhead_id)
@@ -58,7 +59,6 @@ function buildQuoteFormData(request: QuoteCreateRequest) {
   appendFormData(fd, "includes_tax", payload.includes_tax)
   appendFormData(fd, "tax_rate", payload.tax_rate)
   appendFormData(fd, "discount", payload.discount)
-  appendFormData(fd, "commission", payload.commission)
   appendFormData(fd, "terms_html", payload.terms_html)
   appendFormData(fd, "notes", payload.notes)
   appendFormData(fd, "items", payload.items)

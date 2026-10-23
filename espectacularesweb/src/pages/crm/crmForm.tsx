@@ -1,4 +1,5 @@
 import * as React from "react"
+import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,8 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { CurpInput, RfcInput } from "@/components/ui/mexican-id-input"
+import { PhoneInput } from "@/components/ui/phone-input"
 import {
   Select,
   SelectContent,
@@ -21,8 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { isValidCurp, isValidRfc } from "@/lib/helpers/mexicanId"
 import type {
   ClientFormValues,
+  ClientRecord,
   CrmUser,
   LeadFormValues,
   LeadPriority,
@@ -39,6 +44,10 @@ type Props = {
   users?: CrmUser[]
   isSubmitting?: boolean
   onSubmit: (payload: LeadFormValues | ClientFormValues) => Promise<void> | void
+  editRecord?: ClientRecord | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  showTrigger?: boolean
 }
 
 const baseForm = {
@@ -74,6 +83,17 @@ const initialLeadForm: LeadFormValues = {
 
 const initialClientForm: ClientFormValues = {
   ...baseForm,
+}
+
+function clientRecordToForm(client: ClientRecord): ClientFormValues {
+  return {
+    nombre: client.nombre || "", apellido_paterno: client.apellido_paterno || "", apellido_materno: client.apellido_materno || "",
+    curp: client.curp || "", rfc: client.rfc || "", negocio: client.negocio || "", razon_social: client.razon_social || "", giro: client.giro || "",
+    email: client.email || "", telefono: client.telefono || "", telefono_2: client.telefono_2 || "", direccion: client.direccion || "",
+    colonia: client.colonia || "", ciudad: client.ciudad || "", estado: client.estado || "", cp: client.cp || "",
+    nombre_aval: client.nombre_aval || "", telefono_aval: client.telefono_aval || "", direccion_aval: client.direccion_aval || "",
+    source: client.source || "", notes: client.notes || "",
+  }
 }
 
 function cleanString(value: string) {
@@ -157,9 +177,16 @@ export function CrmForm({
   users = [],
   isSubmitting = false,
   onSubmit,
+  editRecord = null,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  showTrigger = true,
 }: Props) {
   const isLead = mode === "lead"
-  const [open, setOpen] = React.useState(false)
+  const isEdit = mode === "client" && !!editRecord
+  const [internalOpen, setInternalOpen] = React.useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = controlledOnOpenChange ?? setInternalOpen
   const [leadForm, setLeadForm] = React.useState<LeadFormValues>(initialLeadForm)
   const [clientForm, setClientForm] = React.useState<ClientFormValues>(initialClientForm)
 
@@ -167,6 +194,15 @@ export function CrmForm({
     setLeadForm(initialLeadForm)
     setClientForm(initialClientForm)
   }, [])
+
+  React.useEffect(() => {
+    if (!open) return
+    if (isEdit && editRecord) {
+      setClientForm(clientRecordToForm(editRecord))
+    } else {
+      resetForm()
+    }
+  }, [editRecord, isEdit, open, resetForm])
 
   const setLeadField = <K extends keyof LeadFormValues>(key: K, value: LeadFormValues[K]) => {
     setLeadForm((prev) => ({ ...prev, [key]: value }))
@@ -182,6 +218,9 @@ export function CrmForm({
   const validate = () => {
     const nombre = isLead ? leadForm.nombre : clientForm.nombre
     if (!nombre.trim()) return "El nombre es obligatorio."
+    const activeForm = isLead ? leadForm : clientForm
+    if (!isValidRfc(activeForm.rfc)) return "Captura un RFC válido o rellénalo completamente con X."
+    if (!isValidCurp(activeForm.curp)) return "Captura una CURP válida o rellénala completamente con X."
     return null
   }
 
@@ -196,10 +235,10 @@ export function CrmForm({
       if (isLead) {
         await onSubmit(buildLeadPayload(leadForm))
       } else {
-        await onSubmit(buildClientPayload(clientForm))
+        await onSubmit(isEdit ? clientForm : buildClientPayload(clientForm))
       }
 
-      toast.success(isLead ? "Prospecto creado" : "Cliente creado")
+      toast.success(isLead ? "Prospecto creado" : isEdit ? "Cliente actualizado" : "Cliente creado")
       resetForm()
       setOpen(false)
     } catch (err) {
@@ -209,10 +248,10 @@ export function CrmForm({
     }
   }
 
-  const title = isLead ? "Nuevo prospecto" : "Nuevo cliente"
+  const title = isLead ? "Nuevo prospecto" : isEdit ? "Editar cliente" : "Nuevo cliente"
   const description = isLead
     ? "Registra un prospecto para seguimiento comercial."
-    : "Registra un cliente disponible para cotizaciones."
+    : isEdit ? "Modifica los datos del cliente." : "Registra un cliente disponible para cotizaciones."
 
   const activeForm = isLead ? leadForm : clientForm
 
@@ -220,13 +259,18 @@ export function CrmForm({
     <Dialog
       open={open}
       onOpenChange={(nextOpen) => {
-        if (!nextOpen) resetForm()
+        if (!nextOpen && !isEdit) resetForm()
         setOpen(nextOpen)
       }}
     >
-      <DialogTrigger asChild>
-        <Button>{isLead ? "Agregar prospecto" : "Agregar cliente"}</Button>
-      </DialogTrigger>
+      {showTrigger && !isEdit ? (
+        <DialogTrigger asChild>
+          <Button className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-6 text-white shadow-lg transition-all hover:from-purple-700 hover:to-indigo-700 hover:-translate-y-0.5 border-none">
+            <Plus className="mr-2 h-5 w-5" />
+            {isLead ? "Agregar prospecto" : "Agregar cliente"}
+          </Button>
+        </DialogTrigger>
+      ) : null}
 
       <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
@@ -309,24 +353,24 @@ export function CrmForm({
             </Field>
 
             <Field label="Teléfono">
-              <Input
+              <PhoneInput
                 value={activeForm.telefono}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("telefono", e.target.value)
-                    : setClientField("telefono", e.target.value)
+                    ? setLeadField("telefono", value)
+                    : setClientField("telefono", value)
                 }
                 placeholder="Teléfono principal"
               />
             </Field>
 
             <Field label="Teléfono secundario">
-              <Input
+              <PhoneInput
                 value={activeForm.telefono_2}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("telefono_2", e.target.value)
-                    : setClientField("telefono_2", e.target.value)
+                    ? setLeadField("telefono_2", value)
+                    : setClientField("telefono_2", value)
                 }
                 placeholder="Teléfono alterno"
               />
@@ -358,26 +402,24 @@ export function CrmForm({
             </Field>
 
             <Field label="RFC">
-              <Input
+              <RfcInput
                 value={activeForm.rfc}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("rfc", e.target.value)
-                    : setClientField("rfc", e.target.value)
+                    ? setLeadField("rfc", value)
+                    : setClientField("rfc", value)
                 }
-                placeholder="RFC"
               />
             </Field>
 
             <Field label="CURP">
-              <Input
+              <CurpInput
                 value={activeForm.curp}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("curp", e.target.value)
-                    : setClientField("curp", e.target.value)
+                    ? setLeadField("curp", value)
+                    : setClientField("curp", value)
                 }
-                placeholder="CURP"
               />
             </Field>
           </div>
@@ -520,12 +562,12 @@ export function CrmForm({
             </Field>
 
             <Field label="Teléfono aval">
-              <Input
+              <PhoneInput
                 value={activeForm.telefono_aval}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   isLead
-                    ? setLeadField("telefono_aval", e.target.value)
-                    : setClientField("telefono_aval", e.target.value)
+                    ? setLeadField("telefono_aval", value)
+                    : setClientField("telefono_aval", value)
                 }
                 placeholder="Teléfono del aval"
               />
@@ -570,7 +612,7 @@ export function CrmForm({
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={isSubmitting}>
-            {isSubmitting ? "Guardando..." : "Guardar"}
+            {isSubmitting ? "Guardando..." : isEdit ? "Guardar cambios" : "Guardar"}
           </Button>
         </DialogFooter>
       </DialogContent>

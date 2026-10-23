@@ -4,17 +4,30 @@ import type { QueryParams } from "@/types/QueryParam"
 import { env } from "@/config/env"
 import { asViewType } from "../helpers/viewTypeHelper"
 
-function resolveSpaceImageUrl(path?: string | null) {
+function resolveSpaceImageUrl(spaceId: number, imageId?: number | null, path?: string | null) {
+  const apiBase = env.apiUrl?.replace(/\/+$/, "") ?? ""
+  if (apiBase && imageId) return `${apiBase}/api/spaces/${spaceId}/images/${imageId}`
   if (!path) return null
   if (/^https?:\/\//i.test(path)) return path
 
-  const apiBase = env.apiUrl?.replace(/\/+$/, "") ?? ""
   const cleanPath = path.replace(/^\/+/, "")
 
   return apiBase ? `${apiBase}/storage/${cleanPath}` : `/storage/${cleanPath}`
 }
 
-export function apiToUiStatus(active?: boolean | number | string | null): Space["status"] {
+export function apiToUiStatus(
+  active?: boolean | number | string | null,
+  isBlockedNow?: boolean | number | string | null
+): Space["status"] {
+  if (isBlockedNow !== null && isBlockedNow !== undefined) {
+    const blocked =
+      isBlockedNow === true ||
+      isBlockedNow === 1 ||
+      isBlockedNow === "1" ||
+      isBlockedNow === "true"
+    return blocked ? "Bloqueado" : "Disponible"
+  }
+
   const isActive = active === true || active === 1 || active === "1" || active === "true"
   return isActive ? "Disponible" : "Bloqueado"
 }
@@ -22,6 +35,9 @@ export function apiToUiStatus(active?: boolean | number | string | null): Space[
 export function apiToUiSpace(r: SpaceApi): Space {
   const images = Array.isArray(r.images) ? r.images : []
   const coverImage = images.find((image) => image.is_cover) ?? images[0] ?? null
+  const imageUrls = images
+    .map((image) => resolveSpaceImageUrl(r.id, image.id, image.path))
+    .filter((url): url is string => Boolean(url))
 
   return {
     id: r.id,
@@ -32,9 +48,28 @@ export function apiToUiSpace(r: SpaceApi): Space {
       lat: r.latitude != null ? Number(r.latitude) : 0,
       lng: r.longitude != null ? Number(r.longitude) : 0,
     },
+    latitude: r.latitude != null ? Number(r.latitude) : null,
+    longitude: r.longitude != null ? Number(r.longitude) : null,
 
-    status: apiToUiStatus(r.active),
+    status: apiToUiStatus(r.active, r.is_blocked_now),
+    active:
+      r.active === true ||
+      r.active === 1 ||
+      r.active === "1" ||
+      r.active === "true",
+    is_rotating:
+      r.is_rotating === true ||
+      r.is_rotating === 1 ||
+      r.is_rotating === "1" ||
+      r.is_rotating === "true",
     createdAt: r.created_at ? r.created_at.slice(0, 10) : "",
+    blocked_from: r.blocked_from?.slice(0, 10) ?? null,
+    blocked_until: r.blocked_until?.slice(0, 10) ?? null,
+    is_blocked_now:
+      r.is_blocked_now === true ||
+      r.is_blocked_now === 1 ||
+      r.is_blocked_now === "1" ||
+      r.is_blocked_now === "true",
 
     type: r.type ?? null,
     socioeconomic_level: r.socioeconomic_level ?? null,
@@ -53,7 +88,8 @@ export function apiToUiSpace(r: SpaceApi): Space {
 
     viewType: asViewType(r.view_type),
     images,
-    coverImageUrl: resolveSpaceImageUrl(coverImage?.path),
+    imageUrls,
+    coverImageUrl: resolveSpaceImageUrl(r.id, coverImage?.id, coverImage?.path),
   }
 }
 
@@ -81,6 +117,9 @@ export function buildSpacesParams(
 
   const conLuz = filters.selects?.conLuz
   if (conLuz === "1" || conLuz === "0") params.has_lights = conLuz
+
+  const rotativo = filters.checks?.rotativo
+  if (rotativo !== undefined) params.is_rotating = rotativo ? 1 : 0
 
   const estatus = filters.selects?.estatus
   if (estatus === "disponible") params.active = 1

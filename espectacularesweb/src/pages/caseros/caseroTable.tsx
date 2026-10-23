@@ -1,9 +1,10 @@
 import * as React from "react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Pencil, Trash2 } from "lucide-react"
+import { Landmark, Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { CaseroRecord } from "@/types/Casero"
+import { useRoles } from "@/hooks/useRoles"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
@@ -28,12 +29,38 @@ function formatCurrency(value?: number | null) {
 export function useCaseroTable({
   onEdit,
   onDelete,
+  onGroundRentals,
 }: {
   onEdit: (row: CaseroRecord) => void
   onDelete: (row: CaseroRecord) => Promise<void> | void
+  onGroundRentals: (row: CaseroRecord) => void
 }) {
+  const { can } = useRoles()
+
   return React.useMemo<ColumnDef<CaseroRecord>[]>(
-    () => [
+    () => {
+      const actions = []
+      if (can("caseros.view")) actions.push({
+        key: "ground-rentals",
+        label: "Predios y rentas de piso",
+        icon: <Landmark className="h-4 w-4" />,
+        onClick: onGroundRentals,
+      })
+      if (can("caseros.edit")) actions.push({
+        key: "edit",
+        label: "Editar",
+        icon: <Pencil className="h-4 w-4" />,
+        onClick: onEdit,
+      })
+      if (can("caseros.delete")) actions.push({
+        key: "delete",
+        label: "Eliminar",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: onDelete,
+        variant: "destructive" as const,
+      })
+
+      return [
       {
         accessorKey: "nombre",
         header: "Casero",
@@ -97,23 +124,9 @@ export function useCaseroTable({
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<CaseroRecord>({
-        actions: [
-          {
-            key: "edit",
-            label: "Editar",
-            icon: <Pencil className="h-4 w-4" />,
-            onClick: onEdit,
-          },
-          {
-            key: "delete",
-            label: "Eliminar",
-            icon: <Trash2 className="h-4 w-4" />,
-            onClick: onDelete,
-            variant: "destructive",
-          },
-        ],
+        actions,
       }),
-    ],
-    [onEdit, onDelete]
+    ]},
+    [onEdit, onDelete, onGroundRentals, can]
   )
 }

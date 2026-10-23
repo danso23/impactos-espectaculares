@@ -6,35 +6,29 @@ El backend se despliega de forma manual desde GitHub Actions. No se ejecuta en c
 
 - `.github/workflows/deploy-backend-manual.yml`
 - Permite elegir la rama a desplegar.
-- Permite decidir si se corren migraciones en ese despliegue.
+- El deploy es por FTPS, igual que el frontend, porque en cPanel no tenemos SSH.
 
 ## Requisitos
 
-El workflow se conecta al servidor por SSH y copia el backend desde la ruta del repo en el servidor hacia la ruta publicada.
+El workflow sube los archivos del backend por FTPS hacia la ruta publicada.
 
 ### Secrets necesarios
 
 En **Settings** → **Secrets and variables** → **Actions** agrega:
 
-- `SSH_HOST`: host SSH del servidor.
-- `SSH_PORT`: puerto SSH, normalmente `22`.
-- `SSH_USER`: usuario SSH.
-- `SSH_KEY`: llave privada SSH.
-- `BACKEND_SOURCE_PATH`: ruta del repositorio en el servidor.
-- `BACKEND_TARGET_PATH`: ruta final donde vive el backend publicado.
-
-### Variable opcional
-
-- `PHP_BIN`: ruta del binario de PHP en el servidor. Si no se define, el workflow usa `php`.
+- `FTP_SERVER`: host FTP/FTPS del servidor.
+- `FTP_PORT`: puerto FTP, normalmente `21`.
+- `FTP_USERNAME`: usuario FTP.
+- `FTP_PASSWORD`: contraseña FTP.
+- `BACKEND_FTP_SERVER_DIR`: carpeta destino del backend en el servidor.
 
 ## Cómo funciona
 
 El despliegue:
 
-1. Sincroniza `espectacularesapi/` hacia la ruta publicada.
-2. Recrea el symlink de `public/storage` si no existe.
-3. Limpia cachés de `config` y `cache`.
-4. Si se marca la opción, corre `php artisan migrate --force`.
+1. Hace checkout de la rama elegida.
+2. Sube `espectacularesapi/` por FTPS.
+3. Conserva `.env`, `storage/` y `public/storage` en el servidor.
 
 ## Cómo ejecutarlo
 
@@ -42,13 +36,17 @@ El despliegue:
 2. Abre **Deploy Backend (Manual)**.
 3. Haz clic en **Run workflow**.
 4. Elige la rama.
-5. Activa o desactiva `run_migrations`.
+
+## Nota sobre migraciones
+
+Con FTP solamente no podemos ejecutar `php artisan migrate --force` desde GitHub Actions.
+Si hay migraciones nuevas, hay que correrlas aparte desde el entorno donde sí tengamos acceso a consola, por ejemplo con Docker local o desde cPanel si tienes terminal disponible.
 
 ## Nota para cPanel
 
-Si el backend vive dentro de cPanel Git Version Control, normalmente:
+Si el backend vive dentro de cPanel, normalmente:
 
-- `BACKEND_SOURCE_PATH` apunta a la ruta del checkout del repositorio.
-- `BACKEND_TARGET_PATH` apunta a la ruta publicada del backend.
+- `BACKEND_FTP_SERVER_DIR` apunta a la carpeta publicada del backend.
+- Debe terminar en `/` para que el despliegue no escriba fuera de la carpeta destino.
 
 Eso hace que el deploy quede separado del frontend y solo ocurra cuando lo lancemos manualmente.

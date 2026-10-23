@@ -1,9 +1,9 @@
 import { pdf } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
-import { SpacesCatalogDocument } from "./SpacesCatalogPdf";
+import { SpacesCatalogDocument, type CatalogSpace } from "./SpacesCatalogPdf";
+import { SpacesCatalogDocumentV1 } from "./SpacesCatalogPdfV1";
 import { env } from "@/config/env";
 import { getToken } from "@/lib/auth";
-import type { SpaceApi } from "@/types/Space";
 
 async function blobToDataUrl(blob: Blob) {
   return await new Promise<string>((resolve, reject) => {
@@ -14,13 +14,13 @@ async function blobToDataUrl(blob: Blob) {
   })
 }
 
-async function hydrateSpaceImages(spaces: SpaceApi[]) {
+async function hydrateSpaceImages(spaces: CatalogSpace[]) {
   const token = getToken()
 
   return await Promise.all(
     spaces.map(async (space) => {
       const images = await Promise.all(
-        (space.images ?? []).slice(0, 3).map(async (image) => {
+        (space.images ?? []).slice(0, 4).map(async (image) => {
           if (!image?.id || !env.apiUrl) return image
 
           const response = await fetch(
@@ -50,9 +50,32 @@ async function hydrateSpaceImages(spaces: SpaceApi[]) {
   )
 }
 
-export const downloadSpacesCatalog = async (spaces: SpaceApi[]) => {
-  const hydratedSpaces = await hydrateSpaceImages(spaces)
-  const blob = await pdf(<SpacesCatalogDocument spaces={hydratedSpaces} />).toBlob();
+export type SpacesCatalogVersion = "v1" | "v2";
 
-  saveAs(blob, "catalogo-espacios.pdf");
+export const createSpacesCatalogPdf = async (
+  spaces: CatalogSpace[],
+  version: SpacesCatalogVersion = "v2",
+  options: { enableMapLinks?: boolean } = {}
+) => {
+  const hydratedSpaces = await hydrateSpaceImages(spaces)
+  const enableMapLinks = options.enableMapLinks ?? true
+  const document = version === "v1"
+    ? <SpacesCatalogDocumentV1 spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />
+    : <SpacesCatalogDocument spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />
+  return await pdf(document).toBlob();
+};
+
+export const saveSpacesCatalogPdf = (
+  blob: Blob,
+  version: SpacesCatalogVersion = "v2"
+) => {
+  saveAs(blob, `catalogo-espacios-${version.toUpperCase()}.pdf`);
+};
+
+export const downloadSpacesCatalog = async (
+  spaces: CatalogSpace[],
+  version: SpacesCatalogVersion = "v2"
+) => {
+  const blob = await createSpacesCatalogPdf(spaces, version);
+  saveSpacesCatalogPdf(blob, version);
 };

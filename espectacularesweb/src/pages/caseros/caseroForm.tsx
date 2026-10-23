@@ -12,8 +12,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { CurpInput, RfcInput } from "@/components/ui/mexican-id-input"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { Label } from "@/components/ui/label"
+import { PhoneInput } from "@/components/ui/phone-input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -170,22 +172,18 @@ export function CaseroForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="casero-rfc">RFC</Label>
-              <Input
+              <RfcInput
                 id="casero-rfc"
                 value={form.rfc}
-                maxLength={13}
-                onChange={(e) => updateField("rfc", e.target.value.toUpperCase())}
-                placeholder="XAXX010101000"
+                onValueChange={(value) => updateField("rfc", value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="casero-curp">CURP</Label>
-              <Input
+              <CurpInput
                 id="casero-curp"
                 value={form.curp}
-                maxLength={18}
-                onChange={(e) => updateField("curp", e.target.value.toUpperCase())}
-                placeholder="XAXX010101HDFRRN09"
+                onValueChange={(value) => updateField("curp", value)}
               />
             </div>
           </div>
@@ -200,19 +198,19 @@ export function CaseroForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="casero-tel">Teléfono</Label>
-              <Input
+              <PhoneInput
                 id="casero-tel"
                 value={form.telefono}
-                onChange={(e) => updateField("telefono", e.target.value)}
+                onValueChange={(value) => updateField("telefono", value)}
                 placeholder="55 1234 5678"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="casero-tel2">Teléfono 2</Label>
-              <Input
+              <PhoneInput
                 id="casero-tel2"
                 value={form.telefono_2}
-                onChange={(e) => updateField("telefono_2", e.target.value)}
+                onValueChange={(value) => updateField("telefono_2", value)}
                 placeholder="Otro teléfono"
               />
             </div>

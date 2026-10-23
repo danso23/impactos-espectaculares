@@ -1,6 +1,7 @@
 // Para el DataTable cuando se le da click
 export type Space = {
   id: number;
+  ground_property_id?: number | null;
   title: string;
   price?: number;
   coords: { lat: number; lng: number };
@@ -18,9 +19,14 @@ export type Space = {
   description?: string | null;
   comments?: string | null;
   active?: boolean | null;
+  is_rotating?: boolean;
+  blocked_from?: string | null;
+  blocked_until?: string | null;
+  is_blocked_now?: boolean | null;
   latitude?: number | null;
   longitude?: number | null;
   images?: SpaceImageApi[];
+  imageUrls?: string[];
   coverImageUrl?: string | null;
 };
 
@@ -36,6 +42,10 @@ export type SpaceImageApi = {
 };
 
 export type SpaceFormValues = {
+  active?: boolean;
+  is_rotating?: boolean;
+  blocked_from?: string;
+  blocked_until?: string;
   faces?: number;
   latitude?: number;
   longitude?: number;
@@ -48,7 +58,7 @@ export type SpaceFormValues = {
   description?: string;
   has_lights?: boolean;
   socioeconomic_level?: string;
-  viewType?: "Vista natural" | "Vista cruzada";
+  viewType?: "Vista natural" | "Vista cruzada" | "Natural/Cruzada";
   images?: File[];
   comments?: string;
 };
@@ -62,22 +72,29 @@ export type CreateSpaceInput = {
   price?: number;
   type?: string;
   socioeconomic_level?: string;
-  viewType?: "Vista natural" | "Vista cruzada";
+  viewType?: "Vista natural" | "Vista cruzada" | "Natural/Cruzada";
   width_m?: number;
   height_m?: number;
   active?: boolean;
+  blocked_from?: string;
+  blocked_until?: string;
   images?: File[];
 };
 
 // PARA DATATABLE
 export type SpaceApi = {
   id: number;
+  ground_property_id?: number | null;
   title: string;
 
   type?: string | null;
   price?: number | string | null;
 
   active?: boolean | number | string | null;
+  is_rotating?: boolean | number | string | null;
+  blocked_from?: string | null;
+  blocked_until?: string | null;
+  is_blocked_now?: boolean | number | string | null;
   created_at?: string | null;
 
   latitude?: number | string | null;
@@ -96,4 +113,8 @@ export type SpaceApi = {
   images?: SpaceImageApi[];
 };
 
-export type SpaceFormPayload = SpaceFormValues & { images: File[] };
+export type SpaceFormPayload = SpaceFormValues & {
+  images: File[];
+  remove_image_ids?: number[];
+  image_order_ids?: number[];
+};

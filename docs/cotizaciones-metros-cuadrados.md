@@ -8,14 +8,15 @@ Agregar soporte para servicios cotizados por metros cuadrados, con un precio bas
 
 - Tabla nueva: `configurations`
 - Campo global: `price_per_square_meter`
-- Campo en el item de cotizacion: `square_meters`
-- Etiqueta UI: `Metros cuadrados`
+- Campos en el item de cotizacion: `width_m`, `height_m` y `square_meters`
+- Etiquetas UI: `Ancho`, `Altura` y `Total m²`
 - Etiqueta UI: `Precio por m2`
 
 ## Alcance funcional
 
 - Al agregar un servicio, precargar el valor de `price_per_square_meter` como precio por defecto.
-- Permitir que el usuario edite los metros cuadrados y el precio por m2 en cada renglon.
+- Permitir que el usuario edite el ancho, la altura y el precio por m2 en cada renglon.
+- Calcular `square_meters` con `width_m * height_m`.
 - Calcular el subtotal del servicio con `square_meters * unit_price`.
 - Quitar las fechas de inicio y fin del flujo de servicios en la cotizacion.
 - Mantener rentas y otros modulos sin cambios hasta confirmar si tambien deben ajustarse.
@@ -37,6 +38,8 @@ Si despues queremos mas configuraciones, esta misma tabla puede evolucionar a un
 
 Agregar:
 
+- `width_m` decimal(12,2) nullable
+- `height_m` decimal(12,2) nullable
 - `square_meters` decimal(12,2) nullable default 1
 
 Mantener:
@@ -46,7 +49,8 @@ Mantener:
 ## Ajustes en pantalla de cotizacion
 
 - Eliminar las columnas o inputs de `Desde` y `Hasta` en servicios.
-- Mostrar `Metros cuadrados` como campo editable.
+- Mostrar `Ancho` y `Altura` como campos editables.
+- Mostrar `Total m²` como valor calculado de solo lectura.
 - Mostrar `Precio por m2` como campo editable.
 - Dejar el subtotal visible y recalculado al editar cualquiera de los dos campos.
 - Tomar el precio inicial desde la configuracion global.
@@ -62,7 +66,7 @@ Mantener:
 ## Orden sugerido de implementacion
 
 1. Crear `configurations` con el precio default del m2.
-2. Agregar `square_meters` a `quote_items`.
+2. Agregar `width_m`, `height_m` y `square_meters` a `quote_items`.
 3. Ajustar calculo y validaciones del backend.
 4. Cambiar la UI para servicios.
 5. Actualizar PDF, preview y tipos.
@@ -78,5 +82,5 @@ Mantener:
 La opcion mas limpia para este caso es:
 
 - usar `configurations.price_per_square_meter` como valor global por defecto
-- usar `quote_items.square_meters` como cantidad editable del servicio
+- calcular `quote_items.square_meters` a partir de `width_m * height_m`
 - mantener `unit_price` como precio por m2

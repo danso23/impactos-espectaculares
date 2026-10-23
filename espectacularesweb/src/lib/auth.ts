@@ -19,6 +19,7 @@ export const tokenStore = {
     localStorage.removeItem("refresh_token")
     localStorage.removeItem("user")
     localStorage.removeItem("token") // legacy
+    localStorage.removeItem("espectaculares.session.last_activity")
   },
 }
 

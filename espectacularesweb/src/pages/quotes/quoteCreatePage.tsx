@@ -1,14 +1,14 @@
 import * as React from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { toast } from "sonner"
-import { FileDown, RefreshCw, Save, Trash2, ImagePlus, X } from "lucide-react"
+import { ArrowLeft, FileDown, RefreshCw, Save, Search, Trash2, ImagePlus, X } from "lucide-react"
 
 import {
   useCreateQuote,
   useQuoteCatalogs,
-  useQuoteCustomerSearch,
   useUpdateQuoteConfiguration,
 } from "@/lib/hooks/quoteHook"
+import { useSpaces } from "@/lib/hooks/spaceHook"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { previewQuote } from "@/lib/services/quoteService"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { QuoteCustomerSelector } from "@/pages/quotes/quoteCustomerSelector"
 import type {
   CustomerType,
   QuoteAmountType,
@@ -32,17 +43,19 @@ import type {
   QuoteCreatePageSpaceSeed,
   QuoteCustomer,
   QuoteItemInput,
+  QuoteKind,
   QuotePayload,
   QuotePreviewData,
   QuoteRecord,
-  SearchableCustomerType,
 } from "@/types/Quote"
+import type { SpaceApi } from "@/types/Space"
 
 type QuoteLocationState = {
   spaces?: QuoteCreatePageSpaceSeed[]
 }
 
 const CURRENCY = "MXN"
+const ADVERTISEMENT_SERVICE_KEY = "anuncio"
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("es-MX", {
@@ -85,7 +98,7 @@ function normalizeSpaceSeed(space: QuoteCreatePageSpaceSeed, index: number): Quo
 
 function calculateItemSubtotal(item: QuoteItemInput) {
   const quantity = Math.max(1, item.qty)
-  const squareMeters = Math.max(0.01, toNumber(item.square_meters ?? 1))
+  const squareMeters = calculateSquareMeters(item)
   const unitPrice = toNumber(item.unit_price)
 
   if (item.item_type === "service") {
@@ -93,6 +106,17 @@ function calculateItemSubtotal(item: QuoteItemInput) {
   }
 
   return quantity * unitPrice
+}
+
+function calculateSquareMeters(item: QuoteItemInput) {
+  const width = toNumber(item.width_m)
+  const height = toNumber(item.height_m)
+
+  if (item.item_type === "service" && width > 0 && height > 0) {
+    return Math.round(width * height * 100) / 100
+  }
+
+  return Math.max(0.01, toNumber(item.square_meters ?? 1))
 }
 
 function isQuoteAmountType(value: string): value is QuoteAmountType {
@@ -124,9 +148,8 @@ export default function QuoteCreatePage() {
   const updateConfigurationMutation = useUpdateQuoteConfiguration()
 
   const [customerType, setCustomerType] = React.useState<CustomerType>("lead")
-  const [customerSearch, setCustomerSearch] = React.useState("")
   const [selectedCustomer, setSelectedCustomer] = React.useState<QuoteCustomer | null>(null)
-  const [showCustomerList, setShowCustomerList] = React.useState(false)
+  const [quoteKind, setQuoteKind] = React.useState<QuoteKind>("space")
 
   const [companyId, setCompanyId] = React.useState<number | null>(null)
   const [letterheadId, setLetterheadId] = React.useState<number | null>(null)
@@ -136,11 +159,11 @@ export default function QuoteCreatePage() {
   const [taxRate, setTaxRate] = React.useState(16)
   const [discountType, setDiscountType] = React.useState<QuoteAmountType>("none")
   const [discountValue, setDiscountValue] = React.useState(0)
-  const [commissionType, setCommissionType] = React.useState<QuoteAmountType>("none")
-  const [commissionValue, setCommissionValue] = React.useState(0)
   const [termsHtml, setTermsHtml] = React.useState("")
   const [notes, setNotes] = React.useState("")
   const [selectedServiceId, setSelectedServiceId] = React.useState<string>("")
+  const [advertisementIdSearch, setAdvertisementIdSearch] = React.useState("")
+  const [debouncedAdvertisementId, setDebouncedAdvertisementId] = React.useState("")
   const [squareMeterPrice, setSquareMeterPrice] = React.useState(0)
   const [quoteImages, setQuoteImages] = React.useState<File[]>([])
   const [quoteImageUrls, setQuoteImageUrls] = React.useState<string[]>([])
@@ -152,14 +175,11 @@ export default function QuoteCreatePage() {
   const [previewError, setPreviewError] = React.useState<string | null>(null)
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(false)
   const [savedQuote, setSavedQuote] = React.useState<QuoteRecord | null>(null)
+  const [exitDialogOpen, setExitDialogOpen] = React.useState(false)
   const previewRequestId = React.useRef(0)
-  const customerSearchRef = React.useRef<HTMLDivElement | null>(null)
+  const initialFormFingerprint = React.useRef<string | null>(null)
+  const allowNavigation = React.useRef(false)
   const isWithoutCustomer = customerType === "sin_cliente"
-  const customerSearchType: SearchableCustomerType = customerType === "cliente" ? "cliente" : "lead"
-  const customerListLabel = customerSearchType === "cliente" ? "clientes" : "leads"
-  const customerSearchTerm = customerSearch.trim()
-
-  const customerQuery = useQuoteCustomerSearch(customerSearch, customerSearchType, !isWithoutCustomer)
 
   const catalogs = catalogsQuery.data?.data
   const companies = React.useMemo(() => catalogs?.companies ?? [], [catalogs])
@@ -167,6 +187,27 @@ export default function QuoteCreatePage() {
   const services = React.useMemo(() => catalogs?.services ?? [], [catalogs])
   const letterheads = React.useMemo(() => catalogs?.letterheads ?? [], [catalogs])
   const showRentalDates = React.useMemo(() => items.some((item) => item.item_type === "rental"), [items])
+  const selectedAdvertisementService = React.useMemo(
+    () => services.find(
+      (service) => service.id === Number(selectedServiceId) && service.key === ADVERTISEMENT_SERVICE_KEY,
+    ) ?? null,
+    [selectedServiceId, services],
+  )
+  const advertisementSearchQuery = useSpaces({
+    page: 1,
+    per_page: 10,
+    assigned_id: debouncedAdvertisementId,
+  }, Boolean(selectedAdvertisementService && debouncedAdvertisementId))
+  const advertisementMatches = advertisementSearchQuery.data?.data ?? []
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedAdvertisementId(advertisementIdSearch.trim()),
+      300,
+    )
+
+    return () => window.clearTimeout(timer)
+  }, [advertisementIdSearch])
 
   React.useEffect(() => {
     if (catalogs?.configuration?.price_per_square_meter === undefined) return
@@ -190,6 +231,11 @@ export default function QuoteCreatePage() {
   const companyLetterheads = React.useMemo(
     () => letterheads.filter((letterhead) => letterhead.company_id === companyId),
     [letterheads, companyId]
+  )
+
+  const selectedLetterhead = React.useMemo(
+    () => companyLetterheads.find((letterhead) => letterhead.id === letterheadId) ?? null,
+    [companyLetterheads, letterheadId]
   )
 
   const selectedAgency = React.useMemo(
@@ -216,42 +262,113 @@ export default function QuoteCreatePage() {
     setLetterheadId(defaultLetterhead?.id ?? null)
   }, [companyLetterheads, letterheadId, selectedCompany])
 
+  const formFingerprint = React.useMemo(
+    () => JSON.stringify({
+      quoteKind,
+      customerType,
+      customerId: selectedCustomer?.id ?? null,
+      companyId,
+      letterheadId,
+      agencyId,
+      validUntil,
+      includeTax,
+      taxRate,
+      discountType,
+      discountValue,
+      termsHtml,
+      notes,
+      items,
+      images: quoteImages.map((file) => ({
+        name: file.name,
+        size: file.size,
+        lastModified: file.lastModified,
+      })),
+    }),
+    [
+      agencyId,
+      companyId,
+      customerType,
+      discountType,
+      discountValue,
+      includeTax,
+      items,
+      letterheadId,
+      notes,
+      quoteImages,
+      quoteKind,
+      selectedCustomer?.id,
+      taxRate,
+      termsHtml,
+      validUntil,
+    ],
+  )
+
   React.useEffect(() => {
-    if (!showCustomerList) return
+    if (initialFormFingerprint.current !== null) return
+    if (catalogsQuery.isLoading) return
+    if (companies.length > 0 && !companyId) return
+    if (companyLetterheads.length > 0 && !letterheadId) return
 
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (!target || customerSearchRef.current?.contains(target)) return
-      setShowCustomerList(false)
+    initialFormFingerprint.current = formFingerprint
+  }, [
+    catalogsQuery.isLoading,
+    companies.length,
+    companyId,
+    companyLetterheads.length,
+    formFingerprint,
+    letterheadId,
+  ])
+
+  const hasUnsavedChanges =
+    seededSpaces.length > 0 ||
+    (initialFormFingerprint.current !== null && initialFormFingerprint.current !== formFingerprint)
+
+  React.useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges || allowNavigation.current) return
+      event.preventDefault()
+      event.returnValue = ""
     }
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShowCustomerList(false)
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  React.useEffect(() => {
+    const handleLinkNavigation = (event: MouseEvent) => {
+      if (!hasUnsavedChanges || allowNavigation.current || event.defaultPrevented) return
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+      const target = event.target
+      if (!(target instanceof Element)) return
+
+      const link = target.closest("a[href]")
+      if (!(link instanceof HTMLAnchorElement)) return
+
+      const destination = new URL(link.href, window.location.href)
+      if (destination.origin !== window.location.origin) return
+      if (destination.pathname === window.location.pathname && destination.search === window.location.search) return
+
+      const shouldLeave = window.confirm(
+        "Tienes cambios sin guardar. Si sales perderás todos los avances de esta cotización. ¿Deseas continuar?",
+      )
+
+      if (!shouldLeave) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return
       }
+
+      allowNavigation.current = true
     }
 
-    document.addEventListener("pointerdown", handlePointerDown, true)
-    document.addEventListener("keydown", handleKeyDown)
+    document.addEventListener("click", handleLinkNavigation, true)
+    return () => document.removeEventListener("click", handleLinkNavigation, true)
+  }, [hasUnsavedChanges])
 
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true)
-      document.removeEventListener("keydown", handleKeyDown)
-    }
-  }, [showCustomerList])
-
-  const filteredCustomerResults = customerQuery.data?.data ?? []
-  const customerSearchHasData = !!customerQuery.data
   const customerDisplayName = isWithoutCustomer
     ? "Sin cliente"
     : selectedCustomer?.display_name ?? "Pendiente"
-  const customerSelectionHint = isWithoutCustomer
-    ? "La cotización se guardará sin cliente asignado."
-    : selectedCustomer
-      ? `Seleccionado: ${selectedCustomer.display_name}.`
-      : customerType === "lead"
-        ? "Selecciona un lead disponible o cambia el tipo a Sin cliente si no deseas asignar uno."
-        : "Selecciona un cliente disponible o cambia el tipo a Sin cliente si no deseas asignar uno."
   const saveBlockingMessage =
     !companyId
       ? "Selecciona una empresa emisora."
@@ -266,6 +383,7 @@ export default function QuoteCreatePage() {
     if (!isWithoutCustomer && !selectedCustomer) return null
 
     return {
+      quote_kind: quoteKind,
       customer: {
         type: customerType,
         id: isWithoutCustomer ? null : selectedCustomer?.id ?? null,
@@ -280,16 +398,14 @@ export default function QuoteCreatePage() {
         type: discountType,
         value: discountValue,
       },
-      commission: {
-        type: commissionType,
-        value: commissionValue,
-      },
       terms_html: termsHtml || null,
       notes: notes || null,
       items: items.map((item, index) => ({
         ...item,
         qty: Math.max(1, item.qty),
-        square_meters: Math.max(0.01, toNumber(item.square_meters ?? 1)),
+        width_m: item.item_type === "service" ? Math.max(0.01, toNumber(item.width_m ?? 1)) : null,
+        height_m: item.item_type === "service" ? Math.max(0.01, toNumber(item.height_m ?? 1)) : null,
+        square_meters: calculateSquareMeters(item),
         unit_price: toNumber(item.unit_price),
         tax_rate: toNumber(item.tax_rate ?? taxRate),
         sort_order: index,
@@ -298,8 +414,6 @@ export default function QuoteCreatePage() {
   }, [
     agencyId,
     companyId,
-    commissionType,
-    commissionValue,
     customerType,
     discountType,
     discountValue,
@@ -308,6 +422,7 @@ export default function QuoteCreatePage() {
     items,
     letterheadId,
     notes,
+    quoteKind,
     selectedCustomer,
     taxRate,
     termsHtml,
@@ -375,6 +490,24 @@ export default function QuoteCreatePage() {
     setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
   }
 
+  const updateServiceDimension = (index: number, dimension: "width_m" | "height_m", value: number) => {
+    setItems((prev) =>
+      prev.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+
+        const nextItem = {
+          ...item,
+          [dimension]: Math.max(0.01, value),
+        }
+
+        return {
+          ...nextItem,
+          square_meters: calculateSquareMeters(nextItem),
+        }
+      })
+    )
+  }
+
   const addService = (service: QuoteCatalogService) => {
     setItems((prev) => [
       ...prev,
@@ -384,6 +517,8 @@ export default function QuoteCreatePage() {
         concept: service.name,
         description: service.description ?? null,
         qty: 1,
+        width_m: 1,
+        height_m: 1,
         square_meters: 1,
         unit_price: squareMeterPrice,
         sort_order: prev.length,
@@ -394,6 +529,36 @@ export default function QuoteCreatePage() {
     setSelectedServiceId("")
   }
 
+  const addAdvertisement = (service: QuoteCatalogService, advertisement: SpaceApi) => {
+    const assignedId = advertisement.assigned_id?.trim() || String(advertisement.id)
+    const width = toNumber(advertisement.width_m)
+    const height = toNumber(advertisement.height_m)
+    const squareMeters = width > 0 && height > 0 ? width * height : 1
+
+    setItems((prev) => [
+      ...prev,
+      {
+        item_type: "service",
+        service_id: service.id,
+        space_id: advertisement.id,
+        concept: `Anuncio ${assignedId}`,
+        description: advertisement.title,
+        qty: 1,
+        width_m: width > 0 ? width : 1,
+        height_m: height > 0 ? height : 1,
+        square_meters: squareMeters,
+        unit_price: squareMeterPrice || toNumber(service.base_price),
+        faces: toNumber(advertisement.faces) || null,
+        sort_order: prev.length,
+        discount_applies: false,
+        tax_rate: toNumber(service.tax_rate),
+      },
+    ])
+    setSelectedServiceId("")
+    setAdvertisementIdSearch("")
+    setDebouncedAdvertisementId("")
+  }
+
   const addManualService = () => {
     setItems((prev) => [
       ...prev,
@@ -402,6 +567,8 @@ export default function QuoteCreatePage() {
         concept: "",
         description: null,
         qty: 1,
+        width_m: 1,
+        height_m: 1,
         square_meters: 1,
         unit_price: squareMeterPrice,
         sort_order: prev.length,
@@ -453,15 +620,11 @@ export default function QuoteCreatePage() {
     if (!nextAgency) {
       setDiscountType("none")
       setDiscountValue(0)
-      setCommissionType("none")
-      setCommissionValue(0)
       return
     }
 
     setDiscountType(nextAgency.discount_type)
     setDiscountValue(toNumber(nextAgency.discount_value))
-    setCommissionType(nextAgency.commission_type)
-    setCommissionValue(toNumber(nextAgency.commission_value))
   }
 
   const handleSaveSquareMeterPrice = async () => {
@@ -491,6 +654,7 @@ export default function QuoteCreatePage() {
       setPreview(null)
       setQuoteImages([])
       toast.success(`Cotización ${response.data.folio} guardada correctamente.`)
+      allowNavigation.current = true
       if (window.history.length > 1) {
         navigate(-1)
       } else {
@@ -501,31 +665,37 @@ export default function QuoteCreatePage() {
     }
   }
 
-  const handleDownloadPdf = () => {
-    if (savedQuote) {
-      downloadQuotePdf(savedQuote, `${savedQuote.folio}.pdf`)
-      return
-    }
+  const handleDownloadPdf = async () => {
+    try {
+      if (savedQuote) {
+        await downloadQuotePdf(savedQuote, `${savedQuote.folio}.pdf`)
+        return
+      }
 
-    if (!preview) {
-      toast.error("Genera primero la vista previa para descargar el PDF.")
-      return
-    }
+      if (!preview) {
+        toast.error("Genera primero la vista previa para descargar el PDF.")
+        return
+      }
 
-    downloadQuotePdf(
-      {
-        customer: preview.customer,
-        company: preview.company,
-        agency: preview.agency,
-        items: preview.items,
-        totals: preview.totals,
-        notes: notes || null,
-        terms_html: preview.resolved.terms_html ?? termsHtml ?? null,
-        includes_tax: preview.resolved.includes_tax,
-        valid_until: validUntil || null,
-      },
-      "cotizacion-preliminar.pdf"
-    )
+      await downloadQuotePdf(
+        {
+          quote_kind: quoteKind,
+          customer: preview.customer,
+          company: preview.company,
+          letterhead: selectedLetterhead ?? preview.letterhead,
+          agency: preview.agency,
+          items: preview.items,
+          totals: preview.totals,
+          notes: notes || null,
+          terms_html: preview.resolved.terms_html ?? termsHtml ?? null,
+          includes_tax: preview.resolved.includes_tax,
+          valid_until: validUntil || null,
+        },
+        "cotizacion-preliminar.pdf"
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible generar el PDF.")
+    }
   }
 
   const localSubtotal = React.useMemo(
@@ -533,13 +703,34 @@ export default function QuoteCreatePage() {
     [items]
   )
 
+  const handleBackToQuotes = () => {
+    if (hasUnsavedChanges) {
+      setExitDialogOpen(true)
+      return
+    }
+
+    navigate("/cotizaciones")
+  }
+
+  const confirmExit = () => {
+    allowNavigation.current = true
+    setExitDialogOpen(false)
+    navigate("/cotizaciones")
+  }
+
   return (
     <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-semibold">Nueva cotización</h1>
-        <p className="text-sm text-muted-foreground">
-          Esta pantalla ya consume catálogos y cálculo comercial desde el backend de cotizaciones.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold">Nueva cotización</h1>
+          <p className="text-sm text-muted-foreground">
+            Esta pantalla ya consume catálogos y cálculo comercial desde el backend de cotizaciones.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={handleBackToQuotes}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Volver a cotizaciones
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,2fr)_380px]">
@@ -550,85 +741,27 @@ export default function QuoteCreatePage() {
               <CardDescription>Cliente, empresa emisora, agencia y vigencia.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <QuoteField label="Tipo de cliente">
-                    <Select
-                      value={customerType}
-                      onValueChange={(value) => {
-                        setCustomerType(value as CustomerType)
-                        setSelectedCustomer(null)
-                        setCustomerSearch("")
-                        setShowCustomerList(value !== "sin_cliente")
-                      }}
-                    >
+              <QuoteField label="Tipo de cotización">
+                <Select
+                  value={quoteKind}
+                  onValueChange={(value) => setQuoteKind(value as QuoteKind)}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecciona" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="lead">Lead / Prospecto</SelectItem>
-                    <SelectItem value="cliente">Cliente</SelectItem>
-                    <SelectItem value="sin_cliente">Sin cliente</SelectItem>
+                    <SelectItem value="advertisement">Anuncio</SelectItem>
+                    <SelectItem value="space">Espacio</SelectItem>
                   </SelectContent>
                 </Select>
               </QuoteField>
 
-              {isWithoutCustomer ? (
-                <QuoteField label="Cliente">
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                    La cotización se guardará sin cliente asignado.
-                  </div>
-                </QuoteField>
-              ) : (
-                <div ref={customerSearchRef} className="relative space-y-2">
-                  <Label>Cliente</Label>
-                  <Input
-                    placeholder="Buscar cliente..."
-                    value={selectedCustomer ? selectedCustomer.display_name : customerSearch}
-                    onChange={(event) => {
-                      setCustomerSearch(event.target.value)
-                      setSelectedCustomer(null)
-                      setShowCustomerList(true)
-                    }}
-                    onFocus={() => setShowCustomerList(true)}
-                  />
-
-                  {showCustomerList && !selectedCustomer ? (
-                    <Card className="absolute z-20 mt-1 max-h-60 w-full overflow-auto">
-                      <CardContent className="space-y-1 p-2">
-                        {customerQuery.isFetching && !customerSearchHasData ? (
-                          <div className="p-2 text-sm text-muted-foreground">Buscando...</div>
-                        ) : null}
-
-                        {customerSearchHasData && filteredCustomerResults.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground">
-                            {customerSearchTerm
-                              ? `Sin resultados para "${customerSearchTerm}".`
-                              : `No hay ${customerListLabel} disponibles.`}
-                          </div>
-                        ) : null}
-
-                        {filteredCustomerResults.map((customer) => (
-                          <button
-                            key={`${customer.type}-${customer.id}`}
-                            type="button"
-                            className="flex w-full flex-col rounded-md px-3 py-2 text-left hover:bg-muted"
-                            onClick={() => {
-                              setSelectedCustomer(customer)
-                              setCustomerSearch(customer.display_name)
-                              setShowCustomerList(false)
-                            }}
-                          >
-                            <span className="text-sm font-medium">{customer.display_name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {customer.contact_name || customer.email || customer.phone || "Sin datos extra"}
-                            </span>
-                          </button>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">{customerSelectionHint}</p>
-                </div>
-              )}
+              <QuoteCustomerSelector
+                customerType={customerType}
+                selectedCustomer={selectedCustomer}
+                onCustomerTypeChange={setCustomerType}
+                onCustomerChange={setSelectedCustomer}
+              />
 
               <QuoteField label="Empresa emisora">
                 <Select
@@ -738,35 +871,6 @@ export default function QuoteCreatePage() {
                 </div>
               </QuoteField>
 
-              <QuoteField label="Comisión">
-                <div className="grid grid-cols-[140px_1fr] gap-2">
-                  <Select
-                    value={commissionType}
-                    onValueChange={(value) => {
-                      if (!isQuoteAmountType(value)) return
-                      setCommissionType(value)
-                      if (value === "none") {
-                        setCommissionValue(0)
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin comisión</SelectItem>
-                      <SelectItem value="percent">Porcentaje</SelectItem>
-                      <SelectItem value="fixed">Monto fijo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <NumericInput
-                    disabled={commissionType === "none"}
-                    value={commissionValue}
-                    onValueChange={setCommissionValue}
-                  />
-                </div>
-              </QuoteField>
-
               <div className="md:col-span-2">
                 <div className="rounded-lg border bg-muted/20 p-4">
                   <div className="mb-3">
@@ -809,7 +913,7 @@ export default function QuoteCreatePage() {
                   onValueChange={(value) => {
                     setSelectedServiceId(value)
                     const service = services.find((entry) => entry.id === Number(value))
-                    if (service) addService(service)
+                    if (service && service.key !== ADVERTISEMENT_SERVICE_KEY) addService(service)
                   }}
                 >
                   <SelectTrigger className="md:max-w-sm">
@@ -829,15 +933,68 @@ export default function QuoteCreatePage() {
                 </Button>
               </div>
 
+              {selectedAdvertisementService ? (
+                <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50/50 p-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-sky-950">Seleccionar anuncio</h3>
+                    <p className="text-xs text-sky-800">
+                      Busca el ID asignado manualmente al anuncio, no el ID interno del sistema.
+                    </p>
+                  </div>
+
+                  <div className="relative max-w-md">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      autoFocus
+                      className="bg-white pl-9"
+                      value={advertisementIdSearch}
+                      onChange={(event) => setAdvertisementIdSearch(event.target.value)}
+                      placeholder="Ej. AN-001"
+                    />
+                  </div>
+
+                  {debouncedAdvertisementId ? (
+                    <div className="max-h-56 space-y-2 overflow-y-auto">
+                      {advertisementSearchQuery.isFetching ? (
+                        <p className="text-sm text-muted-foreground">Buscando anuncios...</p>
+                      ) : advertisementMatches.length ? (
+                        advertisementMatches.map((advertisement) => (
+                          <button
+                            key={advertisement.id}
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-sky-100 bg-white px-3 py-2 text-left transition-colors hover:border-sky-300 hover:bg-sky-50"
+                            onClick={() => addAdvertisement(selectedAdvertisementService, advertisement)}
+                          >
+                            <span>
+                              <span className="block text-sm font-semibold text-slate-900">
+                                ID {advertisement.assigned_id || "sin ID asignado"}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">{advertisement.title}</span>
+                            </span>
+                            <span className="text-xs font-medium text-sky-700">Agregar</span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No se encontró un anuncio con ese ID.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="overflow-x-auto">
-                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1040px]" : "min-w-[920px]"}`}>
+                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1240px]" : "min-w-[1080px]"}`}>
                   <thead className="border-b text-muted-foreground">
                     <tr>
                       <th className="py-3 text-left">Tipo</th>
                       <th className="text-left">Concepto</th>
                       {showRentalDates ? <th className="text-left">Desde</th> : null}
                       {showRentalDates ? <th className="text-left">Hasta</th> : null}
-                      <th className="text-left">Metros cuadrados</th>
+                      <th className="text-left">Ancho (m)</th>
+                      <th className="text-left">Altura (m)</th>
+                      <th className="text-right">Total m²</th>
                       <th className="text-left">Precio / m2</th>
                       <th className="text-right">Subtotal</th>
                       <th className="text-right">Acciones</th>
@@ -897,14 +1054,25 @@ export default function QuoteCreatePage() {
                           <td className="py-4">
                             {item.item_type === "service" ? (
                               <NumericInput
-                                value={item.square_meters ?? 1}
-                                onValueChange={(value) =>
-                                  updateItem(index, { square_meters: Math.max(0.01, value) })
-                                }
+                                value={item.width_m ?? 1}
+                                onValueChange={(value) => updateServiceDimension(index, "width_m", value)}
                               />
                             ) : (
                               <div className="py-2 text-center text-muted-foreground">—</div>
                             )}
+                          </td>
+                          <td className="py-4">
+                            {item.item_type === "service" ? (
+                              <NumericInput
+                                value={item.height_m ?? 1}
+                                onValueChange={(value) => updateServiceDimension(index, "height_m", value)}
+                              />
+                            ) : (
+                              <div className="py-2 text-center text-muted-foreground">—</div>
+                            )}
+                          </td>
+                          <td className="py-4 text-right font-medium">
+                            {item.item_type === "service" ? calculateSquareMeters(item).toFixed(2) : "—"}
                           </td>
                           <td className="py-4">
                             <NumericInput
@@ -1044,10 +1212,6 @@ export default function QuoteCreatePage() {
                 <span>IVA</span>
                 <span>{formatCurrency(preview?.totals.tax ?? 0)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>Comisión agencia</span>
-                <span>{formatCurrency(preview?.totals.commission_amount ?? 0)}</span>
-              </div>
               <div className="flex justify-between border-t pt-3 text-base font-semibold">
                 <span>Total</span>
                 <span>{formatCurrency(preview?.totals.total ?? 0)}</span>
@@ -1068,6 +1232,7 @@ export default function QuoteCreatePage() {
               <div className="rounded-md border bg-muted/50 p-3 text-xs text-muted-foreground">
                 <div>Cliente: {customerDisplayName}</div>
                 <div>Empresa: {selectedCompany?.name ?? "Pendiente"}</div>
+                <div>Membretado: {selectedLetterhead?.name ?? "Sin membrete"}</div>
                 <div>Agencia: {selectedAgency?.name ?? "Sin agencia"}</div>
               </div>
 
@@ -1075,7 +1240,7 @@ export default function QuoteCreatePage() {
                 <Button
                   variant="outline"
                   onClick={handleDownloadPdf}
-                  disabled={!preview && !savedQuote}
+                  disabled={(!preview && !savedQuote) || isPreviewLoading}
                 >
                   <FileDown className="mr-2 h-4 w-4" />
                   Descargar cotización PDF
@@ -1096,6 +1261,23 @@ export default function QuoteCreatePage() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Salir de la nueva cotización?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tienes cambios sin guardar. Si sales ahora perderás todos los avances de esta cotización.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Seguir editando</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmExit}>
+              Salir sin guardar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

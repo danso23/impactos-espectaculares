@@ -39,7 +39,8 @@ export function useRoles() {
 
     const can = (permissionName: string) => {
         if (!user) return false
-        if (user.roles?.includes('admin')) return true
+        if (user.roles?.some(role => role.toLowerCase() === 'admin')) return true
+        if (user.role?.toLowerCase() === 'admin') return true
         if (!user.permissions) return false
         return user.permissions.includes(permissionName)
     }

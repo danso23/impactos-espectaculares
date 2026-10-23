@@ -6,6 +6,7 @@ use App\Models\Entities\Space;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 
@@ -14,6 +15,35 @@ class SpaceController extends BaseCrudController
     protected function model(): string
     {
         return Space::class;
+    }
+
+    protected function applyIndexQuery($query, Request $request)
+    {
+        $activeFilter = $request->filled('active') ? (int) $request->get('active') : null;
+
+        if ($activeFilter !== null) {
+            $request->query->remove('active');
+        }
+
+        $query = parent::applyIndexQuery($query, $request);
+
+        if ($activeFilter !== null) {
+            $request->query->set('active', $activeFilter);
+            $activeFilter === 1
+                ? $query->currentlyAvailable()
+                : $query->currentlyBlocked();
+        }
+
+        if ($request->filled('assigned_id')) {
+            $assignedId = trim((string) $request->get('assigned_id'));
+            $query->where('assigned_id', 'like', "%{$assignedId}%");
+        }
+
+        if ($request->filled('is_rotating')) {
+            $query->where('is_rotating', filter_var($request->get('is_rotating'), FILTER_VALIDATE_BOOLEAN));
+        }
+
+        return $query;
     }
 
     protected function rulesStore(Request $request): array
@@ -30,6 +60,9 @@ class SpaceController extends BaseCrudController
             'latitude'              => ['nullable', 'numeric', 'between:-90,90'],
             'longitude'             => ['nullable', 'numeric', 'between:-180,180'],
             'active'                => ['nullable', 'boolean'],
+            'is_rotating'           => ['nullable', 'boolean'],
+            'blocked_from'          => ['nullable', 'date_format:Y-m-d', 'required_if:active,0'],
+            'blocked_until'         => ['nullable', 'date_format:Y-m-d', 'after_or_equal:blocked_from', 'required_if:active,0'],
             'faces'                 => ['required', 'numeric', 'min:0'],
             'has_lights'            => ['required', 'boolean'],
             'view_type'             => ['nullable', 'string', 'max:255'],
@@ -37,7 +70,7 @@ class SpaceController extends BaseCrudController
 
             // imágenes
             'images'                => ['nullable', 'array', 'max:10'],
-            'images.*'              => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images.*'              => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
         ];
     }
 
@@ -55,6 +88,9 @@ class SpaceController extends BaseCrudController
             'latitude'              => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude'             => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
             'active'                => ['sometimes', 'nullable', 'boolean'],
+            'is_rotating'           => ['sometimes', 'nullable', 'boolean'],
+            'blocked_from'          => ['sometimes', 'nullable', 'date_format:Y-m-d', 'required_if:active,0'],
+            'blocked_until'         => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:blocked_from', 'required_if:active,0'],
             'faces'                 => ['sometimes', 'nullable', 'integer', 'min:0'],
             'has_lights'            => ['sometimes', 'nullable', 'boolean'],
             'view_type'             => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -62,14 +98,44 @@ class SpaceController extends BaseCrudController
 
             // mágenes (en update las agregamos)
             'images' => ['sometimes', 'nullable', 'array', 'max:10'],
-            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:15360'],
+            'remove_image_ids' => ['sometimes', 'array'],
+            'remove_image_ids.*' => ['integer', 'distinct'],
+            'image_order_ids' => ['sometimes', 'array', 'max:10'],
+            'image_order_ids.*' => ['integer', 'distinct'],
         ];
+    }
+
+    protected function beforeStore(array $data, Request $request): array
+    {
+        if (filter_var($data['active'] ?? true, FILTER_VALIDATE_BOOLEAN)) {
+            $data['blocked_from'] = null;
+            $data['blocked_until'] = null;
+        }
+
+        return $data;
+    }
+
+    protected function beforeUpdate(array $data, Request $request, \Illuminate\Database\Eloquent\Model $model): array
+    {
+        if (
+            array_key_exists('active', $data) &&
+            filter_var($data['active'], FILTER_VALIDATE_BOOLEAN)
+        ) {
+            $data['blocked_from'] = null;
+            $data['blocked_until'] = null;
+        }
+
+        return $data;
     }
 
     // --- override store ---
     public function index(Request $request)
     {
-        $q = Space::query()->with('images');
+        $q = Space::query()
+            ->select('spaces.*')
+            ->withBlockStatus()
+            ->with('images');
 
         $q = $this->applyIndexQuery($q, $request);
         $q = $this->indexOrder($q, $request);
@@ -77,7 +143,7 @@ class SpaceController extends BaseCrudController
         $perPage = (int) $request->get('perPage', $request->get('per_page', 10));
         $page = (int) $request->get('page', 1);
 
-        $items = $q->select($this->indexSelect())->paginate($perPage, ['*'], 'page', $page);
+        $items = $q->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'data' => $items->items(),
@@ -87,6 +153,19 @@ class SpaceController extends BaseCrudController
                 'total' => $items->total(),
                 'totalPages' => $items->lastPage(),
             ],
+        ]);
+    }
+
+    public function find($id)
+    {
+        $space = Space::query()
+            ->select('spaces.*')
+            ->withBlockStatus()
+            ->with('images')
+            ->findOrFail($id);
+
+        return response()->json([
+            'data' => $space,
         ]);
     }
 
@@ -130,10 +209,41 @@ class SpaceController extends BaseCrudController
         $data = $validator->validated();
         $data = $this->beforeUpdate($data, $request, $space);
 
+        $removeImageIds = collect($data['remove_image_ids'] ?? [])
+            ->map(fn ($imageId) => (int) $imageId)
+            ->unique()
+            ->values();
+        $imageOrderIds = collect($data['image_order_ids'] ?? [])
+            ->map(fn ($imageId) => (int) $imageId)
+            ->unique()
+            ->values()
+            ->all();
+        unset($data['remove_image_ids'], $data['image_order_ids'], $data['images']);
+
+        $remainingImageCount = $space->images()
+            ->when($removeImageIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $removeImageIds))
+            ->count();
+        $newImages = $request->file('images', []);
+        $newImageCount = is_array($newImages) ? count($newImages) : ($newImages ? 1 : 0);
+
+        if ($remainingImageCount + $newImageCount > 10) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => ['images' => ['El espacio puede tener como máximo 10 imágenes.']],
+            ], 422);
+        }
+
         $space->update($data);
+
+        $this->removeImagesFromSpace($space, $removeImageIds->all());
 
         // agregar imágenes nuevas
         $this->storeImagesForSpace($space, $request);
+        if ($request->has('image_order_ids')) {
+            $this->applyImageOrder($space, $imageOrderIds);
+        } else {
+            $this->ensureImageCover($space);
+        }
 
         return response()->json([
             'message' => 'Actualizado correctamente',
@@ -169,6 +279,47 @@ class SpaceController extends BaseCrudController
         }
     }
 
+    private function removeImagesFromSpace(Space $space, array $imageIds): void
+    {
+        if (empty($imageIds)) return;
+
+        $images = $space->images()->whereIn('id', $imageIds)->get();
+
+        foreach ($images as $image) {
+            Storage::disk('public')->delete($image->path);
+            $image->delete();
+        }
+    }
+
+    private function ensureImageCover(Space $space): void
+    {
+        $images = $space->images()->orderBy('position')->orderBy('id')->get();
+        if ($images->isEmpty() || $images->contains(fn ($image) => (bool) $image->is_cover)) return;
+
+        $images->first()->update(['is_cover' => true]);
+    }
+
+    private function applyImageOrder(Space $space, array $requestedImageIds): void
+    {
+        $images = $space->images()->orderBy('position')->orderBy('id')->get();
+        $imagesById = $images->keyBy('id');
+        $ordered = collect($requestedImageIds)
+            ->map(fn ($imageId) => $imagesById->get((int) $imageId))
+            ->filter();
+
+        $listedIds = $ordered->pluck('id');
+        $ordered = $ordered
+            ->concat($images->whereNotIn('id', $listedIds))
+            ->values();
+
+        foreach ($ordered as $index => $image) {
+            $image->update([
+                'position' => $index + 1,
+                'is_cover' => $index === 0,
+            ]);
+        }
+    }
+
     /**
      * GET /api/spaces/coords
      * Regresa solo coordenadas para mapa/heatmap (ligero)
@@ -180,9 +331,7 @@ class SpaceController extends BaseCrudController
         // Opcional: solo activos (por default true)
         $onlyActive = $request->query('active', '1'); // '1'|'0'
         if ($onlyActive === '1' || $onlyActive === 1 || $onlyActive === true || $onlyActive === 'true') {
-            $q->where(function ($qq) {
-                $qq->whereNull('active')->orWhere('active', true);
-            });
+            $q->currentlyAvailable();
         }
 
         $data = $q->select(['id', 'title', 'latitude', 'longitude', 'active'])
@@ -210,12 +359,51 @@ class SpaceController extends BaseCrudController
         }
 
         $mimeType = mime_content_type($absolutePath) ?: 'application/octet-stream';
+        $contents = $this->orientedImageContents($absolutePath, $mimeType);
 
-        return response(file_get_contents($absolutePath), 200, [
+        return response($contents ?? file_get_contents($absolutePath), 200, [
             'Content-Type' => $mimeType,
-            'Content-Length' => (string) filesize($absolutePath),
             'Cache-Control' => 'private, max-age=300',
         ]);
+    }
+
+    private function orientedImageContents(string $path, string $mimeType): ?string
+    {
+        if ($mimeType !== 'image/jpeg' || !function_exists('exif_read_data') || !function_exists('imagecreatefromjpeg')) {
+            return null;
+        }
+
+        $orientation = (int) ((@exif_read_data($path)['Orientation'] ?? 1));
+        if ($orientation === 1) return null;
+
+        $image = @imagecreatefromjpeg($path);
+        if (!$image) return null;
+
+        if (in_array($orientation, [2, 4, 5, 7], true) && function_exists('imageflip')) {
+            imageflip($image, IMG_FLIP_HORIZONTAL);
+        }
+
+        $degrees = match ($orientation) {
+            3, 4 => 180,
+            5, 6 => -90,
+            7, 8 => 90,
+            default => 0,
+        };
+
+        if ($degrees !== 0) {
+            $rotated = imagerotate($image, $degrees, 0);
+            if ($rotated !== false) {
+                imagedestroy($image);
+                $image = $rotated;
+            }
+        }
+
+        ob_start();
+        imagejpeg($image, null, 90);
+        $contents = ob_get_clean();
+        imagedestroy($image);
+
+        return is_string($contents) ? $contents : null;
     }
 
     public function delete($id)

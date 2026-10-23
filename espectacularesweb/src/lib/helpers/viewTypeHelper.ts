@@ -1,6 +1,7 @@
 const VIEW_TYPE_MAP = {
   "vista natural": "Vista natural",
   "vista cruzada": "Vista cruzada",
+  "natural/cruzada": "Natural/Cruzada",
 } as const
 
 export type ViewType = (typeof VIEW_TYPE_MAP)[keyof typeof VIEW_TYPE_MAP]

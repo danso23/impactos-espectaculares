@@ -15,11 +15,8 @@ class Casero extends Model
         'active'      => 'boolean',
     ];
 
-    /**
-     * Espacios (espectaculares) que pertenecen a este casero.
-     */
-    public function spaces()
+    public function properties()
     {
-        return $this->hasMany(Space::class, 'casero_id');
+        return $this->hasMany(GroundProperty::class, 'casero_id');
     }
 }

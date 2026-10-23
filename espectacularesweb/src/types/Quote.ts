@@ -3,6 +3,7 @@ import type { ApiListResponse, ApiResponse } from "@/types/Api"
 export type CustomerType = "lead" | "cliente" | "sin_cliente"
 export type SearchableCustomerType = Exclude<CustomerType, "sin_cliente">
 export type QuoteItemType = "rental" | "service"
+export type QuoteKind = "advertisement" | "space"
 export type QuoteAmountType = "none" | "percent" | "fixed"
 
 export type QuoteCatalogCompany = {
@@ -20,6 +21,8 @@ export type QuoteCatalogLetterhead = {
   name: string
   code?: string | null
   template_key: string
+  primary_color?: string | null
+  secondary_color?: string | null
   is_default: boolean
 }
 
@@ -81,6 +84,7 @@ export type QuoteImage = {
 export type QuoteRentalSummary = {
   id: number
   status: string
+  is_rotating?: boolean
   starts_at?: string | null
   ends_at?: string | null
   total: number
@@ -120,6 +124,8 @@ export type QuoteItemInput = {
   start_date?: string | null
   end_date?: string | null
   qty: number
+  width_m?: number | null
+  height_m?: number | null
   square_meters?: number
   unit_price: number
   faces?: number | null
@@ -131,6 +137,7 @@ export type QuoteItemInput = {
 }
 
 export type QuotePayload = {
+  quote_kind: QuoteKind
   customer: {
     type: CustomerType
     id?: number | null
@@ -142,10 +149,6 @@ export type QuotePayload = {
   includes_tax: boolean
   tax_rate: number
   discount: {
-    type: QuoteAmountType
-    value: number
-  }
-  commission: {
     type: QuoteAmountType
     value: number
   }
@@ -183,6 +186,7 @@ export type QuoteTotals = {
 }
 
 export type QuotePreviewData = {
+  quote_kind: QuoteKind
   customer: QuoteCustomer
   company: QuoteCatalogCompany
   letterhead?: QuoteCatalogLetterhead | null
@@ -196,10 +200,6 @@ export type QuotePreviewData = {
       type: QuoteAmountType
       value: number
     }
-    commission: {
-      type: QuoteAmountType
-      value: number
-    }
     terms_html?: string | null
   }
 }
@@ -210,6 +210,7 @@ export type QuoteRecord = {
   id: number
   folio: string
   version: number
+  quote_kind: QuoteKind
   customer_type?: CustomerType | null
   customer_id?: number | null
   customer?: QuoteCustomer | null
@@ -264,6 +265,19 @@ export type QuoteConvertToRentalPayload = {
     type: SearchableCustomerType
     id: number
   } | null
+  rental: {
+    starts_at: string
+    is_rotating: boolean
+  }
+  payment: {
+    frequency: import("@/types/Rental").PaymentFrequency
+    first_payment_date: string
+    renewals: number
+  }
+  commission: {
+    type: QuoteAmountType
+    value: number
+  }
 }
 
 export type QuoteListParams = {

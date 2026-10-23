@@ -19,8 +19,8 @@ export function RichTextEditor({ value = "", onChange }: Props) {
   if (!editor) return null
 
   return (
-    <div className="rounded-md border">
-      <div className="flex flex-wrap gap-1 border-b p-1">
+    <div className="overflow-hidden rounded-xl border-[1.5px] border-transparent bg-violet-50/75 transition-[border-color,box-shadow,background-color] focus-within:border-violet-600 focus-within:bg-white focus-within:ring-4 focus-within:ring-violet-500/15">
+      <div className="flex flex-wrap gap-1 border-b border-violet-100 bg-white/70 p-1.5">
         <Button
           size="sm"
           variant={editor.isActive("bold") ? "default" : "ghost"}
@@ -46,7 +46,7 @@ export function RichTextEditor({ value = "", onChange }: Props) {
 
       <EditorContent
         editor={editor}
-        className="prose max-w-none p-3 focus:outline-none"
+        className="prose min-h-28 max-w-none p-3.5 text-sm text-slate-900 focus:outline-none"
       />
     </div>
   )

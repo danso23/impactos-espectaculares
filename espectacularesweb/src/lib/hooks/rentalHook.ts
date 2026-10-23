@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { tokenStore } from "@/lib/auth"
 import {
   createRental,
+  confirmRental,
   deleteRental,
   getRentals,
   updateRental,
 } from "@/lib/services/rentalService"
-import type { RentalFormValues } from "@/types/Rental"
+import type { RentalCreatePayload, RentalFormValues } from "@/types/Rental"
 import type { QueryParams } from "@/types/QueryParam"
 
 export function useRentals(params: QueryParams) {
@@ -24,13 +25,25 @@ export function useRentals(params: QueryParams) {
   })
 }
 
+export function useConfirmRental() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => confirmRental(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["rentals"] })
+      void queryClient.invalidateQueries({ queryKey: ["payments"] })
+    },
+  })
+}
+
 export function useCreateRental() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: RentalFormValues) => createRental(payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["rentals"] })
+    mutationFn: (payload: RentalCreatePayload) => createRental(payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["rentals"] })
     },
   })
 }
@@ -41,8 +54,8 @@ export function useUpdateRental() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Partial<RentalFormValues> }) =>
       updateRental(id, payload),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["rentals"] })
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["rentals"] })
     },
   })
 }
@@ -52,8 +65,8 @@ export function useDeleteRental() {
 
   return useMutation({
     mutationFn: (id: number) => deleteRental(id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["rentals"] })
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["rentals"] })
     },
   })
 }

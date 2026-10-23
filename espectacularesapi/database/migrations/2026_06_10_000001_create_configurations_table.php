@@ -20,8 +20,8 @@ class CreateConfigurationsTable extends Migration
         if (!DB::table('configurations')->exists()) {
             DB::table('configurations')->insert([
                 'price_per_square_meter' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'created_at' => \Carbon\Carbon::now(),
+                'updated_at' => \Carbon\Carbon::now(),
             ]);
         }
     }

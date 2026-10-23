@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { userService } from "@/lib/services/userService"
 import type { Role } from "@/lib/services/userService"
 import type { AuthUser } from "@/types/AuthUser"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { FileSpreadsheet, Plus, Pencil, Search, Trash2, UsersRound } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -26,6 +26,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { Can } from "@/components/auth/Can"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import { ModuleHeader } from "@/components/generic/module-header"
+import { exportRowsToExcel } from "@/lib/exportExcel"
 
 type UserWithRoles = AuthUser & { roles_array: string[] }
 
@@ -40,6 +42,7 @@ export default function UsersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<UserWithRoles | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [search, setSearch] = useState("")
 
   // Form state
   const [formData, setFormData] = useState({
@@ -171,14 +174,39 @@ export default function UsersPage() {
     }
   }
 
+  const filteredUsers = users.filter((user) => {
+    const term = search.trim().toLocaleLowerCase()
+    if (!term) return true
+    return [user.name, user.username, user.email, ...(user.roles_array ?? [])]
+      .some((value) => String(value ?? "").toLocaleLowerCase().includes(term))
+  })
+
+  const exportUsers = () => exportRowsToExcel({
+    filename: "usuarios",
+    columns: [
+      { id: "name", label: "Nombre" },
+      { id: "username", label: "Usuario" },
+      { id: "email", label: "Correo electrónico" },
+      { id: "roles", label: "Roles" },
+    ],
+    rows: filteredUsers.map((user) => ({
+      getValue: (column: string) => ({
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        roles: user.roles_array.join(", "),
+      })[column],
+    })),
+  })
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Usuarios</h1>
-          <p className="text-gray-600">Gestiona los usuarios y sus roles en el sistema.</p>
-        </div>
-        <Can role="admin">
+      <ModuleHeader
+        title="Usuarios"
+        badge="Control de usuarios"
+        description="Gestiona los usuarios y sus roles en el sistema."
+        icon={UsersRound}
+        actions={<Can permission="users.edit">
            <Button 
             onClick={() => handleOpenModal()}
             className="flex items-center gap-2 px-6 py-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border-none"
@@ -186,10 +214,20 @@ export default function UsersPage() {
             <Plus className="w-5 h-5" />
             <span>Nuevo usuario</span>
           </Button>
-        </Can>
-      </div>
+        </Can>}
+      />
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filtrar usuarios..." className="pl-10" />
+          </div>
+          <Button type="button" variant="outline" onClick={exportUsers} disabled={filteredUsers.length === 0} className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
+            <FileSpreadsheet className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
         <Table>
           <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             <TableRow className="hover:bg-transparent border-none">
@@ -201,14 +239,14 @@ export default function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody className="divide-y divide-gray-100">
-            {users.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-48 text-center text-gray-500 italic">
                   No hay usuarios registrados.
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <TableRow 
                   key={user.id}
                   className="hover:bg-gradient-to-r hover:from-purple-50 hover:to-indigo-50 transition-colors"
@@ -230,7 +268,7 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <Can role="admin">
+                      <Can permission="users.edit">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -240,14 +278,16 @@ export default function UsersPage() {
                           <Pencil className="w-5 h-5" />
                         </Button>
                         {user.username !== 'admin' && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            onClick={() => handleDeleteClick(user)}
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
+                          <Can permission="users.delete">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              onClick={() => handleDeleteClick(user)}
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </Button>
+                          </Can>
                         )}
                       </Can>
                     </div>
@@ -260,17 +300,17 @@ export default function UsersPage() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-xl border-none shadow-2xl overflow-hidden">
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[500px]">
           <form onSubmit={handleSubmit}>
-            <DialogHeader className="p-6 pb-0">
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+            <DialogHeader>
+              <DialogTitle>
                 {editingUser ? "Editar Usuario" : "Nuevo Usuario"}
               </DialogTitle>
-              <DialogDescription className="text-gray-500">
+              <DialogDescription>
                 Completa los datos para gestionar el acceso del usuario.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 p-6 py-4">
+            <div className="grid gap-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-sm font-semibold text-gray-700">Nombre completo</Label>
@@ -278,7 +318,6 @@ export default function UsersPage() {
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="rounded-lg border-gray-300 h-11"
                     required
                   />
                 </div>
@@ -288,7 +327,6 @@ export default function UsersPage() {
                     id="username"
                     value={formData.username}
                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="rounded-lg border-gray-300 h-11"
                     required
                   />
                 </div>
@@ -300,7 +338,6 @@ export default function UsersPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="rounded-lg border-gray-300 h-11"
                   required
                 />
               </div>
@@ -313,7 +350,6 @@ export default function UsersPage() {
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="rounded-lg border-gray-300 h-11"
                   required={!editingUser}
                 />
               </div>
@@ -338,14 +374,13 @@ export default function UsersPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter className="p-6 pt-2 gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="rounded-lg px-6 h-11 border-gray-300">
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                 Cancelar
               </Button>
               <Button 
                 type="submit" 
                 disabled={loading}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg px-8 h-11 shadow-md"
               >
                 {loading ? "Guardando..." : "Guardar Usuario"}
               </Button>
