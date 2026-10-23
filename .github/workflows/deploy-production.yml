@@ -1,0 +1,73 @@
+name: Deploy Production (cPanel)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    name: Build and deploy frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: espectacularesweb/package-lock.json
+
+      - name: Install dependencies
+        working-directory: espectacularesweb
+        run: npm install --no-audit --no-fund
+
+      - name: Create production environment file
+        working-directory: espectacularesweb
+        run: |
+          printf 'VITE_API_URL=%s\nVITE_APP_ENV=production\n' "${{ vars.PROD_VITE_API_URL }}" > .env.production
+
+      - name: Build
+        working-directory: espectacularesweb
+        run: npm run build:prod
+
+      - name: Deploy frontend through FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.PROD_FTP_SERVER }}
+          username: ${{ secrets.PROD_FTP_USERNAME }}
+          password: ${{ secrets.PROD_FTP_PASSWORD }}
+          port: ${{ secrets.PROD_FTP_PORT }}
+          protocol: ftps
+          security: loose
+          local-dir: espectacularesweb/dist/
+          server-dir: ${{ secrets.PROD_FTP_SERVER_DIR }}
+          exclude: |
+            **/.htaccess
+
+  backend:
+    name: Deploy backend and migrations
+    runs-on: ubuntu-latest
+    needs: frontend
+    permissions: {}
+    steps:
+      - name: Trigger the cPanel Git deployment
+        env:
+          CPANEL_API_URL: ${{ secrets.CPANEL_PROD_API_URL }}
+          CPANEL_API_TOKEN: ${{ secrets.CPANEL_PROD_API_TOKEN }}
+          CPANEL_REPOSITORY_ROOT: ${{ secrets.CPANEL_PROD_REPOSITORY_ROOT }}
+          CPANEL_USERNAME: ${{ secrets.CPANEL_PROD_USERNAME }}
+        run: |
+          curl --fail-with-body --silent --show-error --get \
+            --header "Authorization: cpanel ${CPANEL_USERNAME}:${CPANEL_API_TOKEN}" \
+            --data-urlencode "repository_root=${CPANEL_REPOSITORY_ROOT}" \
+            "${CPANEL_API_URL}/execute/VersionControlDeployment/create"
