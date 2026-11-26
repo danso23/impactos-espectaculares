@@ -329,17 +329,14 @@ class QuoteController extends Controller
         $sourceQuote = null;
         if (!empty($validated['duplicate_of_quote_id'])) {
             $sourceQuote = Quote::query()->with(['status', 'rental'])->findOrFail($validated['duplicate_of_quote_id']);
-
-            if ($sourceQuote->converted_to_rental_at || $sourceQuote->rental) {
-                return response()->json([
-                    'message' => 'No se puede duplicar una cotización que ya fue convertida a renta.',
-                ], 422);
-            }
         }
+        // Una cotización convertida se puede copiar (p. ej. para revender el espacio),
+        // pero no se cancela: su renta sigue vigente.
+        $sourceIsConverted = $sourceQuote && ($sourceQuote->converted_to_rental_at || $sourceQuote->rental);
 
         $cancelledStatus = QuoteStatus::query()->where('key', 'cancelled')->first();
 
-        $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request, $sourceQuote, $cancelledStatus) {
+        $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request, $sourceQuote, $cancelledStatus, $sourceIsConverted) {
             $duplicateColumn = $sourceQuote && $this->hasColumn('quotes', 'duplicated_from_quote_id')
                 ? ['duplicated_from_quote_id' => $sourceQuote->id]
                 : [];
@@ -391,7 +388,7 @@ class QuoteController extends Controller
                 ],
             );
 
-            if ($sourceQuote) {
+            if ($sourceQuote && !$sourceIsConverted) {
                 $this->cancelReplacedQuote($sourceQuote, $quote, $cancelledStatus, $request);
             }
 

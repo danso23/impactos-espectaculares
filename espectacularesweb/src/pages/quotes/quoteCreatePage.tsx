@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { QuoteCustomerSelector } from "@/pages/quotes/quoteCustomerSelector"
+import { isConvertedToRental } from "@/pages/quotes/quoteStatus"
 import type {
   CustomerType,
   QuoteAmountType,
@@ -502,9 +503,10 @@ export default function QuoteCreatePage() {
           ? "Selecciona un cliente, o cambia el tipo a Sin cliente para guardar sin asignarlo."
           : null
 
-  const payload = React.useMemo<QuotePayload | null>(() => {
+  // Borrador del payload aunque falte el cliente: los totales no dependen de él,
+  // así que la vista previa se calcula igual. Guardar sí exige cliente.
+  const draftPayload = React.useMemo<QuotePayload | null>(() => {
     if (!companyId || items.length === 0) return null
-    if (!isWithoutCustomer && !selectedCustomer) return null
 
     return {
       quote_kind: quoteKind,
@@ -557,22 +559,31 @@ export default function QuoteCreatePage() {
     validUntil,
   ])
 
-  const canPreview = React.useMemo(() => {
-    if (!payload) return false
+  const isCustomerMissing = !isWithoutCustomer && !selectedCustomer
+  const payload = isCustomerMissing ? null : draftPayload
+  const previewPayload = React.useMemo<QuotePayload | null>(
+    () => draftPayload && isCustomerMissing
+      ? { ...draftPayload, customer: { type: "sin_cliente", id: null } }
+      : draftPayload,
+    [draftPayload, isCustomerMissing]
+  )
 
-    return payload.items.every((item) => {
+  const canPreview = React.useMemo(() => {
+    if (!previewPayload) return false
+
+    return previewPayload.items.every((item) => {
       // Un servicio libre sin concepto todavía se está capturando: la API lo rechaza.
       if (item.item_type === "service") return !!item.service_id || !!item.concept?.trim()
       return !!item.space_id && !!item.start_date && !!item.end_date
     })
-  }, [payload])
+  }, [previewPayload])
 
   React.useEffect(() => {
     setSavedQuote(null)
   }, [payload])
 
   React.useEffect(() => {
-    if (!payload) {
+    if (!previewPayload) {
       setPreview(null)
       setPreviewError(null)
       return
@@ -588,7 +599,7 @@ export default function QuoteCreatePage() {
     const timer = window.setTimeout(async () => {
       setIsPreviewLoading(true)
       try {
-        const response = await previewQuote(payload)
+        const response = await previewQuote(previewPayload)
         if (previewRequestId.current !== requestId) return
         setPreview(response.data)
         setPreviewError(null)
@@ -606,7 +617,7 @@ export default function QuoteCreatePage() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [canPreview, payload])
+  }, [canPreview, previewPayload])
 
   const updateItem = (index: number, changes: Partial<QuoteItemInput>) => {
     setItems((prev) =>
@@ -839,7 +850,9 @@ export default function QuoteCreatePage() {
         editId
           ? `Cotización ${response.data.folio} actualizada.`
           : sourceQuote
-            ? `Cotización ${response.data.folio} creada. ${sourceQuote.folio} quedó cancelada.`
+            ? isConvertedToRental(sourceQuote)
+              ? `Cotización ${response.data.folio} creada a partir de ${sourceQuote.folio}.`
+              : `Cotización ${response.data.folio} creada. ${sourceQuote.folio} quedó cancelada.`
             : `Cotización ${response.data.folio} guardada correctamente.`,
       )
       allowNavigation.current = true

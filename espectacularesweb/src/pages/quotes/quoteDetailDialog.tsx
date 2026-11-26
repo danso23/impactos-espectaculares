@@ -172,7 +172,7 @@ export function QuoteDetailDialog({ open, onOpenChange, quote }: QuoteDetailDial
                           {item.description ? (
                             <div className="text-xs text-muted-foreground">{item.description}</div>
                           ) : null}
-                          {item.width_m && item.height_m ? (
+                          {isArea && item.width_m && item.height_m ? (
                             <div className="text-xs text-muted-foreground">
                               {Number(item.width_m)} × {Number(item.height_m)} m
                             </div>
