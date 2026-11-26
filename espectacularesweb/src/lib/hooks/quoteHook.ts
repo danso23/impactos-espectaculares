@@ -13,6 +13,7 @@ import {
   getQuotes,
   previewQuote,
   searchQuoteCustomers,
+  deleteQuote,
 } from "@/lib/services/quoteService"
 import type {
   QuoteCreateRequest,
@@ -120,6 +121,17 @@ export function useUpdateQuoteConfiguration() {
     mutationFn: (payload: QuoteConfigurationUpdatePayload) => updateQuoteConfiguration(payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["quotes", "catalogs"] })
+    },
+  })
+}
+
+export function useDeleteQuote() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => deleteQuote(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["quotes"] })
     },
   })
 }

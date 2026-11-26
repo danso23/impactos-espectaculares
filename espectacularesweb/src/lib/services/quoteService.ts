@@ -98,10 +98,16 @@ export function getQuotes(params: QuoteListParams = {}) {
   if (params.status !== undefined && params.status !== null && params.status !== "") {
     qs.set("status", String(params.status))
   }
+  if (params.date_from) qs.set("date_from", params.date_from)
+  if (params.date_to) qs.set("date_to", params.date_to)
 
   const query = qs.toString()
 
   return apiFetch<QuoteListResponse>(`/api/quotes${query ? `?${query}` : ""}`)
+}
+
+export function deleteQuote(id: number | string) {
+  return apiFetch<{ message: string }>(`/api/quotes/${id}`, { method: "DELETE" })
 }
 
 export function getQuote(id: number | string) {

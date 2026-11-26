@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { Plus, ReceiptText } from "lucide-react"
 import { toast } from "sonner"
 
@@ -13,7 +13,7 @@ import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
-import { useQuoteCatalogs, useQuotes } from "@/lib/hooks/quoteHook"
+import { useDeleteQuote, useQuoteCatalogs, useQuotes } from "@/lib/hooks/quoteHook"
 import { QuoteConvertToRentalDialog } from "@/pages/quotes/quoteConvertToRentalDialog"
 import { QuoteDetailDialog } from "@/pages/quotes/quoteDetailDialog"
 import { getQuote, getQuotes } from "@/lib/services/quoteService"
@@ -22,6 +22,17 @@ import { QuoteStatusDialog } from "@/pages/quotes/quoteStatusDialog"
 import { useQuoteTable } from "@/pages/quotes/quoteTable"
 import type { QuoteRecord } from "@/types/Quote"
 import { Can } from "@/components/auth/Can"
+import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const ALL = "all"
 
@@ -38,7 +49,20 @@ export default function QuotesPage() {
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false)
   const [convertDialogOpen, setConvertDialogOpen] = React.useState(false)
   const [detailDialogOpen, setDetailDialogOpen] = React.useState(false)
+  const [quoteToDelete, setQuoteToDelete] = React.useState<QuoteRecord | null>(null)
+  const [acceptedQuote, setAcceptedQuote] = React.useState<QuoteRecord | null>(null)
+  const deleteMutation = useDeleteQuote()
   const perPage = 10
+  const location = useLocation()
+
+  // Al guardar una cotización se regresa aquí con ella en el state: se abre su detalle.
+  React.useEffect(() => {
+    const openQuote = (location.state as { openQuote?: QuoteRecord } | null)?.openQuote
+    if (!openQuote) return
+    setSelectedQuote(openQuote)
+    setDetailDialogOpen(true)
+    navigate(location.pathname + location.search, { replace: true, state: null })
+  }, [location.pathname, location.search, location.state, navigate])
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -96,6 +120,19 @@ export default function QuotesPage() {
     navigate(`/cotizaciones/nueva?duplicar=${quote.id}`)
   }, [navigate])
 
+  const handleConfirmDelete = async () => {
+    if (!quoteToDelete) return
+    try {
+      await deleteMutation.mutateAsync(quoteToDelete.id)
+      toast.success(`Cotización ${quoteToDelete.folio} eliminada.`)
+      setQuoteToDelete(null)
+    } catch (error) {
+      toast.error("No se pudo eliminar la cotización", {
+        description: error instanceof Error ? error.message : "Intenta nuevamente.",
+      })
+    }
+  }
+
   const columns = useQuoteTable({
     onView: handleView,
     onDownload: handleDownload,
@@ -103,6 +140,7 @@ export default function QuotesPage() {
     onConvertToRental: handleConvertToRental,
     onDuplicate: handleDuplicate,
     onEdit: handleEdit,
+    onDelete: setQuoteToDelete,
   })
 
   // Selección de filas: si hay seleccionadas, se exportan solo esas.
@@ -191,6 +229,39 @@ export default function QuotesPage() {
         }}
         quote={selectedQuote}
         statuses={statuses}
+        onAccepted={setAcceptedQuote}
+      />
+
+      <AlertDialog open={acceptedQuote !== null} onOpenChange={(open) => !open && setAcceptedQuote(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Convertir a renta ahora?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La cotización {acceptedQuote?.folio} quedó Aceptada. Puedes convertirla a renta ahora
+              o después desde el menú de acciones.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>En otro momento</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setSelectedQuote(acceptedQuote)
+                setAcceptedQuote(null)
+                setConvertDialogOpen(true)
+              }}
+            >
+              Convertir a renta
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <DeleteConfirmDialog
+        open={quoteToDelete !== null}
+        onOpenChange={(open) => !open && setQuoteToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        itemName={quoteToDelete ? `Cotización ${quoteToDelete.folio}` : undefined}
+        loading={deleteMutation.isPending}
       />
 
       <QuoteConvertToRentalDialog

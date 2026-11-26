@@ -292,6 +292,8 @@ export type QuoteListParams = {
   per_page?: number
   q?: string
   status?: string | number
+  date_from?: string
+  date_to?: string
 }
 
 export type QuoteListResponse = ApiListResponse<QuoteRecord>

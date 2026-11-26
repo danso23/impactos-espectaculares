@@ -297,7 +297,8 @@ export function DataTable<TData>({
                   colSpan={columns.length}
                   className="h-32 text-center text-gray-500 italic"
                 >
-                  Sin resultados.
+                  {/* Mientras llega la primera respuesta no hay filas: no es "sin resultados". */}
+                  {isLoading ? "Cargando…" : "Sin resultados."}
                 </TableCell>
               </TableRow>
             )}

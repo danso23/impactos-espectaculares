@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -219,6 +220,40 @@ class QuoteController extends Controller
         ]);
     }
 
+    /**
+     * Elimina una cotización en Borrador: nunca se envió al cliente ni tiene renta.
+     * Las demás solo cambian de estatus para conservar su historial.
+     */
+    public function destroy($id)
+    {
+        $quote = Quote::query()->with(['status', 'images'])->findOrFail($id);
+
+        if ($quote->status?->key !== 'draft') {
+            return response()->json(['message' => 'Solo se pueden eliminar cotizaciones en Borrador.'], 422);
+        }
+
+        if ($quote->converted_to_rental_at || $quote->rental()->exists()) {
+            return response()->json(['message' => 'La cotización tiene una renta ligada y no se puede eliminar.'], 422);
+        }
+
+        $paths = $quote->images->map(fn (QuoteImage $image) => [$image->disk ?: 'public', $image->path])->all();
+
+        DB::transaction(function () use ($quote) {
+            // Una cotización duplicada a partir de esta conserva su folio; solo pierde la referencia.
+            Quote::query()->where('duplicated_from_quote_id', $quote->id)->update(['duplicated_from_quote_id' => null]);
+            // Partidas, imágenes e historial se borran en cascada.
+            $quote->delete();
+        });
+
+        foreach ($paths as [$disk, $path]) {
+            if ($path) {
+                Storage::disk($disk)->delete($path);
+            }
+        }
+
+        return response()->json(['message' => "Cotización {$quote->folio} eliminada."]);
+    }
+
     public function history($id)
     {
         $quote = Quote::query()->findOrFail($id);
@@ -232,7 +267,7 @@ class QuoteController extends Controller
             ->map(function (QuoteStatusHistory $entry) {
                 return [
                     'id' => $entry->id,
-                    'changed_at' => optional($entry->changed_at)->toDateTimeString(),
+                    'changed_at' => optional($entry->changed_at)->toIso8601String(),
                     'reason' => $entry->reason,
                     'notes' => $entry->notes,
                     'from_status' => $entry->fromStatus ? [
@@ -1234,14 +1269,14 @@ class QuoteController extends Controller
                 'tax' => (float)$quote->tax,
                 'total' => (float)$quote->total,
             ],
-            'accepted_at' => optional($quote->accepted_at)->toDateTimeString(),
+            'accepted_at' => optional($quote->accepted_at)->toIso8601String(),
             'accepted_by' => $quote->acceptedByUser ? [
                 'id' => $quote->acceptedByUser->id,
                 'name' => $quote->acceptedByUser->name,
                 'username' => $quote->acceptedByUser->username,
                 'email' => $quote->acceptedByUser->email,
             ] : null,
-            'converted_to_rental_at' => optional($quote->converted_to_rental_at)->toDateTimeString(),
+            'converted_to_rental_at' => optional($quote->converted_to_rental_at)->toIso8601String(),
             'converted_to_rental_by' => $quote->convertedToRentalByUser ? [
                 'id' => $quote->convertedToRentalByUser->id,
                 'name' => $quote->convertedToRentalByUser->name,
@@ -1260,9 +1295,9 @@ class QuoteController extends Controller
             'notes' => $quote->notes,
             'terms_html' => $quote->terms_html,
             'pdf_path' => $quote->pdf_path,
-            'pdf_generated_at' => optional($quote->pdf_generated_at)->toDateTimeString(),
-            'created_at' => optional($quote->created_at)->toDateTimeString(),
-            'updated_at' => optional($quote->updated_at)->toDateTimeString(),
+            'pdf_generated_at' => optional($quote->pdf_generated_at)->toIso8601String(),
+            'created_at' => optional($quote->created_at)->toIso8601String(),
+            'updated_at' => optional($quote->updated_at)->toIso8601String(),
             'items' => $withItems
                 ? $quote->items->map(function (QuoteItem $item) {
                     return [

@@ -125,6 +125,7 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->get('quotes/{id}', ['middleware' => 'permission:quotes.view', 'uses' => 'QuoteController@show']);
         $router->post('quotes/{id}', ['middleware' => 'permission:quotes.edit', 'uses' => 'QuoteController@update']);
         $router->get('quotes/{id}/history', ['middleware' => 'permission:quotes.view', 'uses' => 'QuoteController@history']);
+        $router->delete('quotes/{id}', ['middleware' => 'permission:quotes.delete', 'uses' => 'QuoteController@destroy']);
         $router->post('quotes/{id}/status', ['middleware' => 'permission:quotes.edit', 'uses' => 'QuoteController@changeStatus']);
         $router->post('quotes/{id}/convert-to-rental', ['middleware' => 'permission:quotes.edit', 'uses' => 'QuoteController@convertToRental']);
 
