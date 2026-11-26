@@ -17,3 +17,7 @@ app/Models/.DS_Store
 app/Models/Entities/.DS_Store
 
 friendst_db (1).sql
+
+# Symlink a storage/app/public: se crea en cada entorno (en producción lo hace .cpanel.yml).
+# No se versiona porque el servidor no permite crear symlinks al clonar.
+/public/storage
