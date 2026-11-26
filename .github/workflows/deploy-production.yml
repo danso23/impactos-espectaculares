@@ -80,7 +80,8 @@ jobs:
               "$@" \
               "${CPANEL_API_URL}/execute/${endpoint}")
             if [ "$(echo "$response" | jq -r '.status')" != "1" ]; then
-              echo "::error::${endpoint} falló: $(echo "$response" | jq -c '.errors')"
+              # A stderr: la salida normal de algunas llamadas se descarta con > /dev/null.
+              echo "::error::${endpoint} falló: $(echo "$response" | jq -c '.errors')" >&2
               exit 1
             fi
             echo "$response"
