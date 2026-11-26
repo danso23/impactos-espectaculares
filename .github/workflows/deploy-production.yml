@@ -64,11 +64,13 @@ jobs:
         env:
           CPANEL_API_URL: ${{ secrets.CPANEL_PROD_API_URL }}
           CPANEL_API_TOKEN: ${{ secrets.CPANEL_PROD_API_TOKEN }}
-          CPANEL_REPOSITORY_ROOT: ${{ secrets.CPANEL_PROD_REPOSITORY_ROOT }}
+          # Ruta del repositorio en cPanel (Git Version Control). No es dato sensible.
+          CPANEL_REPOSITORY_ROOT: /home1/impactos/repositories/espectaculares-deploy
           CPANEL_USERNAME: ${{ secrets.CPANEL_PROD_USERNAME }}
           DEPLOY_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          echo "Repositorio en cPanel: ${CPANEL_REPOSITORY_ROOT}"
 
           # La API de cPanel (UAPI) responde HTTP 200 aunque falle: el resultado
           # real viene en .status del JSON, por eso se valida cada llamada.
