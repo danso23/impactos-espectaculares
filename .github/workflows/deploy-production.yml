@@ -55,19 +55,76 @@ jobs:
             **/.htaccess
 
   backend:
-    name: Deploy backend and migrations
+    name: Deploy backend and migrations (cPanel)
     runs-on: ubuntu-latest
     needs: frontend
     permissions: {}
     steps:
-      - name: Trigger the cPanel Git deployment
+      - name: Pull latest main into the cPanel repository and deploy
         env:
           CPANEL_API_URL: ${{ secrets.CPANEL_PROD_API_URL }}
           CPANEL_API_TOKEN: ${{ secrets.CPANEL_PROD_API_TOKEN }}
           CPANEL_REPOSITORY_ROOT: ${{ secrets.CPANEL_PROD_REPOSITORY_ROOT }}
           CPANEL_USERNAME: ${{ secrets.CPANEL_PROD_USERNAME }}
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
-          curl --fail-with-body --silent --show-error --get \
-            --header "Authorization: cpanel ${CPANEL_USERNAME}:${CPANEL_API_TOKEN}" \
+          set -euo pipefail
+
+          # La API de cPanel (UAPI) responde HTTP 200 aunque falle: el resultado
+          # real viene en .status del JSON, por eso se valida cada llamada.
+          uapi() {
+            local endpoint="$1"; shift
+            local response
+            response=$(curl --fail-with-body --silent --show-error --get \
+              --header "Authorization: cpanel ${CPANEL_USERNAME}:${CPANEL_API_TOKEN}" \
+              "$@" \
+              "${CPANEL_API_URL}/execute/${endpoint}")
+            if [ "$(echo "$response" | jq -r '.status')" != "1" ]; then
+              echo "::error::${endpoint} falló: $(echo "$response" | jq -c '.errors')"
+              exit 1
+            fi
+            echo "$response"
+          }
+
+          # 1. Traer main de GitHub a la copia del repositorio en cPanel.
+          uapi VersionControl/update \
             --data-urlencode "repository_root=${CPANEL_REPOSITORY_ROOT}" \
-            "${CPANEL_API_URL}/execute/VersionControlDeployment/create"
+            --data-urlencode "branch=main" > /dev/null
+
+          # 2. Revisar que cPanel quedó en este commit y que puede desplegar.
+          repo=$(uapi VersionControl/retrieve \
+            | jq -c --arg root "$CPANEL_REPOSITORY_ROOT" '.data[] | select(.repository_root == $root)')
+          head_sha=$(echo "$repo" | jq -r '.last_update.identifier // empty')
+          echo "cPanel HEAD: ${head_sha:-desconocido} / esperado: ${DEPLOY_SHA}"
+          if [ -n "$head_sha" ] && [ "$head_sha" != "$DEPLOY_SHA" ]; then
+            echo "::error::cPanel no está en el commit esperado."
+            exit 1
+          fi
+          if [ "$(echo "$repo" | jq -r '.deployable')" != "1" ]; then
+            echo "::error::cPanel marca el repositorio como no desplegable: hay cambios sin commit en el servidor o el .cpanel.yml no es válido."
+            exit 1
+          fi
+
+          # 3. Ejecutar las tareas de .cpanel.yml (copia del API y migraciones).
+          deploy_id=$(uapi VersionControlDeployment/create \
+            --data-urlencode "repository_root=${CPANEL_REPOSITORY_ROOT}" | jq -r '.data.deploy_id // empty')
+          if [ -z "$deploy_id" ]; then
+            echo "::error::cPanel no encoló el despliegue."
+            exit 1
+          fi
+          echo "Despliegue en cola: ${deploy_id}"
+
+          # 4. Esperar a que termine (máx. 5 minutos).
+          for _ in $(seq 1 30); do
+            sleep 10
+            state=$(uapi VersionControlDeployment/retrieve \
+              | jq -r --arg id "$deploy_id" '.data[] | select((.deploy_id|tostring) == $id)
+                  | if .timestamps.succeeded then "succeeded" elif .timestamps.failed then "failed" else "running" end')
+            echo "Estado: ${state}"
+            [ "$state" = "succeeded" ] && exit 0
+            if [ "$state" = "failed" ]; then
+              echo "::error::El despliegue falló. Revisa /home1/impactos/deploy_full.log en el servidor."
+              exit 1
+            fi
+          done
+          echo "::warning::El despliegue sigue en curso después de 5 minutos; revisa /home1/impactos/deploy_full.log."
