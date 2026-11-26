@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronsUpDown, CircleDollarSign, Download, Landmark, Loader2, Plus, ReceiptText, Search, X } from "lucide-react"
+import { Building2, CalendarDays, CheckCircle2, ChevronDown, ChevronsUpDown, CircleDollarSign, Download, Landmark, Loader2, Pencil, Plus, ReceiptText, Search, X } from "lucide-react"
 import { toast } from "sonner"
 import * as XLSX from "xlsx"
 
@@ -9,7 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useAvailableGroundRentSpaces, useCreateGroundProperty, useCreateGroundRentContract, useGroundRentals, useMarkGroundRentPaymentPaid } from "@/lib/hooks/groundRentHook"
+import { useAvailableGroundRentSpaces, useCreateGroundProperty, useCreateGroundRentContract, useGroundRentals, useMarkGroundRentPaymentPaid, useUpdateGroundRentPaymentAmount } from "@/lib/hooks/groundRentHook"
 import type { CaseroRecord } from "@/types/Casero"
 import type { GroundProperty, GroundRentContract, GroundRentPayment } from "@/types/GroundRent"
 
@@ -169,18 +169,57 @@ function SpaceMultiSelect({ spaces, selectedIds, onChange, loading }: { spaces: 
   </div>
 }
 
-function PaymentSchedule({ contract, canEdit, paymentIsUpdating, onPay }: { contract: GroundRentContract; canEdit: boolean; paymentIsUpdating: boolean; onPay: (payment: GroundRentPayment) => void }) {
+function AmountCell({ payment, canEdit, caseroId }: { payment: GroundRentPayment; canEdit: boolean; caseroId: number }) {
+  const update = useUpdateGroundRentPaymentAmount(caseroId)
+  const [editing, setEditing] = React.useState(false)
+  const [value, setValue] = React.useState(String(payment.amount))
+  const [applyToFollowing, setApplyToFollowing] = React.useState(true)
+  const editable = canEdit && (payment.status === "pending" || payment.status === "overdue")
+
+  async function save() {
+    const amount = Number(value)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Ingresa un importe válido.")
+      return
+    }
+    try {
+      const response = await update.mutateAsync({ id: payment.id, amount, apply_to_following: applyToFollowing })
+      toast.success(response.message || "Importe actualizado")
+      setEditing(false)
+    } catch (error) {
+      toast.error("No se pudo actualizar el importe", { description: error instanceof Error ? error.message : "Intenta nuevamente." })
+    }
+  }
+
+  if (!editing) {
+    return <span className="inline-flex items-center gap-1">
+      {currency(payment.amount)}
+      {editable && <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" title="Editar importe" aria-label="Editar importe" onClick={() => { setValue(String(payment.amount)); setEditing(true) }}><Pencil className="h-3.5 w-3.5" /></Button>}
+    </span>
+  }
+
+  return <div className="space-y-1.5">
+    <div className="flex items-center gap-1">
+      <Input type="number" min="0.01" step="0.01" value={value} onChange={(event) => setValue(event.target.value)} className="h-8 w-28" autoFocus onKeyDown={(event) => { if (event.key === "Enter") void save(); if (event.key === "Escape") setEditing(false) }} />
+      <Button type="button" size="sm" className="h-8" disabled={update.isPending} onClick={() => void save()}>{update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar"}</Button>
+      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Cancelar" onClick={() => setEditing(false)}><X className="h-4 w-4" /></Button>
+    </div>
+    <label className="flex items-center gap-1.5 text-xs text-muted-foreground"><Checkbox checked={applyToFollowing} onCheckedChange={(checked) => setApplyToFollowing(checked === true)} />Aplicar también a los pagos siguientes</label>
+  </div>
+}
+
+function PaymentSchedule({ contract, canEdit, caseroId, paymentIsUpdating, onPay }: { contract: GroundRentContract; canEdit: boolean; caseroId: number; paymentIsUpdating: boolean; onPay: (payment: GroundRentPayment) => void }) {
   const [isOpen, setIsOpen] = React.useState(false)
 
   return <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mb-3 overflow-hidden rounded-xl border last:mb-0">
     <CollapsibleTrigger asChild>
       <button type="button" className="flex w-full flex-wrap items-center justify-between gap-2 bg-slate-50 px-3 py-3 text-left text-sm transition-colors hover:bg-violet-50">
         <span className="font-medium">{contract.contract_number || `Contrato #${contract.id}`} · {frequencyLabels[contract.payment_frequency]}</span>
-        <span className="flex items-center gap-3"><span>{currency(contract.payment_amount)} × {contract.payment_count}</span><span className="inline-flex items-center gap-1 text-violet-700">{isOpen ? "Ocultar calendario" : "Ver calendario"}<ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} /></span></span>
+        <span className="flex items-center gap-3"><span>{currency(contract.payments.reduce((sum, payment) => sum + (payment.status === "cancelled" ? 0 : Number(payment.amount)), 0))} en {contract.payment_count} pago{contract.payment_count === 1 ? "" : "s"}</span><span className="inline-flex items-center gap-1 text-violet-700">{isOpen ? "Ocultar calendario" : "Ver calendario"}<ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} /></span></span>
       </button>
     </CollapsibleTrigger>
     <CollapsibleContent>
-      <div className="overflow-x-auto border-t"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-white text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Periodo</th><th className="px-3 py-2">Vence</th><th className="px-3 py-2">Importe</th><th className="px-3 py-2">Estatus</th><th className="px-3 py-2 text-right">Acción</th></tr></thead><tbody>{contract.payments.map((payment) => <tr key={payment.id} className="border-t"><td className="px-3 py-2">{payment.installment_number}</td><td className="px-3 py-2">{date(payment.period_start)} – {date(payment.period_end)}</td><td className="px-3 py-2">{date(payment.due_date)}</td><td className="px-3 py-2">{currency(payment.amount)}</td><td className="px-3 py-2"><span className={`rounded-full border px-2 py-1 text-xs font-medium ${statusClass(payment.status)}`}>{statusLabel(payment.status)}</span></td><td className="px-3 py-2 text-right">{payment.status === "paid" ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4" />{date(payment.paid_at)}</span> : canEdit && payment.status !== "cancelled" ? <Button size="sm" variant="outline" disabled={paymentIsUpdating} onClick={() => onPay(payment)}>Marcar pagado</Button> : "—"}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto border-t"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-white text-xs uppercase text-slate-500"><tr><th className="px-3 py-2">#</th><th className="px-3 py-2">Periodo</th><th className="px-3 py-2">Vence</th><th className="px-3 py-2">Importe</th><th className="px-3 py-2">Estatus</th><th className="px-3 py-2 text-right">Acción</th></tr></thead><tbody>{contract.payments.map((payment) => <tr key={payment.id} className="border-t"><td className="px-3 py-2">{payment.installment_number}</td><td className="px-3 py-2">{date(payment.period_start)} – {date(payment.period_end)}</td><td className="px-3 py-2">{date(payment.due_date)}</td><td className="px-3 py-2"><AmountCell payment={payment} canEdit={canEdit} caseroId={caseroId} /></td><td className="px-3 py-2"><span className={`rounded-full border px-2 py-1 text-xs font-medium ${statusClass(payment.status)}`}>{statusLabel(payment.status)}</span></td><td className="px-3 py-2 text-right">{payment.status === "paid" ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4" />{date(payment.paid_at)}</span> : canEdit && payment.status !== "cancelled" ? <Button size="sm" variant="outline" disabled={paymentIsUpdating} onClick={() => onPay(payment)}>Marcar pagado</Button> : "—"}</td></tr>)}</tbody></table></div>
     </CollapsibleContent>
   </Collapsible>
 }
@@ -309,7 +348,7 @@ export function GroundRentalsDialog({ casero, open, onOpenChange, canEdit }: { c
           {properties.length === 0 ? <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">Aún no hay predios registrados para este casero.</div> : properties.map((property) => <article key={property.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm">
             <div className="flex flex-col gap-2 border-b bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"><div><h4 className="font-semibold text-slate-900">{property.name}</h4>{property.address && <p className="text-sm text-muted-foreground">{property.address}</p>}</div><div className="text-sm text-muted-foreground">{property.spaces.length} espacio{property.spaces.length === 1 ? "" : "s"}</div></div>
             <div className="p-4">{property.spaces.length > 0 && <div className="mb-4 flex flex-wrap gap-2">{property.spaces.map((space) => <span key={space.id} className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700">{space.title}</span>)}</div>}
-              {property.contracts.length === 0 ? <p className="text-sm text-muted-foreground">Sin contrato o calendario de pagos.</p> : property.contracts.map((contract) => <PaymentSchedule key={contract.id} contract={contract} canEdit={canEdit} paymentIsUpdating={markPaid.isPending} onPay={pay} />)}</div>
+              {property.contracts.length === 0 ? <p className="text-sm text-muted-foreground">Sin contrato o calendario de pagos.</p> : property.contracts.map((contract) => <PaymentSchedule key={contract.id} contract={contract} canEdit={canEdit} caseroId={caseroId ?? 0} paymentIsUpdating={markPaid.isPending} onPay={pay} />)}</div>
           </article>)}
         </section>
       </div>}

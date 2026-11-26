@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { NumericInput } from "@/components/ui/numeric-input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -24,6 +23,43 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { RentalFormValues, RentalRecord } from "@/types/Rental"
+import type { CustomerType, QuoteCustomer } from "@/types/Quote"
+import { useRoles } from "@/hooks/useRoles"
+import { useQuoteCatalogs } from "@/lib/hooks/quoteHook"
+import { QuoteCustomerSelector } from "@/pages/quotes/quoteCustomerSelector"
+
+const NO_AGENCY = "none"
+
+const STATUS_LABELS: Record<RentalFormValues["status"], string> = {
+  draft: "Borrador",
+  active: "Activa / confirmada",
+  completed: "Completada",
+  cancelled: "Cancelada",
+}
+
+/** Cambios de estatus que acepta el backend desde cada estatus. */
+const ALLOWED_STATUSES: Record<RentalFormValues["status"], RentalFormValues["status"][]> = {
+  draft: ["draft", "active", "cancelled"],
+  active: ["active", "completed", "cancelled"],
+  completed: ["completed"],
+  cancelled: ["cancelled"],
+}
+
+function money(value: string) {
+  const amount = Number(value)
+  return Number.isFinite(amount) && value !== ""
+    ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount)
+    : "—"
+}
+
+function customerFromRecord(record: RentalRecord | null | undefined): QuoteCustomer | null {
+  if (!record || !record.customer_id || record.customer_type === "sin_cliente") return null
+  return {
+    type: (record.customer_type ?? "lead") as CustomerType,
+    id: Number(record.customer_id),
+    display_name: record.customer_name || `#${record.customer_id}`,
+  }
+}
 
 const EMPTY_FORM: RentalFormValues = {
   customer_type: "lead",
@@ -68,7 +104,7 @@ function recordToForm(record: RentalRecord): RentalFormValues {
 type RentalFormProps = {
   editRecord?: RentalRecord | null
   isSubmitting: boolean
-  onSubmit: (payload: RentalFormValues) => Promise<void>
+  onSubmit: (payload: Partial<RentalFormValues>) => Promise<void>
   open?: boolean
   onOpenChange?: (open: boolean) => void
   showTrigger?: boolean
@@ -83,14 +119,25 @@ export function RentalForm({
   showTrigger = true,
 }: RentalFormProps) {
   const isEdit = !!editRecord
+  const { can } = useRoles()
+  // Renta confirmada: la fecha de inicio solo la cambia quien tenga el permiso especial.
+  const isConfirmed = editRecord?.status === "active" || editRecord?.status === "completed"
+  const startDateLocked = isConfirmed && !can("rentals.edit_start_date")
   const [internalOpen, setInternalOpen] = React.useState(false)
   const open = controlledOpen ?? internalOpen
   const setOpen = controlledOnOpenChange ?? setInternalOpen
   const [form, setForm] = React.useState<RentalFormValues>(EMPTY_FORM)
+  const [customer, setCustomer] = React.useState<QuoteCustomer | null>(null)
+  const catalogsQuery = useQuoteCatalogs()
+  const companies = catalogsQuery.data?.data?.companies ?? []
+  const agencies = catalogsQuery.data?.data?.agencies ?? []
+  const originalStatus = (editRecord?.status as RentalFormValues["status"]) ?? "draft"
+  const statusOptions = ALLOWED_STATUSES[originalStatus] ?? [originalStatus]
 
   React.useEffect(() => {
     if (open) {
       setForm(editRecord ? recordToForm(editRecord) : EMPTY_FORM)
+      setCustomer(customerFromRecord(editRecord))
     }
   }, [open, editRecord])
 
@@ -100,7 +147,20 @@ export function RentalForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await onSubmit(form)
+    // Los importes salen del plan de pagos y "creado por" no se edita: no se envían.
+    const isWithoutCustomer = form.customer_type === "sin_cliente"
+    await onSubmit({
+      customer_type: form.customer_type,
+      customer_id: isWithoutCustomer || customer?.id == null ? "" : String(customer.id),
+      agency_id: form.agency_id,
+      issuer_company_id: form.issuer_company_id,
+      status: form.status,
+      is_rotating: form.is_rotating,
+      starts_at: form.starts_at,
+      ends_at: form.ends_at,
+      notes: form.notes,
+      manual_invoice_id: form.manual_invoice_id,
+    })
     setOpen(false)
   }
 
@@ -120,69 +180,89 @@ export function RentalForm({
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <QuoteCustomerSelector
+            customerType={form.customer_type}
+            selectedCustomer={customer}
+            onCustomerTypeChange={(type) => {
+              updateField("customer_type", type)
+              setCustomer(null)
+            }}
+            onCustomerChange={setCustomer}
+            allowWithoutCustomer
+            enabled={open}
+          />
           <div className="space-y-2">
-            <Label>Tipo de cliente</Label>
-            <Select
-              value={form.customer_type}
-              onValueChange={(value) => updateField("customer_type", value as RentalFormValues["customer_type"])}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+            <Label>Empresa emisora</Label>
+            <Select value={form.issuer_company_id} onValueChange={(value) => updateField("issuer_company_id", value)}>
+              <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="lead">Lead</SelectItem>
-                <SelectItem value="cliente">Cliente</SelectItem>
-                <SelectItem value="sin_cliente">Sin cliente</SelectItem>
+                {companies.map((company) => (
+                  <SelectItem key={company.id} value={String(company.id)}>{company.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Customer ID</Label>
-            <Input
-              value={form.customer_id}
-              onChange={(e) => updateField("customer_id", e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Agencia ID</Label>
-            <Input value={form.agency_id} onChange={(e) => updateField("agency_id", e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Empresa ID</Label>
-            <Input
-              value={form.issuer_company_id}
-              onChange={(e) => updateField("issuer_company_id", e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Creado por</Label>
-            <Input value={form.created_by} onChange={(e) => updateField("created_by", e.target.value)} />
+            <Label>Agencia</Label>
+            <Select
+              value={form.agency_id || NO_AGENCY}
+              onValueChange={(value) => updateField("agency_id", value === NO_AGENCY ? "" : value)}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_AGENCY}>Sin agencia</SelectItem>
+                {agencies.map((agency) => (
+                  <SelectItem key={agency.id} value={String(agency.id)}>{agency.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Estatus</Label>
             <Select
               value={form.status}
+              disabled={statusOptions.length <= 1}
               onValueChange={(value) => updateField("status", value as RentalFormValues["status"])}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="draft">Borrador</SelectItem>
-                <SelectItem value="active">Activa / confirmada</SelectItem>
-                <SelectItem value="completed">Completada</SelectItem>
-                <SelectItem value="cancelled">Cancelada</SelectItem>
+                {statusOptions.map((status) => (
+                  <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {form.status === "cancelled" && originalStatus !== "cancelled" ? (
+              <p className="text-xs text-amber-700">Al cancelar se liberan los anuncios y se cancelan los cobros pendientes.</p>
+            ) : statusOptions.length <= 1 ? (
+              <p className="text-xs text-muted-foreground">Una renta {STATUS_LABELS[originalStatus].toLowerCase()} ya no cambia de estatus.</p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>Inicio</Label>
-            <Input type="date" value={form.starts_at} onChange={(e) => updateField("starts_at", e.target.value)} />
+            <Input
+              type="date"
+              value={form.starts_at}
+              disabled={startDateLocked}
+              onChange={(e) => updateField("starts_at", e.target.value)}
+            />
+            {startDateLocked ? (
+              <p className="text-xs text-muted-foreground">
+                Renta confirmada: se requiere el permiso «Editar fecha de inicio de rentas confirmadas».
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>Fin</Label>
             <Input type="date" value={form.ends_at} onChange={(e) => updateField("ends_at", e.target.value)} />
           </div>
+          {isEdit && (form.starts_at !== (editRecord?.starts_at ?? "") || form.ends_at !== (editRecord?.ends_at ?? "")) ? (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 col-span-full">
+              Al guardar se recalcula el plan de pagos: los pendientes se ajustan a la nueva vigencia, se agregan o
+              cancelan pagos según los meses y los ya cobrados no se modifican.
+            </p>
+          ) : null}
           <div className="flex items-center justify-between rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2">
             <Label>Es rotativa</Label>
             <Switch
@@ -191,17 +271,13 @@ export function RentalForm({
               aria-label="Marcar renta como rotativa"
             />
           </div>
-          <div className="space-y-2">
-            <Label>Subtotal</Label>
-            <NumericInput value={form.subtotal} onValueChange={(value) => updateField("subtotal", String(value))} />
-          </div>
-          <div className="space-y-2">
-            <Label>IVA</Label>
-            <NumericInput value={form.tax} onValueChange={(value) => updateField("tax", String(value))} />
-          </div>
-          <div className="space-y-2">
-            <Label>Total</Label>
-            <NumericInput value={form.total} onValueChange={(value) => updateField("total", String(value))} />
+          <div className="space-y-1 rounded-lg border bg-slate-50 px-3 py-2 sm:col-span-2">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              <span>Subtotal <strong>{money(form.subtotal)}</strong></span>
+              <span>IVA <strong>{money(form.tax)}</strong></span>
+              <span>Total <strong>{money(form.total)}</strong></span>
+            </div>
+            <p className="text-xs text-muted-foreground">Los importes salen del plan de pagos; se ajustan desde Pagos.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="rental-manual-invoice-id">ID de factura</Label>

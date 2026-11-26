@@ -22,7 +22,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { useChangeQuoteStatus, useQuoteHistory } from "@/lib/hooks/quoteHook"
 import type { QuoteRecord, QuoteStatus } from "@/types/Quote"
-import { getAllowedQuoteStatusKeys, toneClass } from "@/pages/quotes/quoteStatus"
+import { getAllowedQuoteStatusKeys, QUOTE_STATUS_HINTS, toneClass } from "@/pages/quotes/quoteStatus"
 
 function formatDateTime(value?: string | null) {
   if (!value) return "—"
@@ -153,6 +153,9 @@ export function QuoteStatusDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {QUOTE_STATUS_HINTS[nextStatusKey] ? (
+                <p className="text-xs text-muted-foreground">{QUOTE_STATUS_HINTS[nextStatusKey]}</p>
+              ) : null}
               {!allowedStatuses.length ? (
                 <div className="text-xs text-muted-foreground">
                   Esta cotización ya no admite cambios de estatus.

@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { ArrowRightLeft, Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
+import { excelDate } from "@/lib/exportExcel"
 import type { ClientRecord, LeadRecord, LeadStatus } from "@/types/Crm"
 import { useRoles } from "@/hooks/useRoles"
 
@@ -64,6 +65,7 @@ export function useLeadTable({
       {
         accessorKey: "status",
         header: "Estatus",
+        meta: { exportValue: (lead) => lead.status?.name ?? "" },
         cell: ({ row }) => {
           const status = row.original.status
 
@@ -96,17 +98,20 @@ export function useLeadTable({
       {
         accessorKey: "priority",
         header: "Prioridad",
+        meta: { exportValue: (lead) => priorityLabel(lead.priority) },
         cell: ({ row }) => priorityLabel(row.original.priority),
       },
       {
         accessorKey: "assigned_user",
         header: "Asignado",
+        meta: { exportValue: (lead) => lead.assigned_user?.name || lead.assigned_user?.username || "" },
         cell: ({ row }) =>
           row.original.assigned_user?.name || row.original.assigned_user?.username || "—",
       },
       {
         accessorKey: "created_at",
         header: "Alta",
+        meta: { exportValue: (record) => excelDate(record.created_at) },
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<LeadRecord>({
@@ -171,6 +176,7 @@ export function useClientTable({ onEdit, onDelete }: { onEdit: (row: ClientRecor
       {
         accessorKey: "created_at",
         header: "Alta",
+        meta: { exportValue: (record) => excelDate(record.created_at) },
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<ClientRecord>({

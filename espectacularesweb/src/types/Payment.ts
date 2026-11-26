@@ -19,6 +19,8 @@ export type ReceivableRecord = {
   customer_id?: number | null
   customer_name: string
   folio?: string | null
+  /** Qué cubre el cobro; null en rentas anteriores a este campo. */
+  concept?: string | null
   status: "draft" | "issued" | "paid" | "overdue" | "cancelled" | string
   period_start: string
   period_end: string

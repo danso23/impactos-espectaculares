@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { createGroundProperty, createGroundRentContract, getAvailableGroundRentSpaces, getGroundRentals, markGroundRentPaymentPaid } from "@/lib/services/groundRentService"
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import type { GroundRentReportParams } from "@/types/GroundRent"
+import { createGroundProperty, createGroundRentContract, getAvailableGroundRentSpaces, getGroundRentals, getGroundRentPaymentsReport, markGroundRentPaymentPaid, updateGroundRentPaymentAmount } from "@/lib/services/groundRentService"
 
 const key = (caseroId: number) => ["caseros", caseroId, "ground-rentals"] as const
 
@@ -23,5 +24,14 @@ export function useCreateGroundRentContract(caseroId: number) {
 
 export function useMarkGroundRentPaymentPaid(caseroId: number) {
   const client = useQueryClient()
-  return useMutation({ mutationFn: ({ id, paid_at, reference }: { id: number; paid_at?: string; reference?: string }) => markGroundRentPaymentPaid(id, { paid_at, reference }), onSuccess: () => client.invalidateQueries({ queryKey: key(caseroId) }) })
+  return useMutation({ mutationFn: ({ id, paid_at, reference }: { id: number; paid_at?: string; reference?: string }) => markGroundRentPaymentPaid(id, { paid_at, reference }), onSuccess: async () => { await client.invalidateQueries({ queryKey: key(caseroId) }); await client.invalidateQueries({ queryKey: ["caseros", "ground-rent-report"] }) } })
+}
+
+export function useUpdateGroundRentPaymentAmount(caseroId: number) {
+  const client = useQueryClient()
+  return useMutation({ mutationFn: ({ id, amount, apply_to_following }: { id: number; amount: number; apply_to_following?: boolean }) => updateGroundRentPaymentAmount(id, { amount, apply_to_following }), onSuccess: async () => { await client.invalidateQueries({ queryKey: key(caseroId) }); await client.invalidateQueries({ queryKey: ["caseros", "ground-rent-report"] }) } })
+}
+
+export function useGroundRentPaymentsReport(params: GroundRentReportParams, enabled: boolean) {
+  return useQuery({ queryKey: ["caseros", "ground-rent-report", params], queryFn: () => getGroundRentPaymentsReport(params), enabled, placeholderData: keepPreviousData })
 }

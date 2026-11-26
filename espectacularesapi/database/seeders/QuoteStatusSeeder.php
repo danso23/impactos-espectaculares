@@ -46,7 +46,7 @@ class QuoteStatusSeeder extends Seeder
             [
                 'key' => 'rejected',
                 'name' => 'Rechazada',
-                'description' => 'Cliente rechazó la cotización',
+                'description' => 'El cliente no aceptó la cotización en esos términos',
                 'color' => 'red',
                 'is_final' => true,
                 'is_active' => true,
@@ -66,7 +66,7 @@ class QuoteStatusSeeder extends Seeder
             [
                 'key' => 'cancelled',
                 'name' => 'Cancelada',
-                'description' => 'Cancelada manualmente',
+                'description' => 'El servicio no se realizó o la cotización fue reemplazada',
                 'color' => 'dark',
                 'is_final' => true,
                 'is_active' => true,

@@ -392,6 +392,46 @@ const RolePage = () => {
                     })}
                   </div>
                 </div>
+                {permissionCatalog?.special?.length ? (
+                  <div className="mt-4 space-y-2 rounded-xl border border-gray-200 p-4">
+                    <Label className="text-sm font-semibold text-gray-700">Permisos especiales</Label>
+                    {permissionCatalog.special.map((special) => {
+                      const module = permissionCatalog.modules.find((item) => item.key === special.module)
+                      return (
+                        <label
+                          key={special.name}
+                          htmlFor={`special-${special.name}`}
+                          className="flex cursor-pointer items-center gap-3 text-sm text-gray-700"
+                        >
+                          <Checkbox
+                            id={`special-${special.name}`}
+                            checked={selectedPermissions.includes(special.name)}
+                            onCheckedChange={(value) =>
+                              setSelectedPermissions((current) => {
+                                const next = new Set(current)
+                                if (value === true) {
+                                  next.add(special.name)
+                                  // El permiso especial requiere poder ver y editar el módulo.
+                                  if (module) {
+                                    next.add(module.permissions.view)
+                                    next.add(module.permissions.edit)
+                                  }
+                                } else {
+                                  next.delete(special.name)
+                                }
+                                return Array.from(next)
+                              })
+                            }
+                          />
+                          <span>
+                            {special.label}
+                            {module ? <span className="ml-1 text-xs text-gray-500">({module.label})</span> : null}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </div>
               <DialogFooter>
                 <Button

@@ -4,6 +4,10 @@ import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
+import { fetchAllPages } from "@/lib/fetchAllPages"
+import { getProviders } from "@/lib/services/providerService"
 import { Filter } from "@/components/generic/filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
@@ -119,6 +123,13 @@ export default function ProviderPage() {
     }
   }
 
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(providers)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof providers)[number]>(), ...columns],
+    [columns],
+  )
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
@@ -185,7 +196,7 @@ export default function ProviderPage() {
                   />
                 </div>
               </div>
-              <ExcelExportButton columns={columns} data={providers} filename="proveedores" disabled={providersQuery.isFetching} />
+              <ExcelExportButton columns={columns} data={providers} filename="proveedores" selected={selection.selected} onClearSelection={selection.clear} disabled={providersQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getProviders({ ...params, page: nextPage, per_page: size }))} />
             </div>
           </div>
 
@@ -203,8 +214,12 @@ export default function ProviderPage() {
             onReset={() => { setActiveFilter("all"); setPage(1) }}
           />
           <DataTable
-            columns={columns}
+            columns={selectableColumns}
             data={providers}
+            rowSelection={selection.rowSelection}
+            onRowSelectionChange={selection.setRowSelection}
+            getRowId={selection.getRowId}
+            enableRowSelection
             enableSearch={false}
             enableExport={false}
             pageSize={perPage}

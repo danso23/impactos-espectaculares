@@ -22,6 +22,7 @@ class ServiceController extends BaseCrudController
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:255'],
             'base_price' => ['required', 'numeric', 'min:0'],
+            'unit' => ['nullable', 'in:pieza,m2'],
             'tax_rate' => ['required', 'numeric', 'min:0', 'max:100'],
             'is_active' => ['nullable', 'boolean'],
         ];
@@ -36,6 +37,7 @@ class ServiceController extends BaseCrudController
             'name' => ['sometimes', 'required', 'string', 'max:150'],
             'description' => ['sometimes', 'nullable', 'string', 'max:255'],
             'base_price' => ['sometimes', 'required', 'numeric', 'min:0'],
+            'unit' => ['sometimes', 'nullable', 'in:pieza,m2'],
             'tax_rate' => ['sometimes', 'required', 'numeric', 'min:0', 'max:100'],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -63,6 +65,7 @@ class ServiceController extends BaseCrudController
     {
         $data['key'] = $this->nullableTrimmedValue($data['key'] ?? null);
         $data['description'] = $this->nullableTrimmedValue($data['description'] ?? null);
+        $data['unit'] = $data['unit'] ?? 'pieza';
 
         return $data;
     }
@@ -74,6 +77,9 @@ class ServiceController extends BaseCrudController
         }
         if (array_key_exists('description', $data)) {
             $data['description'] = $this->nullableTrimmedValue($data['description']);
+        }
+        if (array_key_exists('unit', $data) && $data['unit'] === null) {
+            $data['unit'] = 'pieza';
         }
 
         return $data;

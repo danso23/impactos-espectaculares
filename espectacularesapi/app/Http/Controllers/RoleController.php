@@ -59,6 +59,13 @@ class RoleController extends Controller
                 })->all(),
             ];
         })->values();
+        $special = collect(config('access.special', []))->map(function ($definition, $name) {
+            return [
+                'name' => $name,
+                'module' => $definition['module'] ?? null,
+                'label' => $definition['label'] ?? $name,
+            ];
+        })->values();
 
         return response()->json([
             'success' => true,
@@ -66,6 +73,7 @@ class RoleController extends Controller
             'data' => [
                 'actions' => $actions,
                 'modules' => $modules,
+                'special' => $special,
             ],
         ]);
     }
@@ -202,6 +210,6 @@ class RoleController extends Controller
             }
         }
 
-        return $permissions;
+        return array_merge($permissions, array_keys(config('access.special', [])));
     }
 }

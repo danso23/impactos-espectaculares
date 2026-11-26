@@ -3,6 +3,7 @@ import type { ApiListResponse, ApiResponse } from "@/types/Api"
 export type CustomerType = "lead" | "cliente" | "sin_cliente"
 export type SearchableCustomerType = Exclude<CustomerType, "sin_cliente">
 export type QuoteItemType = "rental" | "service"
+export type QuoteItemUnit = "pieza" | "m2"
 export type QuoteKind = "advertisement" | "space"
 export type QuoteAmountType = "none" | "percent" | "fixed"
 
@@ -41,6 +42,7 @@ export type QuoteCatalogService = {
   name: string
   description?: string | null
   base_price: string | number
+  unit?: QuoteItemUnit | null
   tax_rate: string | number
 }
 
@@ -124,6 +126,7 @@ export type QuoteItemInput = {
   start_date?: string | null
   end_date?: string | null
   qty: number
+  unit?: QuoteItemUnit
   width_m?: number | null
   height_m?: number | null
   square_meters?: number
@@ -155,6 +158,7 @@ export type QuotePayload = {
   terms_html?: string | null
   notes?: string | null
   items: QuoteItemInput[]
+  duplicate_of_quote_id?: number | null
 }
 
 export type QuoteCreateRequest = {
@@ -210,6 +214,7 @@ export type QuoteRecord = {
   id: number
   folio: string
   version: number
+  duplicated_from_quote_id?: number | null
   quote_kind: QuoteKind
   customer_type?: CustomerType | null
   customer_id?: number | null
@@ -273,6 +278,8 @@ export type QuoteConvertToRentalPayload = {
     frequency: import("@/types/Rental").PaymentFrequency
     first_payment_date: string
     renewals: number
+    /** Importe sin IVA de cada pago, en el orden del calendario. */
+    installment_amounts?: number[]
   }
   commission: {
     type: QuoteAmountType
@@ -294,4 +301,6 @@ export type QuoteCreatePageSpaceSeed = {
   title: string
   price: number | string
   faces?: number | null
+  width_m?: number | string | null
+  height_m?: number | string | null
 }

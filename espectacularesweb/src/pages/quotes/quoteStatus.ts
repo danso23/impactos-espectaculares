@@ -4,9 +4,19 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   draft: ["sent", "cancelled"],
   sent: ["draft", "accepted", "rejected", "expired", "cancelled"],
   expired: ["sent", "cancelled"],
-  accepted: [],
+  // Aceptada → rechazada (el cliente no la aceptó así) o cancelada (el servicio no se hizo).
+  accepted: ["rejected", "cancelled"],
   rejected: [],
   cancelled: [],
+}
+
+export const QUOTE_STATUS_HINTS: Record<string, string> = {
+  rejected: "El cliente no aceptó la cotización en esos términos.",
+  cancelled: "El servicio no se realizó (o la cotización fue reemplazada por otra).",
+}
+
+function isConvertedToRental(quote: QuoteRecord) {
+  return Boolean(quote.converted_to_rental_at || quote.rental)
 }
 
 export function getAllowedQuoteStatusKeys(statusKey?: string | null) {
@@ -15,7 +25,17 @@ export function getAllowedQuoteStatusKeys(statusKey?: string | null) {
 }
 
 export function canChangeQuoteStatus(quote: QuoteRecord) {
+  if (isConvertedToRental(quote)) return false
   return getAllowedQuoteStatusKeys(quote.status?.key).length > 0
+}
+
+export function canDuplicateQuote(quote: QuoteRecord) {
+  return !isConvertedToRental(quote)
+}
+
+/** Solo Borrador o Enviada, y sin renta generada. */
+export function canEditQuote(quote: QuoteRecord) {
+  return ["draft", "sent"].includes(quote.status?.key ?? "") && !isConvertedToRental(quote)
 }
 
 export function canConvertQuoteToRental(quote: QuoteRecord) {

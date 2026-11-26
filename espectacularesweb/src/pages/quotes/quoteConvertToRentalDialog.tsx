@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useConvertQuoteToRental } from "@/lib/hooks/quoteHook"
+import { useConvertQuoteToRental, useQuote } from "@/lib/hooks/quoteHook"
 import {
   buildRentalPaymentSchedule,
   calculateRentalEndDate,
@@ -42,6 +42,10 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "MXN",
   }).format(value || 0)
+}
+
+function roundMoney(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
 function formatDate(value: string) {
@@ -69,6 +73,12 @@ export function QuoteConvertToRentalDialog({
   quote,
 }: QuoteConvertToRentalDialogProps) {
   const convertMutation = useConvertQuoteToRental()
+  // El listado no trae las partidas: se carga la cotización completa para
+  // separar renta por periodo y servicios de cargo único.
+  const quoteDetailQuery = useQuote(quote?.id ?? null, open)
+  const detailItems = quoteDetailQuery.data?.data?.items
+  const listItems = quote?.items
+  const quoteItems = React.useMemo(() => detailItems ?? listItems ?? [], [detailItems, listItems])
   const requiresCustomer = !quote?.customer_id || quote?.customer_type === "sin_cliente"
   const [customerType, setCustomerType] = React.useState<CustomerType>("cliente")
   const [selectedCustomer, setSelectedCustomer] = React.useState<QuoteCustomer | null>(null)
@@ -77,31 +87,36 @@ export function QuoteConvertToRentalDialog({
   const [renewalCount, setRenewalCount] = React.useState(1)
   const [isRotating, setIsRotating] = React.useState(false)
   const [firstPaymentDate, setFirstPaymentDate] = React.useState("")
+  // Mientras el usuario no edite el primer vencimiento, sigue a la fecha de inicio.
+  // Antes se copiaba solo en el primer cambio y, al teclear el año, quedaba "0002-...".
+  const [firstPaymentTouched, setFirstPaymentTouched] = React.useState(false)
   const [commissionType, setCommissionType] = React.useState<QuoteAmountType>("none")
   const [commissionValue, setCommissionValue] = React.useState(0)
 
-  const totalToConvert = quote?.totals.rentals_subtotal
-    ? quote.totals.rentals_subtotal
-    : quote?.totals.total ?? 0
-
-  const commissionBase = React.useMemo(() => {
-    const rentalItems = quote?.items.filter((item) => item.item_type === "rental") ?? []
-    const itemsToConvert = rentalItems.length ? rentalItems : quote?.items ?? []
-
-    return itemsToConvert.reduce(
-      (sum, item) => sum + Math.max(0, Number(item.total) - Number(item.tax_amount)),
-      0,
-    )
-  }, [quote?.items])
+  // Importes sin IVA (ya con descuento). La renta de los espacios se cobra en
+  // cada periodo; los servicios (impresión, instalación…) solo en el primer pago.
+  const { quotedRentPerPeriod, oneTimeServices } = React.useMemo(() => {
+    const net = (item: { total: number | string; tax_amount: number | string }) =>
+      Math.max(0, Number(item.total) - Number(item.tax_amount))
+    const items = quoteItems
+    return {
+      quotedRentPerPeriod: roundMoney(items.filter((item) => item.space_id).reduce((sum, item) => sum + net(item), 0)),
+      oneTimeServices: roundMoney(items.filter((item) => !item.space_id).reduce((sum, item) => sum + net(item), 0)),
+    }
+  }, [quoteItems])
+  const taxRate = quote?.includes_tax ? Number(quote?.tax_rate ?? 0) : 0
+  const [rentPerPeriod, setRentPerPeriod] = React.useState(0)
+  // Importes editados a mano por pago (índice → importe sin IVA).
+  const [amountOverrides, setAmountOverrides] = React.useState<Record<number, number>>({})
 
   const defaultRentalPeriod = React.useMemo(() => {
-    const rentalItems = quote?.items.filter((item) => item.item_type === "rental") ?? []
+    const rentalItems = quoteItems.filter((item) => item.item_type === "rental") ?? []
     const startDates = rentalItems.map((item) => item.start_date).filter(Boolean).sort() as string[]
 
     return {
       startsAt: startDates[0] ?? "",
     }
-  }, [quote?.items])
+  }, [quoteItems])
 
   React.useEffect(() => {
     if (!open) return
@@ -113,21 +128,23 @@ export function QuoteConvertToRentalDialog({
     setRenewalCount(1)
     setIsRotating(false)
     setFirstPaymentDate(defaultRentalPeriod.startsAt)
+    setFirstPaymentTouched(false)
     setCommissionType(quote?.agency?.commission_type ?? "none")
     setCommissionValue(Number(quote?.agency?.commission_value ?? 0))
   }, [
-    defaultRentalPeriod,
+    defaultRentalPeriod.startsAt,
     open,
     quote?.agency?.commission_type,
     quote?.agency?.commission_value,
     quote?.id,
   ])
 
-  const commissionAmount = React.useMemo(() => {
-    if (commissionType === "none" || commissionValue <= 0) return 0
-    if (commissionType === "percent") return commissionBase * (commissionValue / 100)
-    return Math.min(commissionValue, commissionBase)
-  }, [commissionBase, commissionType, commissionValue])
+  // La renta por periodo se toma de la cotización completa en cuanto carga.
+  React.useEffect(() => {
+    if (!open) return
+    setRentPerPeriod(quotedRentPerPeriod)
+    setAmountOverrides({})
+  }, [open, quotedRentPerPeriod])
 
   const normalizedRenewalCount = frequency === "single" ? 1 : renewalCount
   const endsAt = React.useMemo(
@@ -140,8 +157,31 @@ export function QuoteConvertToRentalDialog({
     firstPaymentDate,
     frequency,
     renewalCount: normalizedRenewalCount,
-    total: totalToConvert,
-  }), [firstPaymentDate, frequency, normalizedRenewalCount, startsAt, totalToConvert])
+    total: 0,
+  }), [firstPaymentDate, frequency, normalizedRenewalCount, startsAt])
+
+  // Si cambia el número de pagos, los importes editados a mano ya no aplican.
+  React.useEffect(() => {
+    setAmountOverrides({})
+  }, [schedule.length])
+
+  const installmentAmounts = React.useMemo(
+    () => schedule.map((_, index) =>
+      amountOverrides[index] ?? roundMoney(rentPerPeriod + (index === 0 ? oneTimeServices : 0)),
+    ),
+    [amountOverrides, oneTimeServices, rentPerPeriod, schedule],
+  )
+  const rentalSubtotal = roundMoney(installmentAmounts.reduce((sum, amount) => sum + amount, 0))
+  const rentalTax = roundMoney(installmentAmounts.reduce((sum, amount) => sum + roundMoney(amount * taxRate / 100), 0))
+  const rentalTotal = roundMoney(rentalSubtotal + rentalTax)
+  const commissionBase = rentalSubtotal
+
+  const commissionAmount = React.useMemo(() => {
+    if (commissionType === "none" || commissionValue <= 0) return 0
+    if (commissionType === "percent") return commissionBase * (commissionValue / 100)
+    return Math.min(commissionValue, commissionBase)
+  }, [commissionBase, commissionType, commissionValue])
+
 
   const handleConfirm = async () => {
     if (!quote) return
@@ -150,7 +190,7 @@ export function QuoteConvertToRentalDialog({
       return
     }
     if (!startsAt || !endsAt || !firstPaymentDate || normalizedRenewalCount < 1) {
-      toast.error("Completa el inicio, las renovaciones y la primera fecha de pago.")
+      toast.error("Completa el inicio, el número de rentas y la primera fecha de pago.")
       return
     }
     if (schedule.length === 0) {
@@ -176,6 +216,7 @@ export function QuoteConvertToRentalDialog({
             frequency,
             first_payment_date: firstPaymentDate,
             renewals: normalizedRenewalCount,
+            installment_amounts: installmentAmounts,
           },
           commission: {
             type: commissionType,
@@ -196,7 +237,7 @@ export function QuoteConvertToRentalDialog({
         <DialogHeader>
           <DialogTitle>Convertir a renta</DialogTitle>
           <DialogDescription>
-            {quote ? `La cotización ${quote.folio} dejará de ser solo comercial y generará una renta operativa.` : "Confirma la conversión a renta."}
+            {quote ? `La cotización ${quote.folio} generará una renta confirmada: los espacios quedarán ocupados durante la vigencia y se emitirán los cobros.` : "Confirma la conversión a renta."}
           </DialogDescription>
         </DialogHeader>
 
@@ -204,12 +245,8 @@ export function QuoteConvertToRentalDialog({
           <div className="rounded-md border bg-muted/30 p-3">
             <div>Cliente: {quote?.customer?.display_name ?? "—"}</div>
             <div>Estatus: {quote?.status?.name ?? "—"}</div>
-            <div>
-              Importe a convertir: {formatCurrency(
-                totalToConvert
-              )}
-            </div>
-            <div>Servicios: {quote?.totals.services_subtotal ? formatCurrency(quote.totals.services_subtotal) : formatCurrency(0)}</div>
+            <div>Renta cotizada por periodo (sin IVA): {formatCurrency(quotedRentPerPeriod)}</div>
+            <div>Servicios, cargo único en el primer pago (sin IVA): {formatCurrency(oneTimeServices)}</div>
           </div>
 
           {requiresCustomer ? (
@@ -242,7 +279,7 @@ export function QuoteConvertToRentalDialog({
                 Vigencia de la renta
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                La fecha final se calcula con la frecuencia y las renovaciones.
+                La fecha final se calcula con la frecuencia y el número de rentas.
               </p>
             </div>
 
@@ -255,12 +292,12 @@ export function QuoteConvertToRentalDialog({
                   value={startsAt}
                   onChange={(event) => {
                     setStartsAt(event.target.value)
-                    if (!firstPaymentDate) setFirstPaymentDate(event.target.value)
+                    if (!firstPaymentTouched) setFirstPaymentDate(event.target.value)
                   }}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rental-renewals">Renovaciones</Label>
+                <Label htmlFor="rental-renewals">Número de rentas</Label>
                 <Input
                   id="rental-renewals"
                   type="number"
@@ -296,7 +333,7 @@ export function QuoteConvertToRentalDialog({
                 Plan de pagos
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Las parcialidades se calculan automáticamente según la vigencia.
+                Cada pago cobra la renta del periodo; el primero incluye los servicios. Los importes son sin IVA y se pueden ajustar.
               </p>
             </div>
 
@@ -325,8 +362,24 @@ export function QuoteConvertToRentalDialog({
                   id="first-payment-date"
                   type="date"
                   value={firstPaymentDate}
-                  onChange={(event) => setFirstPaymentDate(event.target.value)}
+                  onChange={(event) => {
+                    setFirstPaymentDate(event.target.value)
+                    setFirstPaymentTouched(true)
+                  }}
                 />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Renta por periodo (sin IVA)</Label>
+                <NumericInput
+                  value={rentPerPeriod}
+                  onValueChange={(value) => {
+                    setRentPerPeriod(Math.max(0, Number(value) || 0))
+                    setAmountOverrides({})
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se cobra en cada pago. Puedes ajustar el importe de cada pago en el calendario.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Comisión</Label>
@@ -368,10 +421,10 @@ export function QuoteConvertToRentalDialog({
                   </span>
                 </div>
                 <div className="max-h-56 overflow-y-auto">
-                  {schedule.map((payment) => (
+                  {schedule.map((payment, index) => (
                     <div
                       key={payment.number}
-                      className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-0"
+                      className="grid grid-cols-[auto_1fr_140px] items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-0"
                     >
                       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-50 text-xs font-bold text-violet-700">
                         {payment.number}
@@ -384,14 +437,30 @@ export function QuoteConvertToRentalDialog({
                           Periodo: {formatDate(payment.periodStart)} – {formatDate(payment.periodEnd)}
                         </div>
                       </div>
-                      <span className="font-semibold text-slate-900">{formatCurrency(payment.amount)}</span>
+                      <div>
+                        <NumericInput
+                          aria-label={`Importe del pago ${payment.number}`}
+                          value={installmentAmounts[index] ?? 0}
+                          onValueChange={(value) =>
+                            setAmountOverrides((current) => ({ ...current, [index]: Math.max(0, Number(value) || 0) }))
+                          }
+                        />
+                        {index === 0 && oneTimeServices > 0 && amountOverrides[index] === undefined ? (
+                          <p className="mt-1 text-[11px] text-muted-foreground">Incluye servicios</p>
+                        ) : null}
+                      </div>
                     </div>
                   ))}
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-t border-emerald-100 bg-emerald-50/50 px-3 py-2 text-xs">
+                  <div>Subtotal: <span className="font-semibold">{formatCurrency(rentalSubtotal)}</span></div>
+                  <div>IVA{taxRate ? ` (${taxRate}%)` : ""}: <span className="font-semibold">{formatCurrency(rentalTax)}</span></div>
+                  <div className="text-right">Total: <span className="font-semibold">{formatCurrency(rentalTotal)}</span></div>
                 </div>
               </div>
             ) : (
               <div className="rounded-lg border border-dashed border-emerald-200 px-3 py-4 text-center text-xs text-muted-foreground">
-                Completa el inicio y las renovaciones para visualizar las parcialidades.
+                Completa el inicio y el número de rentas para visualizar las parcialidades.
               </div>
             )}
           </div>

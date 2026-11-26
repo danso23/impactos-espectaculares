@@ -4,7 +4,11 @@ import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
 import { Filter } from "@/components/generic/filter"
+import { fetchAllPages } from "@/lib/fetchAllPages"
+import { getRentals } from "@/lib/services/rentalService"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
@@ -82,6 +86,8 @@ export default function RentalPage() {
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [rotatingFilter, setRotatingFilter] = React.useState("all")
+  // Rangos de inicio y fin: qué se instala y qué se retira en un periodo.
+  const [dateFilters, setDateFilters] = React.useState<Record<string, string | undefined>>({})
   const perPage = 10
 
   const [editRecord, setEditRecord] = React.useState<RentalRecord | null>(null)
@@ -107,8 +113,12 @@ export default function RentalPage() {
       q: search || undefined,
       status: statusFilter === "all" ? undefined : statusFilter,
       is_rotating: rotatingFilter === "all" ? undefined : rotatingFilter,
+      starts_from: dateFilters.starts_from,
+      starts_to: dateFilters.starts_to,
+      ends_from: dateFilters.ends_from,
+      ends_to: dateFilters.ends_to,
     }),
-    [page, perPage, rotatingFilter, search, statusFilter]
+    [dateFilters, page, perPage, rotatingFilter, search, statusFilter]
   )
 
   const rentalsQuery = useRentals(params)
@@ -164,7 +174,7 @@ export default function RentalPage() {
     }
   }
 
-  async function handleUpdate(payload: RentalFormValues) {
+  async function handleUpdate(payload: Partial<RentalFormValues>) {
     if (!editRecord) return
 
     try {
@@ -195,6 +205,13 @@ export default function RentalPage() {
       setRentalToDelete(null)
     }
   }
+
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(rentals)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof rentals)[number]>(), ...columns],
+    [columns],
+  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -256,7 +273,7 @@ export default function RentalPage() {
             <div>
               <CardTitle className="text-xl">Búsqueda rápida</CardTitle>
               <CardDescription>
-                Filtra por ID, nota o estatus.
+                Filtra por ID, cliente, anuncio, nota o estatus; usa los filtros para ver qué inicia o termina en un periodo.
               </CardDescription>
             </div>
 
@@ -266,11 +283,17 @@ export default function RentalPage() {
                 <Input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar renta..."
+                  placeholder="Buscar por renta, cliente o anuncio..."
                   className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                 />
               </div>
-              <ExcelExportButton columns={columns} data={rentals} filename="rentas" disabled={rentalsQuery.isFetching} />
+              <ExcelExportButton
+                columns={columns}
+                data={rentals}
+                filename="rentas" selected={selection.selected} onClearSelection={selection.clear}
+                disabled={rentalsQuery.isFetching}
+                fetchAll={() => fetchAllPages((nextPage, size) => getRentals({ ...params, page: nextPage, per_page: size }))}
+              />
             </div>
           </div>
 
@@ -286,13 +309,25 @@ export default function RentalPage() {
               { key: "estatus", label: "Estatus", options: [{ label: "Borrador", value: "draft" }, { label: "Confirmada", value: "active" }, { label: "Completada", value: "completed" }, { label: "Cancelada", value: "cancelled" }] },
               { key: "rotativa", label: "Tipo de renta", options: [{ label: "Rotativa", value: "1" }, { label: "No rotativa", value: "0" }] },
             ]}
-            initialValues={{ selects: { estatus: statusFilter === "all" ? undefined : statusFilter, rotativa: rotatingFilter === "all" ? undefined : rotatingFilter }, checks: {} }}
-            onApply={(values) => { setStatusFilter(values.selects.estatus ?? "all"); setRotatingFilter(values.selects.rotativa ?? "all"); setPage(1) }}
-            onReset={() => { setStatusFilter("all"); setRotatingFilter("all"); setPage(1) }}
+            dateFields={[
+              { key: "starts_from", label: "Inicio desde" },
+              { key: "starts_to", label: "Inicio hasta" },
+              { key: "ends_from", label: "Fin desde" },
+              { key: "ends_to", label: "Fin hasta" },
+            ]}
+            initialValues={{ selects: { estatus: statusFilter === "all" ? undefined : statusFilter, rotativa: rotatingFilter === "all" ? undefined : rotatingFilter }, checks: {}, dates: dateFilters }}
+            onApply={(values) => { setStatusFilter(values.selects.estatus ?? "all"); setRotatingFilter(values.selects.rotativa ?? "all"); setDateFilters({ ...(values.dates ?? {}) }); setPage(1) }}
+            onReset={() => { setStatusFilter("all"); setRotatingFilter("all"); setDateFilters({}); setPage(1) }}
           />
           <DataTable
-            columns={columns}
+            columns={selectableColumns}
             data={rentals}
+            rowSelection={selection.rowSelection}
+            onRowSelectionChange={selection.setRowSelection}
+            getRowId={selection.getRowId}
+            enableRowSelection
+            tableClassName="min-w-[1400px]"
+            noWrap
             enableSearch={false}
             enableExport={false}
             pageSize={perPage}
@@ -367,7 +402,10 @@ export default function RentalPage() {
                       className="grid grid-cols-[60px_1fr_1fr_120px_110px] items-center gap-3 border-t border-slate-100 px-4 py-3 text-sm"
                     >
                       <span className="font-semibold text-violet-700">#{index + 1}</span>
-                      <span>{formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}</span>
+                      <span>
+                        {formatDate(invoice.period_start)} – {formatDate(invoice.period_end)}
+                        <span className="block text-xs text-muted-foreground">{invoice.concept || "Renta del periodo"}</span>
+                      </span>
                       <span>{formatDate(invoice.due_date)}</span>
                       <span className="w-fit rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium">
                         {invoiceStatusLabel(invoice.status)}

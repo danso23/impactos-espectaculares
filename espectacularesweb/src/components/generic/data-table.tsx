@@ -81,6 +81,10 @@ type DataTableProps<TData> = {
   enableExport?: boolean;
 
   className?: string;
+  /** Clases extra para <table>, p. ej. un ancho mínimo para activar scroll horizontal. */
+  tableClassName?: string;
+  /** Evita que el texto de las celdas se parta en varias líneas. */
+  noWrap?: boolean;
 };
 
 export function DataTable<TData>({
@@ -108,6 +112,8 @@ export function DataTable<TData>({
   onRowClick,
   renderToolbar,
   className,
+  tableClassName,
+  noWrap = false,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
@@ -228,7 +234,7 @@ export function DataTable<TData>({
       )}
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
-        <Table>
+        <Table className={tableClassName}>
           <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent border-none">
@@ -237,6 +243,7 @@ export function DataTable<TData>({
                     key={header.id}
                     className={cn(
                       "px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs",
+                      noWrap && "whitespace-nowrap",
                       header.column.id === "actions" &&
                         "sticky right-0 z-30 bg-gradient-to-r from-purple-600 to-indigo-600 shadow-[-10px_0_12px_-12px_rgba(0,0,0,0.35)]",
                     )}
@@ -271,6 +278,7 @@ export function DataTable<TData>({
                       key={cell.id}
                       className={cn(
                         "px-6 py-4 text-gray-700",
+                        noWrap && "whitespace-nowrap",
                         cell.column.id === "actions" &&
                           "sticky right-0 z-10 bg-white shadow-[-10px_0_12px_-12px_rgba(0,0,0,0.25)]",
                       )}

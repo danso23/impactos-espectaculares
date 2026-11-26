@@ -61,7 +61,7 @@ class RentalPaymentSchedule
         $count = $frequency === 'single' ? 1 : $renewals;
 
         if ($count < 1 || $count > self::MAX_INSTALLMENTS) {
-            throw new InvalidArgumentException('La cantidad de renovaciones debe estar entre 1 y 120.');
+            throw new InvalidArgumentException('El número de rentas debe estar entre 1 y 120.');
         }
 
         if (!in_array($frequency, ['single', 'weekly', 'biweekly', 'monthly', 'annual'], true)) {
@@ -98,10 +98,12 @@ class RentalPaymentSchedule
         $subtotals = $this->splitAmount((float) $rental->subtotal, count($schedule));
         $taxes = $this->splitAmount((float) $rental->tax, count($schedule));
         $totals = $this->splitAmount((float) $rental->total, count($schedule));
+        $concept = $this->rentalConcept($rental);
 
         foreach ($schedule as $index => $period) {
             Invoice::create([
                 'rental_id' => $rental->id,
+                'concept' => $concept,
                 'status' => $rental->status === 'active' ? 'issued' : 'draft',
                 'period_start' => $period['period_start'],
                 'period_end' => $period['period_end'],
@@ -111,6 +113,146 @@ class RentalPaymentSchedule
                 'total' => $totals[$index],
             ]);
         }
+    }
+
+    /**
+     * Recalcula el calendario de cobros cuando cambia la vigencia de la renta.
+     *
+     * - Los pagos cobrados (o con abonos registrados) no se modifican.
+     * - Los pendientes se ajustan a los nuevos periodos y fechas de vencimiento.
+     * - Si la vigencia crece, se agregan pagos con el importe del último pago.
+     * - Si se acorta, los pendientes sobrantes se eliminan (o se cancelan si ya tienen folio).
+     * - Los totales de la renta quedan como la suma de los pagos vigentes.
+     *
+     * @throws \DomainException si un pago cobrado queda fuera de la nueva vigencia.
+     */
+    public function reschedule(Rental $rental, ?string $previousStartsAt = null): void
+    {
+        $invoices = $rental->invoices()
+            ->withCount('payments')
+            ->where('status', '!=', 'cancelled')
+            ->orderBy('period_start')
+            ->orderBy('id')
+            ->get();
+
+        if ($invoices->isEmpty()) return;
+
+        $startsAt = Carbon::parse($rental->starts_at)->format('Y-m-d');
+        $firstPaymentDate = $rental->first_payment_date
+            ? Carbon::parse($rental->first_payment_date)
+            : Carbon::parse($startsAt);
+
+        // Si se movió el inicio, el primer vencimiento se recorre lo mismo.
+        if ($previousStartsAt && $previousStartsAt !== $startsAt) {
+            $shift = Carbon::parse($previousStartsAt)->diffInDays(Carbon::parse($startsAt), false);
+            $firstPaymentDate = $firstPaymentDate->copy()->addDays($shift);
+        }
+
+        $schedule = $this->build(
+            $startsAt,
+            Carbon::parse($rental->ends_at)->format('Y-m-d'),
+            $firstPaymentDate->format('Y-m-d'),
+            (string) ($rental->payment_frequency ?: 'monthly')
+        );
+
+        $isLocked = fn (Invoice $invoice) => $invoice->status === 'paid' || $invoice->payments_count > 0;
+        $template = $invoices->last();
+        $pendingStatus = $rental->status === 'active' ? 'issued' : 'draft';
+        $today = Carbon::today();
+
+        foreach ($schedule as $index => $period) {
+            $invoice = $invoices->get($index);
+
+            if ($invoice && $isLocked($invoice)) continue;
+
+            $dueDate = Carbon::parse($period['due_date']);
+            $status = $pendingStatus === 'issued' && $dueDate->lt($today) ? 'overdue' : $pendingStatus;
+
+            if ($invoice) {
+                // Un borrador sigue en borrador; emitido/vencido se recalcula con el nuevo vencimiento.
+                $invoice->update([
+                    'period_start' => $period['period_start'],
+                    'period_end' => $period['period_end'],
+                    'due_date' => $period['due_date'],
+                    'status' => $invoice->status === 'draft' ? 'draft' : ($dueDate->lt($today) ? 'overdue' : 'issued'),
+                ]);
+                continue;
+            }
+
+            Invoice::create([
+                'rental_id' => $rental->id,
+                'concept' => $template->concept,
+                'status' => $template->status === 'draft' ? 'draft' : $status,
+                'period_start' => $period['period_start'],
+                'period_end' => $period['period_end'],
+                'due_date' => $period['due_date'],
+                'subtotal' => $template->subtotal,
+                'tax' => $template->tax,
+                'total' => $template->total,
+            ]);
+        }
+
+        $leftover = $invoices->slice(count($schedule));
+        if ($leftover->contains($isLocked)) {
+            throw new \DomainException('No se puede acortar la vigencia: hay pagos cobrados en periodos que quedarían fuera.');
+        }
+        // Sin folio ni abonos nunca salieron del sistema: se eliminan para no ensuciar el plan.
+        $leftover->each(fn (Invoice $invoice) => $invoice->folio
+            ? $invoice->update(['status' => 'cancelled'])
+            : $invoice->delete());
+
+        $active = $rental->invoices()->where('status', '!=', 'cancelled');
+        $rental->forceFill([
+            'first_payment_date' => $firstPaymentDate->format('Y-m-d'),
+            'payment_installments' => count($schedule),
+            'subtotal' => round((float) (clone $active)->sum('subtotal'), 2),
+            'tax' => round((float) (clone $active)->sum('tax'), 2),
+            'total' => round((float) (clone $active)->sum('total'), 2),
+        ])->save();
+    }
+
+    /**
+     * Crea un cobro por periodo con el importe (sin IVA) indicado para cada uno.
+     */
+    public function createInvoicesFromAmounts(Rental $rental, array $schedule, array $amounts, float $taxRate, array $concepts = []): void
+    {
+        foreach (array_values($schedule) as $index => $period) {
+            $subtotal = round((float) ($amounts[$index] ?? 0), 2);
+            $tax = round($subtotal * $taxRate / 100, 2);
+
+            Invoice::create([
+                'rental_id' => $rental->id,
+                'concept' => isset($concepts[$index]) ? mb_substr((string) $concepts[$index], 0, 500) : null,
+                'status' => $rental->status === 'active' ? 'issued' : 'draft',
+                'period_start' => $period['period_start'],
+                'period_end' => $period['period_end'],
+                'due_date' => $period['due_date'],
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'total' => round($subtotal + $tax, 2),
+            ]);
+        }
+    }
+
+    /**
+     * Concepto genérico para rentas capturadas directamente: los espacios rentados.
+     */
+    private function rentalConcept(Rental $rental): string
+    {
+        $spaces = $rental->items()->with('space')->get()
+            ->map(function ($item) {
+                $space = $item->space;
+                if (!$space) {
+                    return null;
+                }
+                return trim(($space->assigned_id ? 'ID ' . $space->assigned_id . ' ' : '') . ($space->title ?? ''));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        return mb_substr($spaces ? 'Renta: ' . implode(', ', $spaces) : 'Renta del periodo', 0, 500);
     }
 
     private function periodEnd(Carbon $anchor, Carbon $cursor, Carbon $end, string $frequency, int $index): Carbon

@@ -5,7 +5,7 @@ export type Space = {
   title: string;
   price?: number;
   coords: { lat: number; lng: number };
-  status: "Disponible" | "Bloqueado" | "Rentado";
+  status: "Disponible" | "Bloqueado" | "Ocupado";
   createdAt: string;
   socioeconomic_level?: string | null;
   // nuevos (opcionales)
@@ -14,6 +14,7 @@ export type Space = {
   has_lights?: boolean;
   viewType?: "Vista natural" | "Vista cruzada" | string;
   type?: string | null;
+  subtype?: string | null;
   width_m?: number;
   height_m?: number;
   description?: string | null;
@@ -23,6 +24,8 @@ export type Space = {
   blocked_from?: string | null;
   blocked_until?: string | null;
   is_blocked_now?: boolean | null;
+  /** Rentado hoy hasta esta fecha (renta confirmada); null si no está ocupado. */
+  occupied_until?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   images?: SpaceImageApi[];
@@ -52,7 +55,8 @@ export type SpaceFormValues = {
   assigned_id?: string;
   title: string;
   price?: number;
-  type?: "Espectacular" | "Muro" | "Parabus";
+  type?: "Espectacular" | "Pantalla" | "Valla movil";
+  subtype?: "Cartelera" | "Unipolar";
   width_m?: number;
   height_m?: number;
   description?: string;
@@ -88,6 +92,7 @@ export type SpaceApi = {
   title: string;
 
   type?: string | null;
+  subtype?: string | null;
   price?: number | string | null;
 
   active?: boolean | number | string | null;
@@ -95,6 +100,7 @@ export type SpaceApi = {
   blocked_from?: string | null;
   blocked_until?: string | null;
   is_blocked_now?: boolean | number | string | null;
+  occupied_until?: string | null;
   created_at?: string | null;
 
   latitude?: number | string | null;

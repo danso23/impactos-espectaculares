@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/utils"
 import type {
     FilterCheckboxConfig,
+    FilterDateFieldConfig,
     FilterDropdownConfig,
     FilterValues,
 } from "@/types/Filter"
@@ -34,6 +35,8 @@ type Props = {
     enableDateRange?: boolean
     dropdowns?: FilterDropdownConfig[]
     checkboxes?: FilterCheckboxConfig[]
+    /** Campos de fecha adicionales (p. ej. inicio desde/hasta, fin desde/hasta). */
+    dateFields?: FilterDateFieldConfig[]
     initialValues?: Partial<FilterValues>
     onApply: (values: FilterValues) => void
     onReset?: () => void
@@ -61,6 +64,7 @@ function buildInitialState(params: {
     return {
         dateFrom: params.initialValues?.dateFrom,
         dateTo: params.initialValues?.dateTo,
+        dates: { ...(params.initialValues?.dates ?? {}) },
         selects: { ...selects, ...(params.initialValues?.selects ?? {}) },
         checks: { ...checks, ...(params.initialValues?.checks ?? {}) },
     }
@@ -77,6 +81,7 @@ export function Filter({
     enableDateRange = true,
     dropdowns = [],
     checkboxes = [],
+    dateFields = [],
     initialValues,
     onApply,
     onReset,
@@ -97,8 +102,9 @@ export function Filter({
         initialValues,
         dropdowns,
         checkboxes,
+        dateFields,
         })
-    }, [enableDateRange, initialValues, dropdowns, checkboxes])
+    }, [enableDateRange, initialValues, dropdowns, checkboxes, dateFields])
 
     React.useEffect(() => {
         setValues(buildInitialState({ dropdowns, checkboxes, initialValues }))
@@ -130,6 +136,9 @@ export function Filter({
     const setDateTo = (val?: string) =>
         setValues((p) => ({ ...p, dateTo: val }))
 
+    const setDateField = (key: string, val?: string) =>
+        setValues((p) => ({ ...p, dates: { ...(p.dates ?? {}), [key]: val } }))
+
     const handleApply = () => {
         if (values.dateFrom && values.dateTo && values.dateFrom > values.dateTo) {
             alert("La fecha inicial no puede ser mayor a la fecha final.")
@@ -153,6 +162,7 @@ export function Filter({
     const activeCount =
         (values.dateFrom ? 1 : 0) +
         (values.dateTo ? 1 : 0) +
+        Object.values(values.dates ?? {}).filter(Boolean).length +
         Object.values(values.selects).filter(Boolean).length +
         Object.values(values.checks).filter((v) => v !== undefined).length
 
@@ -255,6 +265,18 @@ export function Filter({
                                     </div>
                                 </>
                             )}
+
+                            {dateFields.map((field) => (
+                                <div key={field.key} className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">{field.label}</Label>
+                                    <Input
+                                        type="date"
+                                        className="rounded-lg border-gray-300 bg-white shadow-sm"
+                                        value={values.dates?.[field.key] ?? ""}
+                                        onChange={(e) => setDateField(field.key, e.target.value || undefined)}
+                                    />
+                                </div>
+                            ))}
 
                             {/* Tri-state checks */}
                             {checkboxes.map((c) => {

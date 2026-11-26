@@ -17,9 +17,16 @@ export type FilterCheckboxConfig = {
     disabled?: boolean
 }
 
+export type FilterDateFieldConfig = {
+    key: string
+    label: string
+}
+
 export type FilterValues = {
     dateFrom?: string // YYYY-MM-DD
     dateTo?: string // YYYY-MM-DD
+    /** Fechas adicionales configuradas con `dateFields` (YYYY-MM-DD). */
+    dates?: Record<string, string | undefined>
     selects: Record<string, string | undefined>
     checks: Record<string, boolean | undefined>
 }

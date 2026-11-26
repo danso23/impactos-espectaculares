@@ -9,7 +9,7 @@ import {
 } from "@react-pdf/renderer";
 import type { CatalogSpace } from "./SpacesCatalogPdf";
 import { env } from "@/config/env";
-import { formatCatalogDate, formatCatalogPrice, getAvailabilityDate, isAvailable } from "@/lib/catalog/catalogHelpers";
+import { formatCatalogDate, getAvailabilityDate, isAvailable } from "@/lib/catalog/catalogHelpers";
 
 const styles = StyleSheet.create({
   /* ================= PORTADA ================= */
@@ -388,6 +388,7 @@ export function SpacesCatalogDocumentV1({
         const googleMapsUrl = getGoogleMapsUrl(space);
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(googleMapsUrl)}`;
 
+        const hasCoords = space.latitude != null && space.longitude != null;
         const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${space.latitude},${space.longitude}&zoom=15&size=400x300&markers=color:red%7C${space.latitude},${space.longitude}`;
 
         return (
@@ -424,13 +425,12 @@ export function SpacesCatalogDocumentV1({
                 </Text>
                 <Text style={styles.iconTextBold}>UBICACIÓN:</Text>
                 <Text style={styles.iconTextBold}>
-                  {space.latitude}, {space.longitude}
+                  {hasCoords ? `${space.latitude}, ${space.longitude}` : "Ubicación móvil"}
                 </Text>
                 <Text style={styles.iconTextBold}>DESCRIPCIÓN:</Text>
                 <Text style={styles.iconTextBold}>
                   {space.description ?? "No disponible"}
                 </Text>
-                <Text style={styles.iconText}>PRECIO: {formatCatalogPrice(space.price)}</Text>
                 <Text style={styles.iconText}>
                   DISPONIBLE A PARTIR DE: {formatCatalogDate(
                     getAvailabilityDate(space),
@@ -440,14 +440,15 @@ export function SpacesCatalogDocumentV1({
                 <Text style={styles.highlight}>
                   {isAvailable(space) ? "DISPONIBLE PARA COTIZAR" : "CONSULTAR DISPONIBILIDAD"}
                 </Text>
-                {enableMapLinks ? (
+                {/* La valla móvil no tiene coordenadas: sin QR ni liga al mapa. */}
+                {!hasCoords ? null : enableMapLinks ? (
                   <Link src={googleMapsUrl}>
                     <Image src={qrUrl} style={styles.qr} />
                   </Link>
                 ) : (
                   <Image src={qrUrl} style={styles.qr} />
                 )}
-                {enableMapLinks ? (
+                {!hasCoords ? null : enableMapLinks ? (
                   <Link src={googleMapsUrl} style={styles.mapLink}>
                     Ver ubicacion en Google Maps
                   </Link>
@@ -465,8 +466,10 @@ export function SpacesCatalogDocumentV1({
 
                 <Image src={catalogImages.tertiary} style={styles.smallImage} />
 
-                {/* MAPA */}
-                <Image src={mapUrl} style={styles.mapImage} />
+                {/* MAPA (la valla móvil no tiene coordenadas) */}
+                {hasCoords ? (
+                  <Image src={mapUrl} style={styles.mapImage} />
+                ) : null}
               </View>
             </View>
 

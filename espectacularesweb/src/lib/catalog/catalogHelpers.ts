@@ -63,9 +63,16 @@ export function formatCatalogDate(value: unknown, fallback = "Disponibilidad inm
 }
 
 export function getAvailabilityDate(space: CatalogSpaceLike) {
-  if (isAvailable(space) || !space.blocked_until) return null;
+  if (isAvailable(space)) return null;
+  // Se libera al día siguiente del fin de la renta o del bloqueo (lo más tarde).
+  const candidates = [space.blocked_until, space.occupied_until]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.slice(0, 10))
+    .sort();
+  const until = candidates.at(-1);
+  if (!until) return null;
 
-  const date = new Date(`${space.blocked_until.slice(0, 10)}T00:00:00Z`);
+  const date = new Date(`${until}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return null;
 
   date.setUTCDate(date.getUTCDate() + 1);
@@ -76,7 +83,12 @@ export function hasLights(value: CatalogSpaceLike["has_lights"]) {
   return value === true || value === 1 || value === "1" || value === "true";
 }
 
+export function isOccupied(space: CatalogSpaceLike) {
+  return Boolean(space.occupied_until);
+}
+
 export function isAvailable(space: CatalogSpaceLike) {
+  if (isOccupied(space)) return false;
   if (space.is_blocked_now !== null && space.is_blocked_now !== undefined) {
     const blocked =
       space.is_blocked_now === true ||
@@ -97,4 +109,16 @@ export function getViewType(space: CatalogSpaceLike) {
   if ("view_type" in space && space.view_type) return space.view_type;
   if ("viewType" in space) return space.viewType;
   return null;
+}
+
+const assignedIdCollator = new Intl.Collator("es", { numeric: true, sensitivity: "base" });
+
+/** Orden natural por ID asignado (2, 10, 233, AN-001…); sin ID al final. */
+export function sortByAssignedId<T extends { assigned_id?: string | number | null; id?: number }>(spaces: T[]): T[] {
+  return [...spaces].sort((a, b) => {
+    const left = a.assigned_id != null ? String(a.assigned_id).trim() : "";
+    const right = b.assigned_id != null ? String(b.assigned_id).trim() : "";
+    if (!left || !right) return left ? -1 : right ? 1 : (a.id ?? 0) - (b.id ?? 0);
+    return assignedIdCollator.compare(left, right) || (a.id ?? 0) - (b.id ?? 0);
+  });
 }
