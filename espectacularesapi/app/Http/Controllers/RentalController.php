@@ -562,11 +562,13 @@ class RentalController extends BaseCrudController
                 );
                 // Anuncios de la renta: ID asignado, nombre y renta contratada (sin IVA).
                 // La renta contratada es el subtotal de la renta (sigue al plan de pagos
-                // cuando cambia la vigencia), repartido según el peso de cada anuncio.
+                // cuando cambia la vigencia) sin los servicios de pago único que trae
+                // una cotización convertida, repartido según el peso de cada anuncio.
                 $groups = $rental->items->filter(fn ($item) => $item->space)->groupBy('space_id')->values();
                 $weights = $groups->map(fn ($items) => (float) $items->sum('subtotal'));
                 $weightSum = $weights->sum();
-                $contracted = round((float) $rental->subtotal, 2);
+                $oneTimeServices = (float) ($snapshot['payment']['one_time_services'] ?? 0);
+                $contracted = round(max(0, (float) $rental->subtotal - $oneTimeServices), 2);
                 $assigned = 0.0;
                 $row['spaces'] = $groups
                     ->map(function ($items, $index) use ($groups, $weights, $weightSum, $contracted, &$assigned) {

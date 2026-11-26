@@ -38,6 +38,11 @@ export function canEditQuote(quote: QuoteRecord) {
   return ["draft", "sent"].includes(quote.status?.key ?? "") && !isConvertedToRental(quote)
 }
 
+// Solo un borrador se puede eliminar: nunca se envió al cliente ni tiene renta.
+export function canDeleteQuote(quote: QuoteRecord) {
+  return quote.status?.key === "draft" && !isConvertedToRental(quote)
+}
+
 export function canConvertQuoteToRental(quote: QuoteRecord) {
   return (
     quote.status?.key === "accepted" &&

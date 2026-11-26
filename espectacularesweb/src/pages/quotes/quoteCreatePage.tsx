@@ -561,7 +561,8 @@ export default function QuoteCreatePage() {
     if (!payload) return false
 
     return payload.items.every((item) => {
-      if (item.item_type === "service") return true
+      // Un servicio libre sin concepto todavía se está capturando: la API lo rechaza.
+      if (item.item_type === "service") return !!item.service_id || !!item.concept?.trim()
       return !!item.space_id && !!item.start_date && !!item.end_date
     })
   }, [payload])
@@ -571,8 +572,14 @@ export default function QuoteCreatePage() {
   }, [payload])
 
   React.useEffect(() => {
-    if (!canPreview || !payload) {
+    if (!payload) {
       setPreview(null)
+      setPreviewError(null)
+      return
+    }
+    // Con una partida a medio capturar se conserva el último cálculo en vez de
+    // bajar los totales a $0; se recalcula en cuanto la partida esté completa.
+    if (!canPreview) {
       setPreviewError(null)
       return
     }
@@ -836,13 +843,9 @@ export default function QuoteCreatePage() {
             : `Cotización ${response.data.folio} guardada correctamente.`,
       )
       allowNavigation.current = true
-      if (sourceQuote) {
-        navigate("/cotizaciones", { replace: true })
-      } else if (window.history.length > 1) {
-        navigate(-1)
-      } else {
-        navigate("/cotizaciones", { replace: true })
-      }
+      // Siempre se abre la cotización guardada, aunque se haya iniciado desde
+      // otro módulo (por ejemplo Espacios › Cotizar).
+      navigate("/cotizaciones", { replace: true, state: { openQuote: response.data } })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible guardar la cotización.")
     }

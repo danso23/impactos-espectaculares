@@ -1,10 +1,10 @@
 import * as React from "react"
 import type { ColumnDef } from "@tanstack/react-table"
-import { Copy, Eye, FileDown, Pencil, PencilLine, ReceiptText } from "lucide-react"
+import { Copy, Eye, FileDown, Pencil, PencilLine, ReceiptText, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { QuoteRecord } from "@/types/Quote"
-import { canChangeQuoteStatus, canConvertQuoteToRental, canDuplicateQuote, canEditQuote, toneClass } from "@/pages/quotes/quoteStatus"
+import { canChangeQuoteStatus, canConvertQuoteToRental, canDeleteQuote, canDuplicateQuote, canEditQuote, toneClass } from "@/pages/quotes/quoteStatus"
 import type { TableAction } from "@/types/TableAction"
 import { useRoles } from "@/hooks/useRoles"
 import { excelDate } from "@/lib/exportExcel"
@@ -39,6 +39,7 @@ export function useQuoteTable({
   onConvertToRental,
   onDuplicate,
   onEdit,
+  onDelete,
 }: {
   onView: (quote: QuoteRecord) => void
   onDownload: (quote: QuoteRecord) => Promise<void> | void
@@ -46,6 +47,7 @@ export function useQuoteTable({
   onConvertToRental: (quote: QuoteRecord) => void
   onDuplicate: (quote: QuoteRecord) => void
   onEdit: (quote: QuoteRecord) => void
+  onDelete: (quote: QuoteRecord) => void
 }) {
   const { can } = useRoles()
 
@@ -92,6 +94,14 @@ export function useQuoteTable({
           visible: canDuplicateQuote,
         },
       )
+      if (can("quotes.delete")) actions.push({
+        key: "delete",
+        label: "Eliminar",
+        icon: <Trash2 className="h-4 w-4" />,
+        onClick: onDelete,
+        visible: canDeleteQuote,
+        variant: "destructive",
+      })
 
       return [
       {
@@ -194,6 +204,6 @@ export function useQuoteTable({
         actions,
       }),
     ]},
-    [onView, onChangeStatus, onConvertToRental, onDownload, onDuplicate, onEdit, can]
+    [onView, onChangeStatus, onConvertToRental, onDownload, onDuplicate, onEdit, onDelete, can]
   )
 }

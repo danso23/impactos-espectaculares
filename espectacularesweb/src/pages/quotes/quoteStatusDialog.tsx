@@ -61,6 +61,8 @@ type QuoteStatusDialogProps = {
   onOpenChange: (open: boolean) => void
   quote: QuoteRecord | null
   statuses: QuoteStatus[]
+  /** Se llama cuando la cotización queda Aceptada, para ofrecer convertirla a renta. */
+  onAccepted?: (quote: QuoteRecord) => void
 }
 
 export function QuoteStatusDialog({
@@ -68,6 +70,7 @@ export function QuoteStatusDialog({
   onOpenChange,
   quote,
   statuses,
+  onAccepted,
 }: QuoteStatusDialogProps) {
   const historyQuery = useQuoteHistory(quote?.id ?? null, open && !!quote)
   const changeStatusMutation = useChangeQuoteStatus()
@@ -109,6 +112,7 @@ export function QuoteStatusDialog({
 
       toast.success(response.data.status?.name ? `Estatus actualizado a ${response.data.status.name}.` : "Estatus actualizado.")
       onOpenChange(false)
+      if (response.data.status?.key === "accepted") onAccepted?.(response.data)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible actualizar el estatus.")
     }
