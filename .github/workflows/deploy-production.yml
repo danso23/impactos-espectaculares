@@ -89,18 +89,27 @@ jobs:
             echo "$response"
           }
 
-          # 1. Traer main de GitHub a la copia del repositorio en cPanel.
-          uapi VersionControl/update \
+          # 1. Pedir a cPanel que traiga main. En esta cuenta el pull de cPanel no
+          #    baja commits nuevos, así que el cron del servidor (fetch + reset a
+          #    origin/main cada minuto) es quien actualiza el repositorio. Se
+          #    espera hasta 3 minutos a que cPanel quede en el commit del push.
+          # En subshell: si falla, uapi hace exit y no debe cortar el job.
+          ( uapi VersionControl/update \
             --data-urlencode "repository_root=${CPANEL_REPOSITORY_ROOT}" \
-            --data-urlencode "branch=main" > /dev/null
+            --data-urlencode "branch=main" > /dev/null ) || true
 
           # 2. Revisar que cPanel quedó en este commit y que puede desplegar.
-          repo=$(uapi VersionControl/retrieve \
-            | jq -c --arg root "$CPANEL_REPOSITORY_ROOT" '.data[] | select(.repository_root == $root)')
-          head_sha=$(echo "$repo" | jq -r '.last_update.identifier // empty')
-          echo "cPanel HEAD: ${head_sha:-desconocido} / esperado: ${DEPLOY_SHA}"
-          if [ -n "$head_sha" ] && [ "$head_sha" != "$DEPLOY_SHA" ]; then
-            echo "::error::cPanel no está en el commit esperado."
+          head_sha=""
+          for _ in $(seq 1 18); do
+            repo=$(uapi VersionControl/retrieve \
+              | jq -c --arg root "$CPANEL_REPOSITORY_ROOT" '.data[] | select(.repository_root == $root)')
+            head_sha=$(echo "$repo" | jq -r '.last_update.identifier // empty')
+            echo "cPanel HEAD: ${head_sha:-desconocido} / esperado: ${DEPLOY_SHA}"
+            [ "$head_sha" = "$DEPLOY_SHA" ] && break
+            sleep 10
+          done
+          if [ "$head_sha" != "$DEPLOY_SHA" ]; then
+            echo "::error::cPanel no llegó al commit esperado en 3 minutos. Revisa que el cron de sincronización esté activo."
             exit 1
           fi
           if [ "$(echo "$repo" | jq -r '.deployable')" != "1" ]; then
