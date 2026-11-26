@@ -15,6 +15,11 @@ import { toast } from "sonner"
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
+import { excelDate } from "@/lib/exportExcel"
+import { fetchAllPages } from "@/lib/fetchAllPages"
+import { getReceivables } from "@/lib/services/paymentService"
 import { Filter } from "@/components/generic/filter"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
@@ -152,6 +157,12 @@ export default function PaymentPage() {
     {
       accessorKey: "rental_id",
       header: "Renta",
+      meta: {
+        exportColumns: [
+          { label: "Renta", value: (r) => `#${r.rental_id}` },
+          { label: "Cargo", value: (r) => `#${r.id}` },
+        ],
+      },
       cell: ({ row }) => (
         <div className="space-y-1">
           <div className="font-semibold">#{row.original.rental_id}</div>
@@ -162,6 +173,12 @@ export default function PaymentPage() {
     {
       accessorKey: "customer_name",
       header: "Cliente",
+      meta: {
+        exportColumns: [
+          { label: "Cliente", value: (r) => r.customer_name },
+          { label: "Tipo de cliente", value: (r) => (r.customer_type === "cliente" ? "Cliente" : r.customer_type === "lead" ? "Lead" : r.customer_type ?? "") },
+        ],
+      },
       cell: ({ row }) => (
         <div className="space-y-1">
           <div className="font-medium">{row.original.customer_name}</div>
@@ -172,16 +189,25 @@ export default function PaymentPage() {
     {
       accessorKey: "period_start",
       header: "Periodo",
+      meta: {
+        exportColumns: [
+          { label: "Periodo desde", value: (r) => excelDate(r.period_start) },
+          { label: "Periodo hasta", value: (r) => excelDate(r.period_end) },
+          { label: "Concepto", value: (r) => r.concept || "Renta del periodo" },
+        ],
+      },
       cell: ({ row }) => (
         <div className="text-sm">
           <div>{formatDate(row.original.period_start)}</div>
           <div className="text-xs text-muted-foreground">al {formatDate(row.original.period_end)}</div>
+          <div className="max-w-[200px] whitespace-normal text-xs text-slate-600">{row.original.concept || "Renta del periodo"}</div>
         </div>
       ),
     },
     {
       accessorKey: "due_date",
       header: "Vencimiento",
+      meta: { exportValue: (r) => excelDate(r.due_date) },
       cell: ({ row }) => {
         const days = daysUntilDue(row.original.due_date)
         const dueSoon = isDueSoon(row.original)
@@ -201,6 +227,15 @@ export default function PaymentPage() {
     {
       accessorKey: "total",
       header: "Importes",
+      meta: {
+        exportColumns: [
+          { label: "Subtotal", value: (r) => Number(r.subtotal) },
+          { label: "IVA", value: (r) => Number(r.tax) },
+          { label: "Total", value: (r) => Number(r.total) },
+          { label: "Pagado", value: (r) => Number(r.paid) },
+          { label: "Saldo", value: (r) => Number(r.balance) },
+        ],
+      },
       cell: ({ row }) => (
         <div className="min-w-32 space-y-1 text-xs">
           <div className="flex justify-between gap-3"><span className="text-muted-foreground">Total</span><span>{formatCurrency(row.original.total)}</span></div>
@@ -212,6 +247,7 @@ export default function PaymentPage() {
     {
       accessorKey: "status",
       header: "Estatus",
+      meta: { exportValue: (r) => statusPresentation(r).label },
       cell: ({ row }) => {
         const presentation = statusPresentation(row.original)
         return <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${presentation.className}`}>{presentation.label}</span>
@@ -269,6 +305,13 @@ export default function PaymentPage() {
     }
   }
 
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(rows)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof rows)[number]>(), ...columns],
+    [columns],
+  )
+
   return (
     <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
@@ -317,7 +360,13 @@ export default function PaymentPage() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Buscar renta o cliente..." className="pl-10" />
               </div>
-              <ExcelExportButton columns={columns} data={rows} filename="pagos" disabled={receivablesQuery.isFetching} />
+              <ExcelExportButton
+                columns={columns}
+                data={rows}
+                filename="pagos" selected={selection.selected} onClearSelection={selection.clear}
+                disabled={receivablesQuery.isFetching}
+                fetchAll={() => fetchAllPages((nextPage, size) => getReceivables({ ...params, page: nextPage, per_page: size }))}
+              />
             </div>
           </div>
         </CardHeader>
@@ -331,8 +380,14 @@ export default function PaymentPage() {
             onReset={() => { setStatus(ALL_STATUSES); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
           />
           <DataTable
-            columns={columns}
+            columns={selectableColumns}
             data={rows}
+            rowSelection={selection.rowSelection}
+            onRowSelectionChange={selection.setRowSelection}
+            getRowId={selection.getRowId}
+            enableRowSelection
+            tableClassName="min-w-[1200px]"
+            noWrap
             enableSearch={false}
             enableExport={false}
             pageSize={perPage}

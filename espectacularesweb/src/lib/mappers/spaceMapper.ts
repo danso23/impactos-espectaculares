@@ -17,8 +17,13 @@ function resolveSpaceImageUrl(spaceId: number, imageId?: number | null, path?: s
 
 export function apiToUiStatus(
   active?: boolean | number | string | null,
-  isBlockedNow?: boolean | number | string | null
+  isBlockedNow?: boolean | number | string | null,
+  occupiedUntil?: string | null,
 ): Space["status"] {
+  const blockedNow = isBlockedNow === true || isBlockedNow === 1 || isBlockedNow === "1" || isBlockedNow === "true"
+  // El bloqueo manual manda; después, si está rentado hoy, aparece como Ocupado.
+  if (!blockedNow && occupiedUntil) return "Ocupado"
+
   if (isBlockedNow !== null && isBlockedNow !== undefined) {
     const blocked =
       isBlockedNow === true ||
@@ -51,7 +56,8 @@ export function apiToUiSpace(r: SpaceApi): Space {
     latitude: r.latitude != null ? Number(r.latitude) : null,
     longitude: r.longitude != null ? Number(r.longitude) : null,
 
-    status: apiToUiStatus(r.active, r.is_blocked_now),
+    status: apiToUiStatus(r.active, r.is_blocked_now, r.occupied_until),
+    occupied_until: r.occupied_until?.slice(0, 10) ?? null,
     active:
       r.active === true ||
       r.active === 1 ||
@@ -72,6 +78,7 @@ export function apiToUiSpace(r: SpaceApi): Space {
       r.is_blocked_now === "true",
 
     type: r.type ?? null,
+    subtype: r.subtype ?? null,
     socioeconomic_level: r.socioeconomic_level ?? null,
     width_m: r.width_m != null ? Number(r.width_m) : undefined,
     height_m: r.height_m != null ? Number(r.height_m) : undefined,
@@ -115,6 +122,9 @@ export function buildSpacesParams(
   const tipo = filters.selects?.tipo
   if (tipo) params.type = tipo
 
+  const subtipo = filters.selects?.subtipo
+  if (subtipo) params.subtype = subtipo
+
   const conLuz = filters.selects?.conLuz
   if (conLuz === "1" || conLuz === "0") params.has_lights = conLuz
 
@@ -122,7 +132,8 @@ export function buildSpacesParams(
   if (rotativo !== undefined) params.is_rotating = rotativo ? 1 : 0
 
   const estatus = filters.selects?.estatus
-  if (estatus === "disponible") params.active = 1
+  if (estatus === "disponible") params.availability = "available"
+  else if (estatus === "ocupado") params.availability = "occupied"
   else if (estatus === "bloqueado") params.active = 0
   else {
     const activo = filters.checks?.activo

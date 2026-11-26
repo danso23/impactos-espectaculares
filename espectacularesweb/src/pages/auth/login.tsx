@@ -1,7 +1,7 @@
 import React from "react"
 import { Navigate, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { env } from "@/config/env"
@@ -95,12 +95,6 @@ export function LoginPage() {
                     </Button>
                     </form>
                 </CardContent>
-
-                <CardFooter className="flex-col gap-4">
-                    <p className="text-center text-xs text-slate-500">
-                    API: <span className="font-mono">{env.apiUrl}</span>
-                    </p>
-                </CardFooter>
             </Card>
         </div>
     )

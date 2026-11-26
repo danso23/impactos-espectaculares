@@ -4,15 +4,16 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { NumericInput } from "@/components/ui/numeric-input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import type { ServiceFormValues, ServiceRecord } from "@/types/Service"
 
-const EMPTY: ServiceFormValues = { key: "", name: "", description: "", base_price: 0, tax_rate: 16, is_active: true }
+const EMPTY: ServiceFormValues = { key: "", name: "", description: "", base_price: 0, unit: "pieza", tax_rate: 16, is_active: true }
 
 function toForm(record: ServiceRecord): ServiceFormValues {
-  return { key: record.key ?? "", name: record.name, description: record.description ?? "", base_price: Number(record.base_price), tax_rate: Number(record.tax_rate), is_active: record.is_active !== false }
+  return { key: record.key ?? "", name: record.name, description: record.description ?? "", base_price: Number(record.base_price), unit: record.unit === "m2" ? "m2" : "pieza", tax_rate: Number(record.tax_rate), is_active: record.is_active !== false }
 }
 
 type Props = {
@@ -43,9 +44,11 @@ export function ServiceForm({ editRecord, isSubmitting, onSubmit, open: controll
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2"><Label>Nombre *</Label><Input value={form.name} onChange={(e) => update("name", e.target.value)} required /></div>
         <div className="space-y-2"><Label>Clave interna</Label><Input value={form.key} onChange={(e) => update("key", e.target.value)} disabled={Boolean(editRecord?.key)} placeholder="Ej. instalacion" /></div>
-        <div className="space-y-2"><Label>Precio base *</Label><NumericInput value={form.base_price} onValueChange={(value) => update("base_price", Number(value))} /></div>
+        <div className="space-y-2"><Label>Precio unitario *</Label><NumericInput value={form.base_price} onValueChange={(value) => update("base_price", Number(value))} /></div>
+        <div className="space-y-2"><Label>Unidad de medida *</Label><Select value={form.unit} onValueChange={(value) => update("unit", value === "m2" ? "m2" : "pieza")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pieza">Pieza (precio por unidad)</SelectItem><SelectItem value="m2">m² (precio × ancho × alto)</SelectItem></SelectContent></Select></div>
         <div className="space-y-2"><Label>IVA (%) *</Label><NumericInput value={form.tax_rate} onValueChange={(value) => update("tax_rate", Number(value))} /></div>
       </div>
+      <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">Cambiar el precio aquí actualiza el precio por defecto de <strong>todas las cotizaciones nuevas</strong>. Las cotizaciones ya guardadas no cambian. Para ajustar una sola cotización, edita el precio directamente en ella.</p>
       <div className="space-y-2"><Label>Descripción</Label><Textarea value={form.description} onChange={(e) => update("description", e.target.value)} /></div>
       <div className="flex items-center justify-between rounded-md border px-4 py-3">
         <div><p className="text-sm font-medium">Activo</p><p className="text-xs text-muted-foreground">Solo los activos se ofrecen en nuevas cotizaciones.</p></div>

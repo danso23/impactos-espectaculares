@@ -20,12 +20,24 @@ class SpaceController extends BaseCrudController
     protected function applyIndexQuery($query, Request $request)
     {
         $activeFilter = $request->filled('active') ? (int) $request->get('active') : null;
+        // availability: available (ni bloqueado ni rentado hoy) | occupied (rentado hoy)
+        $availability = $request->filled('availability') ? (string) $request->get('availability') : null;
 
         if ($activeFilter !== null) {
             $request->query->remove('active');
         }
+        $request->query->remove('availability');
 
         $query = parent::applyIndexQuery($query, $request);
+
+        if ($availability === 'available') {
+            $query->currentlyAvailable()->currentlyOccupied(false);
+        } elseif ($availability === 'occupied') {
+            $query->currentlyOccupied();
+        }
+        if ($availability !== null) {
+            $request->query->set('availability', $availability);
+        }
 
         if ($activeFilter !== null) {
             $request->query->set('active', $activeFilter);
@@ -37,6 +49,10 @@ class SpaceController extends BaseCrudController
         if ($request->filled('assigned_id')) {
             $assignedId = trim((string) $request->get('assigned_id'));
             $query->where('assigned_id', 'like', "%{$assignedId}%");
+        }
+
+        if ($request->filled('subtype')) {
+            $query->where('spaces.subtype', $request->get('subtype'));
         }
 
         if ($request->filled('is_rotating')) {
@@ -51,7 +67,8 @@ class SpaceController extends BaseCrudController
         return [
             'title'                 => ['required', 'string', 'max:255'],
             'price'                 => ['nullable', 'numeric', 'min:0'],
-            'type'                  => ['nullable', 'string', 'max:50'],
+            'type'                  => ['nullable', 'string', 'in:' . implode(',', self::TYPES)],
+            'subtype'               => ['nullable', 'string', 'in:' . implode(',', self::SUBTYPES)],
             'socioeconomic_level'   => ['nullable', 'string', 'max:50'],
             'width_m'               => ['nullable', 'numeric', 'min:0'],
             'height_m'              => ['nullable', 'numeric', 'min:0'],
@@ -64,7 +81,7 @@ class SpaceController extends BaseCrudController
             'blocked_from'          => ['nullable', 'date_format:Y-m-d', 'required_if:active,0'],
             'blocked_until'         => ['nullable', 'date_format:Y-m-d', 'after_or_equal:blocked_from', 'required_if:active,0'],
             'faces'                 => ['required', 'numeric', 'min:0'],
-            'has_lights'            => ['required', 'boolean'],
+            'has_lights'            => ['nullable', 'boolean'],
             'view_type'             => ['nullable', 'string', 'max:255'],
             'assigned_id'           => ['nullable', 'string', 'max:50'],
 
@@ -79,7 +96,8 @@ class SpaceController extends BaseCrudController
         return [
             'title'                 => ['sometimes', 'required', 'string', 'max:255'],
             'price'                 => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'type'                  => ['sometimes', 'nullable', 'string', 'max:50'],
+            'type'                  => ['sometimes', 'nullable', 'string', 'in:' . implode(',', self::TYPES)],
+            'subtype'               => ['sometimes', 'nullable', 'string', 'in:' . implode(',', self::SUBTYPES)],
             'socioeconomic_level'   => ['sometimes', 'nullable', 'string', 'max:50'],
             'width_m'               => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'height_m'              => ['sometimes', 'nullable', 'numeric', 'min:0'],
@@ -106,6 +124,12 @@ class SpaceController extends BaseCrudController
         ];
     }
 
+    public const TYPES = ['Espectacular', 'Pantalla', 'Valla movil'];
+    public const SUBTYPES = ['Cartelera', 'Unipolar'];
+    public const MOBILE_FENCE = 'Valla movil';
+    private const MAX_IMAGES = 10;
+    private const MAX_MOBILE_FENCE_IMAGES = 3;
+
     protected function beforeStore(array $data, Request $request): array
     {
         if (filter_var($data['active'] ?? true, FILTER_VALIDATE_BOOLEAN)) {
@@ -113,7 +137,33 @@ class SpaceController extends BaseCrudController
             $data['blocked_until'] = null;
         }
 
+        $data['has_lights'] = (bool) ($data['has_lights'] ?? false);
+
+        return $this->normalizeTypeFields($data, $data['type'] ?? null);
+    }
+
+    /**
+     * Subtipo solo aplica a Espectacular. La valla móvil no lleva luz ni
+     * coordenadas: es una descripción libre con hasta 3 fotos.
+     */
+    private function normalizeTypeFields(array $data, ?string $type): array
+    {
+        if (array_key_exists('type', $data) && $type !== 'Espectacular') {
+            $data['subtype'] = null;
+        }
+
+        if ($type === self::MOBILE_FENCE) {
+            $data['has_lights'] = false;
+            $data['latitude'] = null;
+            $data['longitude'] = null;
+        }
+
         return $data;
+    }
+
+    private function maxImagesFor(?string $type): int
+    {
+        return $type === self::MOBILE_FENCE ? self::MAX_MOBILE_FENCE_IMAGES : self::MAX_IMAGES;
     }
 
     protected function beforeUpdate(array $data, Request $request, \Illuminate\Database\Eloquent\Model $model): array
@@ -126,7 +176,18 @@ class SpaceController extends BaseCrudController
             $data['blocked_until'] = null;
         }
 
-        return $data;
+        return $this->normalizeTypeFields($data, $data['type'] ?? $model->type);
+    }
+
+    /** Orden natural por ID asignado: numéricos primero (2, 10, 233), luego texto. */
+    protected function indexOrder($query, Request $request)
+    {
+        return $query
+            ->orderByRaw("(spaces.assigned_id IS NULL OR spaces.assigned_id = '')")
+            ->orderByRaw("(spaces.assigned_id REGEXP '^[0-9]') DESC")
+            ->orderByRaw('CAST(spaces.assigned_id AS UNSIGNED)')
+            ->orderBy('spaces.assigned_id')
+            ->orderBy('spaces.id');
     }
 
     // --- override store ---
@@ -135,6 +196,7 @@ class SpaceController extends BaseCrudController
         $q = Space::query()
             ->select('spaces.*')
             ->withBlockStatus()
+            ->withOccupancy()
             ->with('images');
 
         $q = $this->applyIndexQuery($q, $request);
@@ -161,6 +223,7 @@ class SpaceController extends BaseCrudController
         $space = Space::query()
             ->select('spaces.*')
             ->withBlockStatus()
+            ->withOccupancy()
             ->with('images')
             ->findOrFail($id);
 
@@ -180,6 +243,16 @@ class SpaceController extends BaseCrudController
         }
         $data = $validator->validated();
         $data = $this->beforeStore($data, $request);
+
+        $newImages = $request->file('images', []);
+        $newImageCount = is_array($newImages) ? count($newImages) : ($newImages ? 1 : 0);
+        $maxImages = $this->maxImagesFor($data['type'] ?? null);
+        if ($newImageCount > $maxImages) {
+            return response()->json([
+                'message' => 'Validation error',
+                'errors' => ['images' => ["Este tipo de espacio puede tener como máximo {$maxImages} imágenes."]],
+            ], 422);
+        }
 
         /** @var Space $space */
         $space = Space::create($data);
@@ -226,10 +299,11 @@ class SpaceController extends BaseCrudController
         $newImages = $request->file('images', []);
         $newImageCount = is_array($newImages) ? count($newImages) : ($newImages ? 1 : 0);
 
-        if ($remainingImageCount + $newImageCount > 10) {
+        $maxImages = $this->maxImagesFor($data['type'] ?? $space->type);
+        if ($remainingImageCount + $newImageCount > $maxImages) {
             return response()->json([
                 'message' => 'Validation error',
-                'errors' => ['images' => ['El espacio puede tener como máximo 10 imágenes.']],
+                'errors' => ['images' => ["Este tipo de espacio puede tener como máximo {$maxImages} imágenes."]],
             ], 422);
         }
 

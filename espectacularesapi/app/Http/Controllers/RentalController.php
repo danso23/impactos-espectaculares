@@ -6,6 +6,7 @@ use App\Models\Entities\Rental;
 use App\Models\Entities\RentalItem;
 use App\Models\Entities\Lead;
 use App\Models\Entities\Agency;
+use App\Services\CustomerNameResolver;
 use App\Services\RentalCommissionCalculator;
 use App\Services\RentalPaymentSchedule;
 use App\Services\SpaceAvailability;
@@ -71,7 +72,7 @@ class RentalController extends BaseCrudController
             'customer_type' => ['sometimes', 'nullable', 'in:lead,cliente,sin_cliente'],
             'customer_id' => ['sometimes', 'nullable', 'integer'],
             'agency_id' => ['sometimes', 'nullable', 'integer', 'exists:agencies,id'],
-            'issuer_company_id' => ['sometimes', 'nullable', 'integer', 'exists:companies,id'],
+            'issuer_company_id' => ['sometimes', 'required', 'integer', 'exists:companies,id'],
             'created_by' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'status' => ['sometimes', 'nullable', 'in:draft,active,completed,cancelled'],
             'is_rotating' => ['sometimes', 'nullable', 'boolean'],
@@ -93,6 +94,40 @@ class RentalController extends BaseCrudController
         ];
     }
 
+    /** IDs asignados (o título) de los espacios, para mensajes al usuario. */
+    private function spaceLabels($spaceIds): string
+    {
+        $ids = collect($spaceIds)->map(fn ($id) => (int) $id)->unique()->values();
+
+        return DB::table('spaces')
+            ->whereIn('id', $ids->all())
+            ->get(['id', 'assigned_id', 'title'])
+            ->map(fn ($space) => $space->assigned_id ?: ($space->title ?: "#{$space->id}"))
+            ->implode(', ');
+    }
+
+    private function userCan(Request $request, string $permission): bool
+    {
+        $user = $request->attributes->get('auth_user');
+        if (!$user) {
+            return false;
+        }
+
+        $isAdmin = strtolower((string) $user->role) === 'admin'
+            || $user->getRoleNames()->contains(fn ($role) => strtolower($role) === 'admin');
+
+        if ($isAdmin) {
+            return true;
+        }
+
+        try {
+            return $user->hasPermissionTo($permission);
+        } catch (\Throwable $exception) {
+            // Permiso aún no creado (migración pendiente).
+            return false;
+        }
+    }
+
     protected function applyIndexQuery($query, Request $request)
     {
         if ($request->filled('status')) {
@@ -107,13 +142,50 @@ class RentalController extends BaseCrudController
             $query->where('is_rotating', filter_var($request->get('is_rotating'), FILTER_VALIDATE_BOOLEAN));
         }
 
+        // Rangos de fecha de inicio y de fin: qué se instala y qué se retira en un periodo.
+        foreach ([
+            'starts_from' => ['starts_at', '>='],
+            'starts_to' => ['starts_at', '<='],
+            'ends_from' => ['ends_at', '>='],
+            'ends_to' => ['ends_at', '<='],
+        ] as $param => [$column, $operator]) {
+            if ($request->filled($param)) {
+                $query->whereDate($column, $operator, $request->get($param));
+            }
+        }
+
         if ($request->filled('q')) {
             $term = $request->get('q');
             $query->where(function ($inner) use ($term) {
                 $inner->where('notes', 'like', "%{$term}%")
                     ->orWhere('status', 'like', "%{$term}%")
                     ->orWhere('customer_type', 'like', "%{$term}%")
-                    ->orWhere('id', 'like', "%{$term}%");
+                    ->orWhere('id', 'like', "%{$term}%")
+                    ->orWhere('manual_invoice_id', 'like', "%{$term}%")
+                    // Cliente guardado en la renta y anuncios (ID asignado o nombre).
+                    ->orWhere('snapshot_json->customer->display_name', 'like', "%{$term}%")
+                    ->orWhereHas('items.space', function ($space) use ($term) {
+                        $space->where('assigned_id', 'like', "%{$term}%")
+                            ->orWhere('title', 'like', "%{$term}%");
+                    })
+                    ->orWhere(function ($byClient) use ($term) {
+                        $byClient->where('customer_type', 'cliente')
+                            ->whereIn('customer_id', function ($sub) use ($term) {
+                                $sub->select('id')->from('clientes')
+                                    ->where('negocio', 'like', "%{$term}%")
+                                    ->orWhere('razon_social', 'like', "%{$term}%")
+                                    ->orWhere('nombre', 'like', "%{$term}%");
+                            });
+                    })
+                    ->orWhere(function ($byLead) use ($term) {
+                        $byLead->where('customer_type', 'lead')
+                            ->whereIn('customer_id', function ($sub) use ($term) {
+                                $sub->select('id')->from('leads')
+                                    ->where('negocio', 'like', "%{$term}%")
+                                    ->orWhere('razon_social', 'like', "%{$term}%")
+                                    ->orWhere('nombre', 'like', "%{$term}%");
+                            });
+                    });
             });
         }
 
@@ -194,7 +266,7 @@ class RentalController extends BaseCrudController
             return response()->json([
                 'message' => 'Uno o más espacios ya están ocupados durante la vigencia seleccionada.',
                 'errors' => ['items' => [
-                    'Espacios no disponibles: ' . $conflictingSpaceIds->implode(', '),
+                    'Espacios no disponibles: ' . $this->spaceLabels($conflictingSpaceIds),
                 ]],
             ], 422);
         }
@@ -217,7 +289,7 @@ class RentalController extends BaseCrudController
                 DB::table('spaces')->whereIn('id', $spaceIds)->lockForUpdate()->get();
                 $conflicts = $this->spaceAvailability->conflictingSpaceIds($periods);
                 if ($conflicts->isNotEmpty()) {
-                    throw new \DomainException('Espacios no disponibles: ' . $conflicts->implode(', ') . '.');
+                    throw new \DomainException('Espacios no disponibles: ' . $this->spaceLabels($conflicts) . '.');
                 }
             }
 
@@ -303,7 +375,7 @@ class RentalController extends BaseCrudController
                 $conflicts = $this->spaceAvailability->conflictingSpaceIds($periods, (int) $rental->id);
 
                 if ($conflicts->isNotEmpty()) {
-                    throw new \DomainException('Espacios no disponibles para la vigencia: ' . $conflicts->implode(', ') . '.');
+                    throw new \DomainException('Espacios no disponibles para la vigencia: ' . $this->spaceLabels($conflicts) . '.');
                 }
 
                 $rental->status = 'active';
@@ -345,14 +417,51 @@ class RentalController extends BaseCrudController
     {
         /** @var Rental $rental */
         $rental = Rental::query()->with(['items', 'invoices'])->findOrFail($id);
-        $validator = Validator::make($request->all(), $this->rulesUpdate($request));
+        // El formulario manda "" en campos vacíos; MySQL los rechaza en columnas
+        // numéricas (p. ej. agency_id), así que se guardan como NULL.
+        $input = array_map(fn ($value) => $value === '' ? null : $value, $request->all());
+        $validator = Validator::make($input, $this->rulesUpdate($request), [
+            'issuer_company_id.required' => 'La empresa emisora es obligatoria.',
+        ]);
+        // Con cliente o lead debe quedar un cliente asignado que exista.
+        $validator->after(function ($validator) use ($input, $rental) {
+            $type = array_key_exists('customer_type', $input) ? $input['customer_type'] : $rental->customer_type;
+            if ($type === null || $type === 'sin_cliente') return;
+            $customerId = array_key_exists('customer_id', $input) ? $input['customer_id'] : $rental->customer_id;
+            if (empty($customerId)) {
+                $validator->errors()->add('customer_id', 'Selecciona el cliente de la renta.');
+                return;
+            }
+            $table = $type === 'cliente' ? 'clientes' : 'leads';
+            if (!DB::table($table)->where('id', (int) $customerId)->exists()) {
+                $validator->errors()->add('customer_id', 'El cliente seleccionado no existe.');
+            }
+        });
 
         if ($validator->fails()) {
-            return response()->json(['message' => 'Validation error', 'errors' => $validator->errors()], 422);
+            return response()->json(['message' => $validator->errors()->first() ?: 'Validation error', 'errors' => $validator->errors()], 422);
         }
 
         $data = $validator->validated();
+        if (($data['customer_type'] ?? null) === 'sin_cliente') {
+            $data['customer_id'] = null;
+        }
         $targetStatus = $data['status'] ?? $rental->status;
+
+        // En una renta confirmada la fecha de inicio solo la cambia quien
+        // tenga el permiso especial rentals.edit_start_date.
+        $currentStartsAt = optional($rental->starts_at)->format('Y-m-d');
+        $startsAtChanged = !empty($data['starts_at'])
+            && Carbon::parse($data['starts_at'])->format('Y-m-d') !== $currentStartsAt;
+
+        if ($startsAtChanged
+            && in_array($rental->status, ['active', 'completed'], true)
+            && !$this->userCan($request, 'rentals.edit_start_date')) {
+            return response()->json([
+                'message' => 'No tienes permiso para cambiar la fecha de inicio de una renta confirmada.',
+                'permission' => 'rentals.edit_start_date',
+            ], 403);
+        }
 
         if ($rental->status === 'draft' && $targetStatus === 'active') {
             $rental->fill(collect($data)->except('status')->all())->save();
@@ -387,9 +496,12 @@ class RentalController extends BaseCrudController
                 DB::table('spaces')->whereIn('id', $spaceIds)->lockForUpdate()->get();
                 $conflicts = $this->spaceAvailability->conflictingSpaceIds($periods, (int) $rental->id);
                 if ($conflicts->isNotEmpty()) {
-                    throw new \DomainException('Espacios no disponibles: ' . $conflicts->implode(', ') . '.');
+                    throw new \DomainException('Espacios no disponibles: ' . $this->spaceLabels($conflicts) . '.');
                 }
             }
+
+            $previousStartsAt = optional($rental->starts_at)->format('Y-m-d');
+            $previousEndsAt = optional($rental->ends_at)->format('Y-m-d');
 
             $rental->update($data);
 
@@ -398,6 +510,17 @@ class RentalController extends BaseCrudController
                     'start_date' => $data['starts_at'] ?? $rental->starts_at,
                     'end_date' => $data['ends_at'] ?? $rental->ends_at,
                 ]);
+
+                $datesChanged = optional($rental->starts_at)->format('Y-m-d') !== $previousStartsAt
+                    || optional($rental->ends_at)->format('Y-m-d') !== $previousEndsAt;
+
+                if ($datesChanged && in_array($targetStatus, ['draft', 'active'], true)) {
+                    try {
+                        $this->paymentSchedule->reschedule($rental, $previousStartsAt);
+                    } catch (\InvalidArgumentException $exception) {
+                        throw new \DomainException('No fue posible recalcular los pagos: ' . $exception->getMessage());
+                    }
+                }
             }
 
             if ($targetStatus === 'cancelled') {
@@ -418,16 +541,51 @@ class RentalController extends BaseCrudController
 
     public function index(Request $request)
     {
-        $query = Rental::query()->with('invoices');
+        $query = Rental::query()->with(['invoices', 'items.space']);
         $query = $this->applyIndexQuery($query, $request);
         $query = $this->indexOrder($query, $request);
 
         $perPage = (int) $request->get('perPage', $request->get('per_page', 10));
         $page = (int) $request->get('page', 1);
         $items = $query->paginate($perPage, ['*'], 'page', $page);
+        $names = new CustomerNameResolver();
 
         return response()->json([
-            'data' => $items->items(),
+            'data' => collect($items->items())->map(function (Rental $rental) use ($names) {
+                $snapshot = is_array($rental->snapshot_json) ? $rental->snapshot_json : [];
+                $row = $rental->toArray();
+                unset($row['items']);
+
+                $row['customer_name'] = $snapshot['customer']['display_name'] ?? $names->resolve(
+                    (string) $rental->customer_type,
+                    $rental->customer_id ? (int) $rental->customer_id : null
+                );
+                // Anuncios de la renta: ID asignado, nombre y renta contratada (sin IVA).
+                // La renta contratada es el subtotal de la renta (sigue al plan de pagos
+                // cuando cambia la vigencia), repartido según el peso de cada anuncio.
+                $groups = $rental->items->filter(fn ($item) => $item->space)->groupBy('space_id')->values();
+                $weights = $groups->map(fn ($items) => (float) $items->sum('subtotal'));
+                $weightSum = $weights->sum();
+                $contracted = round((float) $rental->subtotal, 2);
+                $assigned = 0.0;
+                $row['spaces'] = $groups
+                    ->map(function ($items, $index) use ($groups, $weights, $weightSum, $contracted, &$assigned) {
+                        $isLast = $index === $groups->count() - 1;
+                        $share = $weightSum > 0 ? $weights[$index] / $weightSum : 1 / max(1, $groups->count());
+                        $rent = $isLast ? round($contracted - $assigned, 2) : round($contracted * $share, 2);
+                        $assigned += $rent;
+
+                        return [
+                            'id' => $items->first()->space->id,
+                            'assigned_id' => $items->first()->space->assigned_id,
+                            'title' => $items->first()->space->title,
+                            'rent' => $rent,
+                        ];
+                    })
+                    ->all();
+
+                return $row;
+            })->values(),
             'meta' => [
                 'page' => $items->currentPage(),
                 'perPage' => $items->perPage(),

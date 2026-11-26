@@ -23,11 +23,14 @@ import { useSpaceCoords } from "@/lib/hooks/spaceHook"
 import { prepareSpaceImages } from "@/lib/images/prepare-space-images"
 import type { SpaceFormPayload, SpaceFormValues } from "@/types/Space"
 
-export type SpaceType = "Espectacular" | "Muro" | "Parabus"
+export type SpaceType = "Espectacular" | "Pantalla" | "Valla movil"
+export type SpaceSubtype = "Cartelera" | "Unipolar"
 export type ViewType = "Vista natural" | "Vista cruzada" | "Natural/Cruzada"
 
 const EMPTY_SELECT_VALUE = "__none__"
 const MAX_SPACE_IMAGES = 10
+// La valla móvil es solo descripción libre con hasta 3 fotos.
+const MAX_MOBILE_FENCE_IMAGES = 3
 
 type SpaceCoord = {
   id?: number
@@ -97,6 +100,9 @@ export function SpaceForm({
     ...initialValues,
   }))
 
+  const isMobileFence = form.type === "Valla movil"
+  const maxImages = isMobileFence ? MAX_MOBILE_FENCE_IMAGES : MAX_SPACE_IMAGES
+
   const coordsQuery = useSpaceCoords()
   const coordsData = React.useMemo<SpaceCoord[]>(
     () => (coordsQuery.data?.data ?? []) as SpaceCoord[],
@@ -160,7 +166,7 @@ export function SpaceForm({
   )
   const availableImageSlots = Math.max(
     0,
-    MAX_SPACE_IMAGES - retainedExistingImages.length - images.length
+    maxImages - retainedExistingImages.length - images.length
   )
 
   const handleImagesChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,7 +178,7 @@ export function SpaceForm({
     setIsPreparingImages(true)
     try {
       const prepared = await prepareSpaceImages(selectedFiles)
-      setImages((current) => [...current, ...prepared].slice(0, MAX_SPACE_IMAGES))
+      setImages((current) => [...current, ...prepared].slice(0, maxImages))
       toast.success("Imágenes optimizadas", {
         description: "Se corrigió su orientación y tamaño para la carga.",
       })
@@ -191,9 +197,9 @@ export function SpaceForm({
   }
 
   const restoreExistingImage = (imageId: number) => {
-    if (retainedExistingImages.length + images.length >= MAX_SPACE_IMAGES) {
+    if (retainedExistingImages.length + images.length >= maxImages) {
       toast.error("No hay espacio para restaurar esta imagen", {
-        description: `Cada espacio puede tener como máximo ${MAX_SPACE_IMAGES} imágenes.`,
+        description: `Cada espacio puede tener como máximo ${maxImages} imágenes.`,
       })
       return
     }
@@ -269,10 +275,14 @@ export function SpaceForm({
       form.blocked_until < form.blocked_from
     ) return "La fecha final del bloqueo no puede ser menor a la inicial"
     if (!form.type) return "Falta el tipo"
+    if (form.type === "Espectacular" && !form.subtype) return "Falta el subtipo (cartelera o unipolar)"
+    if (retainedExistingImages.length + images.length > maxImages) {
+      return `Este tipo de espacio permite como máximo ${maxImages} imágenes`
+    }
     if (!form.width_m || form.width_m <= 0) return "Falta el ancho"
     if (!form.height_m || form.height_m <= 0) return "Falta el alto"
     if (!form.viewType) return "Falta el tipo de vista"
-    if (form.latitude === undefined || form.longitude === undefined) return "Falta la ubicación"
+    if (!isMobileFence && (form.latitude === undefined || form.longitude === undefined)) return "Falta la ubicación"
     return null
   }
 
@@ -309,6 +319,20 @@ export function SpaceForm({
   return (
     <div className="space-y-6">
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
+        {isMobileFence ? (
+          <Card className="border-violet-100 shadow-lg shadow-violet-950/5 xl:sticky xl:top-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MapPin className="h-5 w-5 text-violet-600" />
+                Valla móvil
+              </CardTitle>
+              <CardDescription>
+                No lleva ubicación fija, coordenadas ni iluminación. Describe el recorrido o la unidad en la
+                descripción y agrega hasta {MAX_MOBILE_FENCE_IMAGES} fotos.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        ) : (
         <Card className="overflow-hidden border-violet-100 shadow-lg shadow-violet-950/5 xl:sticky xl:top-6">
           <CardHeader className="border-b border-violet-100 bg-violet-50/40">
             <div className="flex items-center justify-between gap-4">
@@ -382,6 +406,7 @@ export function SpaceForm({
             ) : null}
           </CardContent>
         </Card>
+        )}
 
         <div className="space-y-6">
           <Card className="border-violet-100 shadow-lg shadow-violet-950/5">
@@ -486,18 +511,46 @@ export function SpaceForm({
                 <Select
                   value={form.type ?? EMPTY_SELECT_VALUE}
                   onValueChange={(value) =>
-                    setField("type", value === EMPTY_SELECT_VALUE ? undefined : value as SpaceType)
+                    setForm((current) => {
+                      const nextType = value === EMPTY_SELECT_VALUE ? undefined : value as SpaceType
+                      return {
+                        ...current,
+                        type: nextType,
+                        subtype: nextType === "Espectacular" ? current.subtype : undefined,
+                        ...(nextType === "Valla movil"
+                          ? { has_lights: false, latitude: undefined, longitude: undefined }
+                          : {}),
+                      }
+                    })
                   }
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={EMPTY_SELECT_VALUE}>Seleccionar</SelectItem>
                     <SelectItem value="Espectacular">Espectacular</SelectItem>
-                    <SelectItem value="Muro">Muro</SelectItem>
-                    <SelectItem value="Parabus">Parabús</SelectItem>
+                    <SelectItem value="Pantalla">Pantalla</SelectItem>
+                    <SelectItem value="Valla movil">Valla móvil</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {form.type === "Espectacular" ? (
+                <div className="space-y-2">
+                  <Label>Subtipo</Label>
+                  <Select
+                    value={form.subtype ?? EMPTY_SELECT_VALUE}
+                    onValueChange={(value) =>
+                      setField("subtype", value === EMPTY_SELECT_VALUE ? undefined : value as SpaceSubtype)
+                    }
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={EMPTY_SELECT_VALUE}>Seleccionar</SelectItem>
+                      <SelectItem value="Cartelera">Cartelera</SelectItem>
+                      <SelectItem value="Unipolar">Unipolar</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label>Precio</Label>
                 <NumericInput
@@ -565,6 +618,7 @@ export function SpaceForm({
                   </SelectContent>
                 </Select>
               </div>
+              {isMobileFence ? null : (
               <div className="flex items-center justify-between rounded-xl border border-violet-100 bg-violet-50/40 px-4 py-3 sm:col-span-2">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Iluminación</p>
@@ -575,6 +629,7 @@ export function SpaceForm({
                   onCheckedChange={(value) => setField("has_lights", value)}
                 />
               </div>
+              )}
               <div className="space-y-2 sm:col-span-2">
                 <Label>Descripción</Label>
                 <Textarea
@@ -726,7 +781,7 @@ export function SpaceForm({
                 <p className="text-xs text-muted-foreground">
                   {isPreparingImages
                     ? "Optimizando imágenes..."
-                    : `Puedes agregar hasta ${MAX_SPACE_IMAGES} imágenes y ordenarlas. Quedan ${availableImageSlots} espacios; la primera será la portada y el PDF mostrará la portada más las siguientes tres.`}
+                    : `Puedes agregar hasta ${maxImages} imágenes y ordenarlas. Quedan ${availableImageSlots} espacios; la primera será la portada y el PDF mostrará la portada más las siguientes tres.`}
                 </p>
               </div>
 

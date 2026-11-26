@@ -60,7 +60,12 @@ function formatCurrency(value: number) {
 function formatDate(value?: string | null) {
   if (!value) return "—"
 
-  const date = new Date(value)
+  // "YYYY-MM-DD" se interpreta como medianoche UTC y en México se mostraba un
+  // día antes; las fechas sin hora se leen como fecha local.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
   if (Number.isNaN(date.getTime())) return value
 
   return new Intl.DateTimeFormat("es-MX", {
@@ -125,20 +130,29 @@ export async function downloadQuotePdf(data: QuotePdfData, filename?: string) {
 
   drawLetterhead()
 
-  const tableData = data.items.map((item) => [
-    item.concept || item.description || (item.item_type === "rental" ? "Renta" : "Servicio"),
-    item.item_type === "rental" ? "Renta" : "Servicio",
-    item.item_type === "service" ? Number(item.square_meters ?? 1).toFixed(2) : "—",
-    formatCurrency(item.unit_price),
-    formatCurrency(item.subtotal),
-    data.includes_tax ? formatCurrency(item.tax_amount) : "—",
-    formatCurrency(item.total),
-  ])
+  const tableData = data.items.map((item) => {
+    // Servicios sin unidad (cotizaciones previas) se calcularon por m².
+    const isSquareMeters = item.item_type === "service" && item.unit !== "pieza"
+    const quantity = Math.max(1, Number(item.qty ?? 1))
+    const squareMeters = Number(item.square_meters ?? 1)
+
+    return [
+      item.concept || item.description || (item.item_type === "rental" ? "Renta" : "Servicio"),
+      isSquareMeters
+        ? `${quantity} × ${squareMeters.toFixed(2)} m²`
+        : String(quantity),
+      isSquareMeters ? "m²" : "Pieza",
+      formatCurrency(item.unit_price),
+      formatCurrency(item.subtotal),
+      data.includes_tax ? formatCurrency(item.tax_amount) : "—",
+      formatCurrency(item.total),
+    ]
+  })
 
   autoTable(doc, {
     startY: 70,
     margin: { top: 36, right: 14, bottom: 35, left: 14 },
-    head: [["Concepto", "Tipo", "M2", "Precio / m2", "Subtotal", "IVA", "Total"]],
+    head: [["Concepto", "Cantidad", "Unidad", "Precio unitario", "Subtotal", "IVA", "Total"]],
     body: tableData,
     styles: {
       fontSize: 9,
@@ -160,7 +174,6 @@ export async function downloadQuotePdf(data: QuotePdfData, filename?: string) {
       doc.text(`Empresa: ${data.company?.name || "—"}`, 14, 56)
       doc.text(`Estatus: ${data.status?.name || "Borrador"}`, 110, 44)
       doc.text(`Vigencia: ${formatDate(data.valid_until)}`, 110, 50)
-      doc.text(`Tipo: ${data.quote_kind === "advertisement" ? "Anuncio" : "Espacio"}`, 110, 56)
 
       if (data.agency?.name) doc.text(`Agencia: ${data.agency.name}`, 14, 62)
       if (data.images?.length) doc.text(`Imágenes adjuntas: ${data.images.length}`, 110, 62)

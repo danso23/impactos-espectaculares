@@ -6,6 +6,8 @@ export type RentalInvoice = {
   id: number
   rental_id: number
   folio?: string | null
+  /** Qué cubre el cobro; null en rentas anteriores a este campo. */
+  concept?: string | null
   status: "draft" | "issued" | "paid" | "overdue" | "cancelled" | string
   period_start: string
   period_end: string
@@ -43,6 +45,18 @@ export type RentalRecord = {
   created_at?: string | null
   updated_at?: string | null
   invoices?: RentalInvoice[]
+  /** Nombre del cliente o prospecto (solo en el listado). */
+  customer_name?: string | null
+  /** Anuncios rentados (solo en el listado). */
+  spaces?: RentalSpaceSummary[]
+}
+
+export type RentalSpaceSummary = {
+  id: number
+  assigned_id?: string | null
+  title?: string | null
+  /** Renta por periodo del anuncio (suma de sus partidas). */
+  rent?: number | null
 }
 
 export type RentalFormValues = {

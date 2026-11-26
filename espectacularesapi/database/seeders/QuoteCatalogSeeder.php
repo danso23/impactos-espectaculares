@@ -155,6 +155,7 @@ class QuoteCatalogSeeder extends Seeder
                 'name' => 'Anuncio',
                 'description' => 'Anuncio seleccionado por ID asignado',
                 'base_price' => 0,
+                'unit' => 'pieza',
                 'tax_rate' => 16,
                 'is_active' => true,
                 'created_at' => $now,
@@ -165,6 +166,7 @@ class QuoteCatalogSeeder extends Seeder
                 'name' => 'Instalación de lonas',
                 'description' => 'Instalación de lonas',
                 'base_price' => 1500,
+                'unit' => 'pieza',
                 'tax_rate' => 16,
                 'is_active' => true,
                 'created_at' => $now,
@@ -175,6 +177,7 @@ class QuoteCatalogSeeder extends Seeder
                 'name' => 'Impresion',
                 'description' => 'Impresion de lona',
                 'base_price' => 2500,
+                'unit' => 'm2',
                 'tax_rate' => 16,
                 'is_active' => true,
                 'created_at' => $now,
@@ -185,12 +188,17 @@ class QuoteCatalogSeeder extends Seeder
                 'name' => 'Desinstalacion',
                 'description' => 'Retiro de material existente',
                 'base_price' => 900,
+                'unit' => 'pieza',
                 'tax_rate' => 16,
                 'is_active' => true,
                 'created_at' => $now,
                 'updated_at' => $now,
             ],
         ] as $service) {
+            if (!Schema::hasColumn('services', 'unit')) {
+                unset($service['unit']);
+            }
+
             DB::table('services')->updateOrInsert(
                 ['key' => $service['key']],
                 $service

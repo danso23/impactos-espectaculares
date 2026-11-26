@@ -59,7 +59,12 @@ function amountInWords(value: number): string {
 export async function downloadRemissionNotePdf(receivable: ReceivableRecord, payment: PaymentEntry) {
   const doc = new jsPDF()
   const noteNumber = `NR-${String(payment.id).padStart(6, "0")}`
-  const description = `Pago de renta #${receivable.rental_id} · periodo ${formatDate(receivable.period_start)} al ${formatDate(receivable.period_end)}`
+  const period = `periodo ${formatDate(receivable.period_start)} al ${formatDate(receivable.period_end)}`
+  // El concepto interno "Importe ajustado manualmente" no va en el documento del cliente.
+  const concept = (receivable.concept ?? "").replace(/\s*·\s*Importe ajustado manualmente/, "").trim()
+  const description = concept
+    ? `${concept} · ${period}`
+    : `Pago de renta #${receivable.rental_id} · ${period}`
   let logo: HTMLImageElement | null = null
 
   try {

@@ -5,6 +5,8 @@ import {
   changeQuoteStatus,
   convertQuoteToRental,
   createQuote,
+  updateQuote,
+  getQuote,
   getQuoteHistory,
   getQuoteCatalogs,
   updateQuoteConfiguration,
@@ -67,6 +69,17 @@ export function useQuotePreview() {
   })
 }
 
+export function useQuote(id: number | null, enabled = true) {
+  const access = tokenStore.getAccess()
+
+  return useQuery({
+    queryKey: ["quotes", "detail", id],
+    queryFn: () => getQuote(id as number),
+    enabled: enabled && !!access && !!id,
+    staleTime: 10_000,
+  })
+}
+
 export function useQuoteHistory(id: number | null, enabled = true) {
   const access = tokenStore.getAccess()
 
@@ -83,6 +96,17 @@ export function useCreateQuote() {
 
   return useMutation({
     mutationFn: (request: QuoteCreateRequest) => createQuote(request),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["quotes"] })
+    },
+  })
+}
+
+export function useUpdateQuote() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: number; request: QuoteCreateRequest }) => updateQuote(id, request),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["quotes"] })
     },

@@ -21,6 +21,7 @@ class PermissionSeeder extends Seeder
                 $permissions[] = $module . '.' . $action;
             }
         }
+        $permissions = array_merge($permissions, array_keys(config('access.special', [])));
 
         foreach ($permissions as $permissionName) {
             Permission::firstOrCreate(['name' => $permissionName, 'guard_name' => $guard]);

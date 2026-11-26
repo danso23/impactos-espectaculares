@@ -62,6 +62,7 @@ function buildQuoteFormData(request: QuoteCreateRequest) {
   appendFormData(fd, "terms_html", payload.terms_html)
   appendFormData(fd, "notes", payload.notes)
   appendFormData(fd, "items", payload.items)
+  appendFormData(fd, "duplicate_of_quote_id", payload.duplicate_of_quote_id)
 
   images?.forEach((file) => {
     fd.append("images[]", file)
@@ -137,6 +138,16 @@ export function createQuote(request: QuoteCreateRequest) {
   const fd = buildQuoteFormData(request)
 
   return apiFetch<QuoteResponse>("/api/quotes", {
+    method: "POST",
+    body: fd,
+  })
+}
+
+/** Edita una cotización en Borrador o Enviada (conserva el folio). */
+export function updateQuote(id: number | string, request: QuoteCreateRequest) {
+  const fd = buildQuoteFormData(request)
+
+  return apiFetch<QuoteResponse>(`/api/quotes/${id}`, {
     method: "POST",
     body: fd,
   })

@@ -3,7 +3,7 @@ import { ArrowLeft, MapPinned, Pencil } from "lucide-react"
 import { useNavigate, useParams } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
-import { asSpaceType } from "@/lib/helpers/spaceTypeHelper"
+import { asSpaceSubtype, asSpaceType } from "@/lib/helpers/spaceTypeHelper"
 import { asViewType } from "@/lib/helpers/viewTypeHelper"
 import { useCreateSpace, useSpace, useUpdateSpace } from "@/lib/hooks/spaceHook"
 import { apiToUiSpace } from "@/lib/mappers/spaceMapper"
@@ -44,6 +44,7 @@ export default function SpaceEditorPage() {
       title: space.title ?? "",
       price: space.price,
       type: asSpaceType(space.type),
+      subtype: asSpaceSubtype(space.subtype),
       width_m: space.width_m,
       height_m: space.height_m,
       has_lights: space.has_lights ?? false,

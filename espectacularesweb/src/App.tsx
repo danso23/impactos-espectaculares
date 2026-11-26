@@ -290,6 +290,7 @@ export default function AppRoot() {
           <Route path="espacios/:id/editar" element={<PermissionRoute permission="spaces.edit"><SpaceEditorPage /></PermissionRoute>} />
           <Route path="cotizaciones" element={<PermissionRoute permission="quotes.view"><QuotesPage /></PermissionRoute>} />
           <Route path="cotizaciones/nueva" element={<PermissionRoute permission="quotes.edit"><QuoteCreatePage /></PermissionRoute>} />
+          <Route path="cotizaciones/:id/editar" element={<PermissionRoute permission="quotes.edit"><QuoteCreatePage key="edit" /></PermissionRoute>} />
           <Route path="rentas" element={<PermissionRoute permission="rentals.view"><RentalPage /></PermissionRoute>} />
           <Route path="usuarios" element={<PermissionRoute permission="users.view"><UsersPage /></PermissionRoute>} />
           <Route path="roles" element={<PermissionRoute permission="roles.view"><RolePage /></PermissionRoute>} />

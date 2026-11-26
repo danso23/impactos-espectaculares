@@ -1,3 +1,5 @@
+import { spaceTypeLabel } from "@/lib/helpers/spaceTypeHelper";
+import { excelDate } from "@/lib/exportExcel";
 import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { TableAction } from "@/types/TableAction";
@@ -17,6 +19,13 @@ type BuildSpaceTableOptions = {
   onDelete?: (row: Space) => Promise<void> | void;
 };
 
+function formatShortDate(value: string) {
+  const parsed = new Date(`${value.slice(0, 10)}T12:00:00`);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", year: "numeric" }).format(parsed);
+}
+
 export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
   const { can } = useRoles();
 
@@ -29,7 +38,8 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         key: "quote",
         label: "Cotizar",
         icon: <FileText className="h-4 w-4" />,
-        disabled: (row) => row.status !== "Disponible",
+        // Un espacio ocupado se puede cotizar para fechas futuras; al convertir se valida el empalme.
+        disabled: (row) => row.status === "Bloqueado",
         onClick: (row) =>
           opts.onQuote ? opts.onQuote(row) : console.log("Cotizar", row.id),
       });
@@ -97,6 +107,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "assigned_id",
+        meta: { exportLabel: "ID anuncio" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -112,6 +123,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "title",
+        meta: { exportLabel: "Nombre" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -127,6 +139,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "status",
+        meta: { exportLabel: "Estatus" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -138,23 +151,29 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         ),
         cell: ({ row }) => {
           const status = row.original.status;
-          const available = status === "Disponible";
+          const tone =
+            status === "Disponible"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : status === "Ocupado"
+                ? "border-sky-200 bg-sky-50 text-sky-700"
+                : "border-amber-200 bg-amber-50 text-amber-700";
+          const until = row.original.occupied_until;
 
           return (
-            <span
-              className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${
-                available
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-amber-200 bg-amber-50 text-amber-700"
-              }`}
-            >
-              {status}
-            </span>
+            <div className="space-y-1">
+              <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}>
+                {status}
+              </span>
+              {status === "Ocupado" && until ? (
+                <div className="text-xs text-muted-foreground">hasta {formatShortDate(until)}</div>
+              ) : null}
+            </div>
           );
         },
       },
       {
         accessorKey: "type",
+        meta: { exportLabel: "Tipo", exportValue: (space) => spaceTypeLabel(space.type, space.subtype) },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -165,11 +184,12 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
           </Button>
         ),
         cell: ({ row }) => (
-          <div className="font-medium">{row.getValue("type")}</div>
+          <div className="font-medium">{spaceTypeLabel(row.original.type, row.original.subtype)}</div>
         ),
       },
       {
         accessorKey: "width_m",
+        meta: { exportLabel: "Ancho (m)", exportValue: (space) => space.width_m ?? "" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -185,6 +205,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "height_m",
+        meta: { exportLabel: "Alto (m)", exportValue: (space) => space.height_m ?? "" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -200,6 +221,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "faces",
+        meta: { exportLabel: "Caras" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -215,6 +237,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "has_lights",
+        meta: { exportLabel: "Iluminación" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -241,6 +264,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "price",
+        meta: { exportLabel: "Precio", exportValue: (space) => (space.price === undefined || space.price === null ? "" : Number(space.price)) },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -271,6 +295,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "socioeconomic_level",
+        meta: { exportLabel: "Nivel socioeconómico" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -288,6 +313,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "viewType",
+        meta: { exportLabel: "Tipo de vista" },
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -303,6 +329,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "coords",
+        meta: { exportColumns: [{ label: "Latitud", value: (space) => space.latitude ?? "" }, { label: "Longitud", value: (space) => space.longitude ?? "" }] },
         header: "Coords",
         cell: ({ row }) => {
           const c = row.getValue("coords") as Space["coords"];
@@ -311,6 +338,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       },
       {
         accessorKey: "createdAt",
+        meta: { exportLabel: "Alta", exportValue: (space) => excelDate(space.createdAt) },
         header: ({ column }) => (
           <Button
             variant="ghost"
