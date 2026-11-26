@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Entities\Invoice;
 use App\Models\Entities\Payment;
 use Carbon\Carbon;
+use App\Services\CustomerNameResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class PaymentController extends Controller
 {
-    private array $customerNameCache = [];
 
     public function index(Request $request)
     {
@@ -215,6 +215,7 @@ class PaymentController extends Controller
                 $invoice->rental?->customer_id ? (int) $invoice->rental->customer_id : null
             ),
             'folio' => $invoice->folio,
+            'concept' => $invoice->concept,
             'status' => $invoice->status,
             'period_start' => optional($invoice->period_start)->format('Y-m-d'),
             'period_end' => optional($invoice->period_end)->format('Y-m-d'),
@@ -235,33 +236,12 @@ class PaymentController extends Controller
         ];
     }
 
+    private ?CustomerNameResolver $customerNames = null;
+
     private function resolveCustomerName(string $type, ?int $id): string
     {
-        if (!$id || !in_array($type, ['lead', 'cliente'], true)) {
-            return 'Cliente no identificado';
-        }
+        $this->customerNames ??= new CustomerNameResolver();
 
-        $cacheKey = "{$type}:{$id}";
-        if (isset($this->customerNameCache[$cacheKey])) {
-            return $this->customerNameCache[$cacheKey];
-        }
-
-        $table = $type === 'cliente' ? 'clientes' : 'leads';
-        $customer = DB::table($table)->where('id', $id)->first();
-        if (!$customer) {
-            return $this->customerNameCache[$cacheKey] = ucfirst($type) . " #{$id}";
-        }
-
-        $personName = trim(implode(' ', array_filter([
-            $customer->nombre ?? null,
-            $customer->apellido_paterno ?? null,
-            $customer->apellido_materno ?? null,
-        ])));
-
-        return $this->customerNameCache[$cacheKey] = (
-            $customer->negocio
-            ?? $customer->razon_social
-            ?? ($personName ?: ucfirst($type) . " #{$id}")
-        );
+        return $this->customerNames->resolve($type, $id);
     }
 }

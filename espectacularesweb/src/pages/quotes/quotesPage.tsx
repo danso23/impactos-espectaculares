@@ -1,10 +1,12 @@
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Plus, ReceiptText } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
 import { Filter } from "@/components/generic/filter"
 import { ListingPanel } from "@/components/generic/listing-panel"
 import { ModuleHeader } from "@/components/generic/module-header"
@@ -13,7 +15,9 @@ import { Input } from "@/components/ui/input"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { useQuoteCatalogs, useQuotes } from "@/lib/hooks/quoteHook"
 import { QuoteConvertToRentalDialog } from "@/pages/quotes/quoteConvertToRentalDialog"
-import { getQuote } from "@/lib/services/quoteService"
+import { QuoteDetailDialog } from "@/pages/quotes/quoteDetailDialog"
+import { getQuote, getQuotes } from "@/lib/services/quoteService"
+import { fetchAllPages } from "@/lib/fetchAllPages"
 import { QuoteStatusDialog } from "@/pages/quotes/quoteStatusDialog"
 import { useQuoteTable } from "@/pages/quotes/quoteTable"
 import type { QuoteRecord } from "@/types/Quote"
@@ -23,6 +27,7 @@ const ALL = "all"
 
 export default function QuotesPage() {
   const catalogsQuery = useQuoteCatalogs()
+  const navigate = useNavigate()
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
@@ -32,6 +37,7 @@ export default function QuotesPage() {
   const [selectedQuote, setSelectedQuote] = React.useState<QuoteRecord | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false)
   const [convertDialogOpen, setConvertDialogOpen] = React.useState(false)
+  const [detailDialogOpen, setDetailDialogOpen] = React.useState(false)
   const perPage = 10
 
   React.useEffect(() => {
@@ -69,6 +75,10 @@ export default function QuotesPage() {
       })
     }
   }, [])
+  const handleView = React.useCallback((quote: QuoteRecord) => {
+    setSelectedQuote(quote)
+    setDetailDialogOpen(true)
+  }, [])
   const handleChangeStatus = React.useCallback((quote: QuoteRecord) => {
     setSelectedQuote(quote)
     setStatusDialogOpen(true)
@@ -78,11 +88,29 @@ export default function QuotesPage() {
     setConvertDialogOpen(true)
   }, [])
 
+  const handleEdit = React.useCallback((quote: QuoteRecord) => {
+    navigate(`/cotizaciones/${quote.id}/editar`)
+  }, [navigate])
+
+  const handleDuplicate = React.useCallback((quote: QuoteRecord) => {
+    navigate(`/cotizaciones/nueva?duplicar=${quote.id}`)
+  }, [navigate])
+
   const columns = useQuoteTable({
+    onView: handleView,
     onDownload: handleDownload,
     onChangeStatus: handleChangeStatus,
     onConvertToRental: handleConvertToRental,
+    onDuplicate: handleDuplicate,
+    onEdit: handleEdit,
   })
+
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(quotes)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof quotes)[number]>(), ...columns],
+    [columns],
+  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -114,7 +142,13 @@ export default function QuotesPage() {
             />
           </div>
         }
-        actions={<ExcelExportButton columns={columns} data={quotes} filename="cotizaciones" disabled={quotesQuery.isFetching} />}
+        actions={<ExcelExportButton
+          columns={columns}
+          data={quotes}
+          filename="cotizaciones" selected={selection.selected} onClearSelection={selection.clear}
+          disabled={quotesQuery.isFetching}
+          fetchAll={() => fetchAllPages((nextPage, size) => getQuotes({ ...params, page: nextPage, per_page: size }))}
+        />}
         filters={<Filter
           title="Filtros avanzados"
           defaultOpen={false}
@@ -127,8 +161,14 @@ export default function QuotesPage() {
         />}
       >
         <DataTable
-          columns={columns}
+          columns={selectableColumns}
           data={quotes}
+          rowSelection={selection.rowSelection}
+          onRowSelectionChange={selection.setRowSelection}
+          getRowId={selection.getRowId}
+          enableRowSelection
+          tableClassName="min-w-[1400px]"
+          noWrap
           enableSearch={false}
           enableExport={false}
           pageSize={perPage}
@@ -157,6 +197,17 @@ export default function QuotesPage() {
         open={convertDialogOpen}
         onOpenChange={(open) => {
           setConvertDialogOpen(open)
+          if (!open) {
+            setSelectedQuote(null)
+          }
+        }}
+        quote={selectedQuote}
+      />
+
+      <QuoteDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={(open) => {
+          setDetailDialogOpen(open)
           if (!open) {
             setSelectedQuote(null)
           }

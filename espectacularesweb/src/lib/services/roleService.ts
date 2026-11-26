@@ -14,9 +14,16 @@ export interface PermissionModule {
   permissions: Record<PermissionAction, string>
 }
 
+export interface SpecialPermission {
+  name: string
+  module: string | null
+  label: string
+}
+
 export interface PermissionCatalog {
   actions: Record<PermissionAction, string>
   modules: PermissionModule[]
+  special?: SpecialPermission[]
 }
 
 export type RoleResponse<T> = {

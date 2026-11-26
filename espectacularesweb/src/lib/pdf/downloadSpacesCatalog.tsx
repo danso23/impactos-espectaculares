@@ -4,6 +4,7 @@ import { SpacesCatalogDocument, type CatalogSpace } from "./SpacesCatalogPdf";
 import { SpacesCatalogDocumentV1 } from "./SpacesCatalogPdfV1";
 import { env } from "@/config/env";
 import { getToken } from "@/lib/auth";
+import { sortByAssignedId } from "@/lib/catalog/catalogHelpers";
 
 async function blobToDataUrl(blob: Blob) {
   return await new Promise<string>((resolve, reject) => {
@@ -57,7 +58,9 @@ export const createSpacesCatalogPdf = async (
   version: SpacesCatalogVersion = "v2",
   options: { enableMapLinks?: boolean } = {}
 ) => {
-  const hydratedSpaces = await hydrateSpaceImages(spaces)
+  // El PDF de fichas se envía al cliente: nunca incluye precios.
+  const clientSpaces = sortByAssignedId(spaces).map((space) => ({ ...space, price: undefined }))
+  const hydratedSpaces = await hydrateSpaceImages(clientSpaces)
   const enableMapLinks = options.enableMapLinks ?? true
   const document = version === "v1"
     ? <SpacesCatalogDocumentV1 spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />

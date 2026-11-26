@@ -1,3 +1,5 @@
+import { sortByAssignedId } from "@/lib/catalog/catalogHelpers";
+import { SPACE_SUBTYPE_OPTIONS, SPACE_TYPE_OPTIONS, spaceTypeLabel } from "@/lib/helpers/spaceTypeHelper";
 import * as React from "react";
 import type { FilterValues } from "@/types/Filter";
 import type { Space } from "@/types/Space";
@@ -68,6 +70,9 @@ import type { RowSelectionState } from "@tanstack/react-table";
 
 import { useSpaces, useDeleteSpace } from "@/lib/hooks/spaceHook";
 import { apiToUiSpace, buildSpacesParams } from "@/lib/mappers/spaceMapper";
+import { fetchAllPages } from "@/lib/fetchAllPages";
+import { getSpaces } from "@/lib/services/spaceService";
+import { SPACE_EXPORT_PRESETS } from "./spaceExportPresets";
 import { useSpaceTable } from "./spaceTable";
 
 import { Can } from "@/components/auth/Can";
@@ -83,6 +88,7 @@ const initialFilters: FilterValues = {
   dateTo: undefined,
   selects: {
     tipo: undefined,
+    subtipo: undefined,
     conLuz: undefined,
     estatus: undefined,
   },
@@ -170,6 +176,9 @@ export default function SpacePage() {
   const visibleBlockedSpaces = data.filter(
     (space) => space.status === "Bloqueado",
   ).length;
+  const visibleOccupiedSpaces = data.filter(
+    (space) => space.status === "Ocupado",
+  ).length;
   const visibleLitSpaces = data.filter((space) => space.has_lights).length;
 
   const { columns } = useSpaceTable({
@@ -182,6 +191,8 @@ export default function SpacePage() {
               title: row.title,
               price: row.price ?? 0,
               faces: row.faces ?? null,
+              width_m: row.width_m ?? null,
+              height_m: row.height_m ?? null,
             },
           ],
         },
@@ -218,9 +229,25 @@ export default function SpacePage() {
     }
   };
 
+  // La selección se conserva al cambiar de página: se guardan los espacios
+  // ya vistos para no perder los seleccionados en otras páginas.
+  const [seenSpaces, setSeenSpaces] = React.useState<Record<string, Space>>({});
+  React.useEffect(() => {
+    if (!data.length) return;
+    setSeenSpaces((current) => {
+      const next = { ...current };
+      for (const space of data) next[String(space.id)] = space;
+      return next;
+    });
+  }, [data]);
+
   const selectedSpaces = React.useMemo(() => {
-    return data.filter((space) => rowSelection[String(space.id)]);
-  }, [rowSelection, data]);
+    return Object.entries(rowSelection)
+      .filter(([, isSelected]) => isSelected)
+      .map(([id]) => seenSpaces[id] ?? data.find((space) => String(space.id) === id))
+      .filter((space): space is Space => Boolean(space));
+  }, [rowSelection, seenSpaces, data]);
+  const sortedSelectedSpaces = React.useMemo(() => sortByAssignedId(selectedSpaces), [selectedSpaces]);
   const hasBlockedSelection = selectedSpaces.some(
     (space) => space.status === "Bloqueado",
   );
@@ -316,7 +343,8 @@ export default function SpacePage() {
     setIsCreatingShare(true);
     try {
       const share = await createCatalogShare(
-        selectedSpaces.map((space) => space.id),
+        // El snapshot conserva este orden: se envía ordenado por ID asignado.
+        sortByAssignedId(selectedSpaces).map((space) => space.id),
         hours
       );
       setCatalogShare(share);
@@ -395,10 +423,10 @@ export default function SpacePage() {
 
         <Card className="border-gray-200 shadow-md">
           <CardHeader className="pb-3">
-            <CardDescription>Bloqueados en página</CardDescription>
+            <CardDescription>Ocupados / bloqueados en página</CardDescription>
             <CardTitle className="flex items-center gap-2 text-3xl">
               <CircleOff className="h-5 w-5 text-slate-500" />
-              {visibleBlockedSpaces}
+              {visibleOccupiedSpaces} / {visibleBlockedSpaces}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -436,7 +464,21 @@ export default function SpacePage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <ExcelExportButton columns={columns} data={data} filename="espacios" disabled={spacesQuery.isFetching} />
+                <ExcelExportButton
+                  columns={columns}
+                  data={data}
+                  filename="espacios"
+                  disabled={spacesQuery.isFetching}
+                  selected={sortedSelectedSpaces}
+                  onClearSelection={() => setRowSelection({})}
+                  presets={SPACE_EXPORT_PRESETS}
+                  fetchAll={async () => {
+                    const rows = await fetchAllPages((nextPage, size) =>
+                      getSpaces(buildSpacesParams(filters, nextPage, size, search)),
+                    );
+                    return sortByAssignedId(rows.map(apiToUiSpace));
+                  }}
+                />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -520,6 +562,7 @@ export default function SpacePage() {
                 placeholder: "Selecciona",
                 options: [
                   { label: "Disponible", value: "disponible" },
+                  { label: "Ocupado (rentado)", value: "ocupado" },
                   { label: "Bloqueado", value: "bloqueado" },
                 ],
               },
@@ -527,11 +570,13 @@ export default function SpacePage() {
                 key: "tipo",
                 label: "Tipo",
                 placeholder: "Selecciona tipo",
-                options: [
-                  { label: "Espectacular", value: "Espectacular" },
-                  { label: "Muro", value: "Muro" },
-                  { label: "Parabús", value: "Parabus" },
-                ],
+                options: SPACE_TYPE_OPTIONS,
+              },
+              {
+                key: "subtipo",
+                label: "Subtipo (espectacular)",
+                placeholder: "Selecciona subtipo",
+                options: SPACE_SUBTYPE_OPTIONS,
               },
               {
                 key: "conLuz",
@@ -698,7 +743,7 @@ export default function SpacePage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Tipo</p>
-                  <p className="font-medium">{viewingSpace.type ?? "—"}</p>
+                  <p className="font-medium">{spaceTypeLabel(viewingSpace.type, viewingSpace.subtype) || "—"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Tipo de vista</p>

@@ -4,6 +4,10 @@ import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
+import { fetchAllPages } from "@/lib/fetchAllPages"
+import { getLeads } from "@/lib/services/crmService"
 import { Filter } from "@/components/generic/filter"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardContent } from "@/components/ui/card"
@@ -70,6 +74,13 @@ export default function LeadsPage() {
 
   const columns = useLeadTable({ onConvert: handleConvert })
 
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(leads)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof leads)[number]>(), ...columns],
+    [columns],
+  )
+
   return (
     <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
@@ -92,14 +103,18 @@ export default function LeadsPage() {
 
       <Card>
         <CardContent className="space-y-4 pt-6">
-          <div className="flex justify-end"><ExcelExportButton columns={columns} data={leads} filename="prospectos" disabled={leadsQuery.isFetching} /></div>
+          <div className="flex justify-end"><ExcelExportButton columns={columns} data={leads} filename="prospectos" selected={selection.selected} onClearSelection={selection.clear} disabled={leadsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getLeads({ ...params, page: nextPage, per_page: size }))} /></div>
           <Filter title="Filtros avanzados" enableDateRange={false} defaultOpen={false} dropdowns={[{ key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) }]} initialValues={{ selects: { estatus: statusFilter === ALL ? undefined : statusFilter }, checks: {} }} onApply={(values) => { setStatusFilter(values.selects.estatus ?? ALL); setPage(1) }} onReset={() => { setStatusFilter(ALL); setPage(1) }} />
 
           <DataTable
             title={`Prospectos (${meta?.total ?? leads.length})`}
             description="Listado de prospectos registrados en el CRM."
-            columns={columns}
+            columns={selectableColumns}
             data={leads}
+            rowSelection={selection.rowSelection}
+            onRowSelectionChange={selection.setRowSelection}
+            getRowId={selection.getRowId}
+            enableRowSelection
             enableSearch
             enableExport={false}
             searchPlaceholder="Buscar prospecto..."

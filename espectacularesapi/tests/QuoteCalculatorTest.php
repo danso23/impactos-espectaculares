@@ -49,4 +49,40 @@ class QuoteCalculatorTest extends TestCase
         $this->assertSame(560.0, $result['items'][0]['subtotal']);
         $this->assertSame(560.0, $result['totals']['services_subtotal']);
     }
+
+    public function testPieceServiceIgnoresSquareMeters(): void
+    {
+        $result = (new QuoteCalculator())->calculate([
+            'includes_tax' => false,
+            'items' => [[
+                'item_type' => 'service',
+                'concept' => 'Instalación de lonas',
+                'unit' => 'pieza',
+                'qty' => 2,
+                'width_m' => 12,
+                'height_m' => 6,
+                'unit_price' => 1500,
+            ]],
+        ]);
+
+        $this->assertSame('pieza', $result['items'][0]['unit']);
+        $this->assertSame(3000.0, $result['items'][0]['subtotal']);
+    }
+
+    public function testServiceWithoutUnitDefaultsToSquareMeters(): void
+    {
+        $result = (new QuoteCalculator())->calculate([
+            'includes_tax' => false,
+            'items' => [[
+                'item_type' => 'service',
+                'qty' => 1,
+                'width_m' => 2,
+                'height_m' => 2,
+                'unit_price' => 100,
+            ]],
+        ]);
+
+        $this->assertSame('m2', $result['items'][0]['unit']);
+        $this->assertSame(400.0, $result['items'][0]['subtotal']);
+    }
 }

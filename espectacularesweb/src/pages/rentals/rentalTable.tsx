@@ -6,11 +6,17 @@ import { createActionsColumn } from "@/components/generic/create-actions-column"
 import type { RentalRecord } from "@/types/Rental"
 import type { TableAction } from "@/types/TableAction"
 import { useRoles } from "@/hooks/useRoles"
+import { excelDate } from "@/lib/exportExcel"
 
 function formatDate(value?: string | null) {
   if (!value) return "—"
 
-  const date = new Date(value)
+  // "YYYY-MM-DD" se interpreta como medianoche UTC y en México se mostraba un
+  // día antes; las fechas sin hora se leen como fecha local.
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
   if (Number.isNaN(date.getTime())) return "—"
 
   return new Intl.DateTimeFormat("es-MX", {
@@ -126,9 +132,70 @@ export function useRentalTable({
         cell: ({ row }) => row.original.id,
       },
       {
-        accessorKey: "customer_type",
+        accessorKey: "customer_name",
         header: "Cliente",
+        cell: ({ row }) => <div className="font-medium">{row.original.customer_name || "—"}</div>,
+        meta: { exportValue: (rental) => rental.customer_name ?? "" },
+      },
+      {
+        id: "customer_type",
+        header: "Tipo de cliente",
+        accessorFn: (rental) => formatCustomerType(rental.customer_type),
         cell: ({ row }) => formatCustomerType(row.original.customer_type),
+      },
+      {
+        id: "space_ids",
+        header: "ID anuncio",
+        accessorFn: (rental) => (rental.spaces ?? []).map((space) => space.assigned_id || "—").join(", "),
+        cell: ({ row }) => {
+          const spaces = row.original.spaces ?? []
+          if (!spaces.length) return <span className="text-muted-foreground">—</span>
+          return (
+            <div className="space-y-1">
+              {spaces.map((space) => (
+                <div key={space.id} className="font-semibold text-violet-700">{space.assigned_id || "—"}</div>
+              ))}
+            </div>
+          )
+        },
+      },
+      {
+        id: "space_titles",
+        header: "Anuncio",
+        accessorFn: (rental) => (rental.spaces ?? []).map((space) => space.title || "—").join(", "),
+        cell: ({ row }) => {
+          const spaces = row.original.spaces ?? []
+          if (!spaces.length) return <span className="text-muted-foreground">—</span>
+          return (
+            <div className="space-y-1">
+              {spaces.map((space) => <div key={space.id}>{space.title || "—"}</div>)}
+            </div>
+          )
+        },
+      },
+      {
+        id: "space_rents",
+        header: "Renta contratada (sin IVA)",
+        accessorFn: (rental) => (rental.spaces ?? [])
+          .map((space) => `${space.assigned_id || space.title || "—"}: ${formatCurrency(space.rent ?? null)}`)
+          .join("; "),
+        meta: {
+          // Con un solo anuncio se exporta como número para poder sumarlo en Excel.
+          exportValue: (rental) => {
+            const spaces = rental.spaces ?? []
+            if (spaces.length === 1) return Number(spaces[0].rent ?? 0)
+            return spaces.map((space) => `${space.assigned_id || space.title || "—"}: ${formatCurrency(space.rent ?? null)}`).join("; ")
+          },
+        },
+        cell: ({ row }) => {
+          const spaces = row.original.spaces ?? []
+          if (!spaces.length) return <span className="text-muted-foreground">—</span>
+          return (
+            <div className="space-y-1">
+              {spaces.map((space) => <div key={space.id}>{formatCurrency(space.rent ?? null)}</div>)}
+            </div>
+          )
+        },
       },
       {
         accessorKey: "manual_invoice_id",
@@ -138,6 +205,7 @@ export function useRentalTable({
       {
         accessorKey: "status",
         header: "Estatus",
+        meta: { exportValue: (rental) => statusLabel(rental.status) },
         cell: ({ row }) => (
           <span
             className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${statusClass(
@@ -151,6 +219,7 @@ export function useRentalTable({
       {
         accessorKey: "is_rotating",
         header: "Rotativa",
+        meta: { exportValue: (rental) => rental.is_rotating === true || rental.is_rotating === 1 || rental.is_rotating === "1" },
         cell: ({ row }) => {
           const rotating = row.original.is_rotating === true || row.original.is_rotating === 1 || row.original.is_rotating === "1"
           return (
@@ -163,6 +232,9 @@ export function useRentalTable({
       {
         accessorKey: "payment_frequency",
         header: "Plan de pagos",
+        meta: {
+          exportValue: (rental) => `${paymentFrequencyLabel(rental.payment_frequency)} · ${rental.payment_installments ?? rental.invoices?.length ?? 0} pago(s)`,
+        },
         cell: ({ row }) => (
           <div className="space-y-1">
             <div className="font-medium">{paymentFrequencyLabel(row.original.payment_frequency)}</div>
@@ -175,21 +247,25 @@ export function useRentalTable({
       {
         accessorKey: "starts_at",
         header: "Inicio",
+        meta: { exportValue: (rental) => excelDate(rental.starts_at) },
         cell: ({ row }) => formatDate(row.original.starts_at),
       },
       {
         accessorKey: "ends_at",
         header: "Fin",
+        meta: { exportValue: (rental) => excelDate(rental.ends_at) },
         cell: ({ row }) => formatDate(row.original.ends_at),
       },
       {
         accessorKey: "total",
         header: "Total",
+        meta: { exportValue: (rental) => Number(rental.total ?? 0) },
         cell: ({ row }) => formatCurrency(row.original.total),
       },
       {
         accessorKey: "created_at",
         header: "Alta",
+        meta: { exportValue: (rental) => excelDate(rental.created_at) },
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<RentalRecord>({

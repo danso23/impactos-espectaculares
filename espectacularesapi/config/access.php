@@ -21,4 +21,12 @@ return [
         'services' => 'Servicios',
         'collaborators' => 'Colaboradores',
     ],
+
+    // Permisos puntuales que no siguen la matriz módulo × acción.
+    'special' => [
+        'rentals.edit_start_date' => [
+            'module' => 'rentals',
+            'label' => 'Editar fecha de inicio de rentas confirmadas',
+        ],
+    ],
 ];

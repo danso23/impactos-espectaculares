@@ -31,16 +31,17 @@ class SpaceCatalogShareController extends Controller
         $spacesById = Space::query()
             ->select('spaces.*')
             ->withBlockStatus()
+            ->withOccupancy()
             ->with('images')
             ->whereIn('id', $spaceIds->all())
             ->get()
             ->keyBy('id');
 
-        $snapshot = $spaceIds
+        $snapshot = $this->forClient($spaceIds
             ->map(fn ($id) => optional($spacesById->get($id))->toArray())
             ->filter()
             ->values()
-            ->all();
+            ->all());
 
         $expiresAt = Carbon::now()->addHours((int) ($data['expires_in_hours'] ?? 48));
         $user = $request->attributes->get('auth_user');
@@ -85,10 +86,20 @@ class SpaceCatalogShareController extends Controller
 
         return response()->json([
             'data' => [
-                'spaces' => $share->snapshot,
+                // Se limpia también al servir para cubrir enlaces creados antes.
+                'spaces' => $this->forClient($share->snapshot ?? []),
                 'created_at' => $share->created_at->toIso8601String(),
                 'expires_at' => $share->expires_at->toIso8601String(),
             ],
         ]);
+    }
+
+    /** El enlace lo ve el cliente: nunca debe incluir precios. */
+    private function forClient(array $spaces): array
+    {
+        return collect($spaces)
+            ->map(fn ($space) => is_array($space) ? collect($space)->except(['price'])->all() : $space)
+            ->values()
+            ->all();
     }
 }

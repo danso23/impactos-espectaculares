@@ -1,3 +1,4 @@
+import { spaceTypeLabel } from "@/lib/helpers/spaceTypeHelper"
 import * as React from "react";
 import { ExternalLink, ImageOff, LoaderCircle, MapPin, ShieldCheck } from "lucide-react";
 import { useParams } from "react-router-dom";
@@ -5,12 +6,12 @@ import { useParams } from "react-router-dom";
 import {
   displayValue,
   formatCatalogDate,
-  formatCatalogPrice,
   getGoogleMapsUrl,
   getAvailabilityDate,
   getViewType,
   hasLights,
   isAvailable,
+  isOccupied,
   resolveCatalogImageUrl,
 } from "@/lib/catalog/catalogHelpers";
 import {
@@ -51,12 +52,14 @@ function PublicSpaceCard({ space }: { space: SpaceApi }) {
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-transparent px-6 pb-6 pt-24 text-white sm:px-8">
           <div className="mb-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide">
             <span className="rounded-full bg-white/15 px-3 py-1.5 backdrop-blur">
-              {displayValue(space.type, "Espacio publicitario")}
+              {displayValue(spaceTypeLabel(space.type, space.subtype), "Espacio publicitario")}
             </span>
             <span className={`rounded-full px-3 py-1.5 ${isAvailable(space) ? "bg-emerald-500" : "bg-amber-500"}`}>
               {isAvailable(space)
                 ? "Disponible"
-                : space.blocked_until
+                : isOccupied(space) && getAvailabilityDate(space)
+                  ? `Disponible a partir de ${formatCatalogDate(getAvailabilityDate(space), "Por confirmar")}`
+                  : space.blocked_until
                   ? `Bloqueado hasta ${blockedUntil}`
                   : "Consultar disponibilidad"}
             </span>
@@ -79,11 +82,10 @@ function PublicSpaceCard({ space }: { space: SpaceApi }) {
             {[
               ["Dimensiones", `${displayValue(space.width_m)} × ${displayValue(space.height_m)} m`],
               ["Caras", displayValue(space.faces)],
-              ["Tipo", displayValue(space.type)],
+              ["Tipo", displayValue(spaceTypeLabel(space.type, space.subtype))],
               ["Tipo de vista", displayValue(getViewType(space))],
               ["Nivel", displayValue(space.socioeconomic_level)],
               ["Iluminación", hasLights(space.has_lights) ? "Sí" : "No"],
-              ["Precio", formatCatalogPrice(space.price)],
               [
                 "Fecha disponible",
                 formatCatalogDate(

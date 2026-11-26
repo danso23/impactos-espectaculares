@@ -291,8 +291,25 @@ class QuoteController extends Controller
             ], 500);
         }
 
-        $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request) {
-            $quote = Quote::create([
+        $sourceQuote = null;
+        if (!empty($validated['duplicate_of_quote_id'])) {
+            $sourceQuote = Quote::query()->with(['status', 'rental'])->findOrFail($validated['duplicate_of_quote_id']);
+
+            if ($sourceQuote->converted_to_rental_at || $sourceQuote->rental) {
+                return response()->json([
+                    'message' => 'No se puede duplicar una cotización que ya fue convertida a renta.',
+                ], 422);
+            }
+        }
+
+        $cancelledStatus = QuoteStatus::query()->where('key', 'cancelled')->first();
+
+        $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request, $sourceQuote, $cancelledStatus) {
+            $duplicateColumn = $sourceQuote && $this->hasColumn('quotes', 'duplicated_from_quote_id')
+                ? ['duplicated_from_quote_id' => $sourceQuote->id]
+                : [];
+
+            $quote = Quote::create($duplicateColumn + [
                 'quote_kind' => $validated['quote_kind'],
                 'lead_id' => $validated['customer']['type'] === 'lead' ? $validated['customer']['id'] : null,
                 'customer_type' => $validated['customer']['type'],
@@ -305,24 +322,7 @@ class QuoteController extends Controller
                 'folio' => null,
                 'version' => 1,
                 'currency' => 'MXN',
-                'includes_tax' => $calculated['resolved']['includes_tax'],
-                'tax_rate' => $calculated['resolved']['tax_rate'],
-                'rentals_subtotal' => $calculated['totals']['rentals_subtotal'],
-                'services_subtotal' => $calculated['totals']['services_subtotal'],
-                'subtotal' => $calculated['totals']['subtotal'],
-                'discount_base' => $calculated['totals']['discount_base'],
-                'discount_type' => $calculated['totals']['discount_type'],
-                'discount_value' => $calculated['totals']['discount_value'],
-                'discount' => $calculated['totals']['discount_amount'],
-                'commission_base' => $calculated['totals']['commission_base'],
-                'commission_type' => $calculated['totals']['commission_type'],
-                'commission_value' => $calculated['totals']['commission_value'],
-                'commission_amount' => $calculated['totals']['commission_amount'],
-                'tax' => $calculated['totals']['tax'],
-                'total' => $calculated['totals']['total'],
-                'valid_until' => $validated['valid_until'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'terms_html' => $calculated['resolved']['terms_html'],
+            ] + $this->calculatedQuoteAttributes($validated, $calculated) + [
                 'pdf_path' => null,
                 'pdf_generated_at' => null,
                 'snapshot_json' => [],
@@ -332,32 +332,7 @@ class QuoteController extends Controller
             $quote->snapshot_json = $this->buildSnapshot($quote, $customerSummary, $company, $letterhead, $agency, $calculated);
             $quote->save();
 
-            foreach ($calculated['items'] as $item) {
-                QuoteItem::create([
-                    'quote_id' => $quote->id,
-                    'space_id' => $item['space_id'],
-                    'service_id' => $item['service_id'],
-                    'item_type' => $item['item_type'],
-                    'concept' => $item['concept'],
-                    'description' => $item['description'],
-                    'start_date' => $item['start_date'],
-                    'end_date' => $item['end_date'],
-                    'unit_price' => $item['unit_price'],
-                    'qty' => $item['qty'],
-                    'width_m' => $item['width_m'],
-                    'height_m' => $item['height_m'],
-                    'square_meters' => $item['square_meters'],
-                    'subtotal' => $item['subtotal'],
-                    'faces' => $item['faces'],
-                    'production_cost' => $item['production_cost'],
-                    'notes' => $item['notes'],
-                    'sort_order' => $item['sort_order'],
-                    'discount_applies' => $item['discount_applies'],
-                    'tax_rate' => $item['tax_rate'],
-                    'tax_amount' => $item['tax_amount'],
-                    'total' => $item['total'],
-                ]);
-            }
+            $this->createQuoteItems($quote, $calculated['items']);
 
             $this->storeQuoteImages($quote, $request);
 
@@ -366,14 +341,24 @@ class QuoteController extends Controller
                 fromStatusId: null,
                 toStatusId: $draftStatus->id,
                 request: $request,
-                reason: 'created',
-                notes: 'Cotización creada',
+                reason: $sourceQuote ? 'duplicated' : 'created',
+                notes: $sourceQuote
+                    ? "Cotización creada como duplicado de {$sourceQuote->folio}"
+                    : 'Cotización creada',
                 meta: [
                     'snapshot_version' => 1,
                     'totals' => $calculated['totals'],
                     'pdf_path' => null,
+                    'duplicated_from' => $sourceQuote ? [
+                        'id' => $sourceQuote->id,
+                        'folio' => $sourceQuote->folio,
+                    ] : null,
                 ],
             );
+
+            if ($sourceQuote) {
+                $this->cancelReplacedQuote($sourceQuote, $quote, $cancelledStatus, $request);
+            }
 
             return $quote;
         });
@@ -384,6 +369,73 @@ class QuoteController extends Controller
             'message' => 'Cotización creada correctamente',
             'data' => $this->serializeQuote($quote, true),
         ], 201);
+    }
+
+    /**
+     * Edita una cotización sin generar folio nuevo. Solo en Borrador o Enviada
+     * y mientras no se haya convertido a renta; recalcula totales, reemplaza
+     * las partidas y deja registro en el historial.
+     */
+    public function update(Request $request, $id)
+    {
+        $quote = Quote::query()->with(['status', 'rental', 'items'])->findOrFail($id);
+        $statusKey = $quote->status?->key;
+
+        if ($quote->converted_to_rental_at || $quote->rental) {
+            return response()->json(['message' => 'No se puede editar una cotización que ya fue convertida a renta.'], 422);
+        }
+        if (!in_array($statusKey, ['draft', 'sent'], true)) {
+            return response()->json([
+                'message' => 'Solo se pueden editar cotizaciones en Borrador o Enviada. Para cambiar una aceptada, rechazada o cancelada, duplícala.',
+            ], 422);
+        }
+
+        $request->request->remove('duplicate_of_quote_id');
+        [$validated, $company, $letterhead, $agency, $customerSummary] = $this->validateAndResolvePayload($request);
+        $calculated = $this->calculator->calculate($validated, $agency, $company);
+        $previousTotals = ['total' => (float) $quote->total, 'items' => $quote->items->count()];
+
+        DB::transaction(function () use ($quote, $validated, $company, $letterhead, $agency, $customerSummary, $calculated, $request, $previousTotals) {
+            $quote->fill([
+                'quote_kind' => $validated['quote_kind'],
+                'lead_id' => $validated['customer']['type'] === 'lead' ? $validated['customer']['id'] : null,
+                'customer_type' => $validated['customer']['type'],
+                'customer_id' => $validated['customer']['id'] ?? null,
+                'agency_id' => $agency?->id,
+                'issuer_company_id' => $company->id,
+                'letterhead_id' => $letterhead?->id,
+                'version' => ((int) $quote->version) + 1,
+                'pdf_path' => null,
+                'pdf_generated_at' => null,
+            ] + $this->calculatedQuoteAttributes($validated, $calculated));
+            $quote->snapshot_json = $this->buildSnapshot($quote, $customerSummary, $company, $letterhead, $agency, $calculated);
+            $quote->save();
+
+            $quote->items()->delete();
+            $this->createQuoteItems($quote, $calculated['items']);
+            $this->storeQuoteImages($quote, $request);
+
+            $this->recordHistory(
+                quote: $quote,
+                fromStatusId: $quote->quote_status_id,
+                toStatusId: $quote->quote_status_id,
+                request: $request,
+                reason: 'edited',
+                notes: "Cotización editada (versión {$quote->version})",
+                meta: [
+                    'snapshot_version' => $quote->version,
+                    'previous' => $previousTotals,
+                    'totals' => $calculated['totals'],
+                ],
+            );
+        });
+
+        $quote->refresh()->load(['items.space', 'items.service', 'images', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
+
+        return response()->json([
+            'message' => "Cotización {$quote->folio} actualizada correctamente",
+            'data' => $this->serializeQuote($quote, true),
+        ]);
     }
 
     public function changeStatus(Request $request, $id)
@@ -419,6 +471,12 @@ class QuoteController extends Controller
         if ((int)$quote->quote_status_id === (int)$toStatus->id) {
             return response()->json([
                 'message' => 'La cotización ya tiene ese estatus',
+            ], 422);
+        }
+
+        if (($quote->status?->key === 'accepted') && ($quote->converted_to_rental_at || $quote->rental()->exists())) {
+            return response()->json([
+                'message' => 'La cotización ya fue convertida a renta; cancela o ajusta la renta directamente.',
             ], 422);
         }
 
@@ -487,6 +545,10 @@ class QuoteController extends Controller
             'payment.frequency' => ['required', 'in:single,weekly,biweekly,monthly,annual'],
             'payment.first_payment_date' => ['required', 'date'],
             'payment.renewals' => ['required', 'integer', 'min:1', 'max:120'],
+            // Importe sin IVA de cada pago; si no viene se calcula
+            // (renta por periodo en cada pago + servicios en el primero).
+            'payment.installment_amounts' => ['nullable', 'array', 'max:120'],
+            'payment.installment_amounts.*' => ['required', 'numeric', 'min:0'],
             'commission.type' => ['nullable', 'in:none,percent,fixed'],
             'commission.value' => ['nullable', 'numeric', 'min:0'],
         ]);
@@ -556,21 +618,69 @@ class QuoteController extends Controller
             ->where('item_type', 'rental')
             ->values();
 
-        // Las cotizaciones anteriores al flujo de rentas pueden contener solo
-        // partidas de servicio. En ese caso la renta conserva esas partidas en
-        // su snapshot, aunque no generen registros de ocupación de espacios.
-        $conversionItems = $rentalItems->isNotEmpty()
-            ? $rentalItems
-            : $quote->items->values();
+        // Todas las partidas pasan a la renta: la renta del espacio se cobra en
+        // cada periodo y los servicios (impresión, instalación…) una sola vez,
+        // en el primer pago.
+        $conversionItems = $quote->items->values();
+        $netAmount = fn (QuoteItem $item) => max(0, (float) $item->total - (float) $item->tax_amount);
+        $rentPerPeriod = round((float) $conversionItems
+            ->filter(fn (QuoteItem $item) => !empty($item->space_id))
+            ->sum($netAmount), 2);
+        $oneTimeServices = round((float) $conversionItems
+            ->filter(fn (QuoteItem $item) => empty($item->space_id))
+            ->sum($netAmount), 2);
 
-        $quotedStartsAt = $rentalItems->min(fn (QuoteItem $item) => optional($item->start_date)->format('Y-m-d'));
-        $quotedEndsAt = $rentalItems->max(fn (QuoteItem $item) => optional($item->end_date)->format('Y-m-d'));
-
-        if ($quotedStartsAt && Carbon::parse($startsAt)->gt(Carbon::parse($quotedStartsAt))) {
+        $customAmounts = $planPayload['payment']['installment_amounts'] ?? null;
+        if (is_array($customAmounts) && count($customAmounts) !== count($paymentSchedule)) {
             return response()->json([
-                'message' => "La renta debe iniciar a más tardar el {$quotedStartsAt} para cubrir las partidas cotizadas.",
+                'message' => 'El número de importes no coincide con el número de pagos.',
             ], 422);
         }
+
+        $installmentAmounts = is_array($customAmounts)
+            ? array_map(fn ($amount) => round((float) $amount, 2), array_values($customAmounts))
+            : array_map(
+                fn ($index) => round($rentPerPeriod + ($index === 0 ? $oneTimeServices : 0), 2),
+                array_keys($paymentSchedule)
+            );
+        $taxRate = $quote->includes_tax ? (float) $quote->tax_rate : 0.0;
+
+        // Concepto de cada cobro: qué espacios cubre y, en el primero, qué
+        // servicios de cargo único incluye. Se marca si el importe se ajustó.
+        $money = fn (float $value) => '$' . number_format($value, 2);
+        $rentConcept = 'Renta: ' . ($conversionItems
+            ->filter(fn (QuoteItem $item) => !empty($item->space_id))
+            ->map(fn (QuoteItem $item) => $item->concept)
+            ->filter()
+            ->implode(', ') ?: 'periodo');
+        $servicesConcept = $conversionItems
+            ->filter(fn (QuoteItem $item) => empty($item->space_id))
+            ->map(fn (QuoteItem $item) => sprintf('%s (%s)', $item->concept, $money($netAmount($item))))
+            ->implode(', ');
+        $installmentConcepts = array_map(function ($index) use ($installmentAmounts, $rentPerPeriod, $oneTimeServices, $rentConcept, $servicesConcept) {
+            $concept = $rentConcept;
+            if ($index === 0 && $servicesConcept !== '') {
+                $concept .= ' + ' . $servicesConcept;
+            }
+            $expected = round($rentPerPeriod + ($index === 0 ? $oneTimeServices : 0), 2);
+            if (abs($installmentAmounts[$index] - $expected) > 0.009) {
+                $concept .= ' · Importe ajustado manualmente';
+            }
+            return $concept;
+        }, array_keys($installmentAmounts));
+
+        // Partidas que ocupan un espacio: rentas y anuncios (servicio ligado a
+        // un espacio). Al convertir, la renta queda confirmada y estos espacios
+        // se bloquean durante la vigencia.
+        $occupancyItems = $quote->items
+            ->filter(fn (QuoteItem $item) => !empty($item->space_id)
+                && ($item->item_type === 'rental' || $item->item_type === 'service'))
+            ->unique('space_id')
+            ->values();
+
+        // La renta puede iniciar después de la fecha cotizada; solo se exige
+        // que su vigencia cubra el final de las partidas cotizadas.
+        $quotedEndsAt = $rentalItems->max(fn (QuoteItem $item) => optional($item->end_date)->format('Y-m-d'));
 
         if ($quotedEndsAt && Carbon::parse($endsAt)->lt(Carbon::parse($quotedEndsAt))) {
             return response()->json([
@@ -580,11 +690,28 @@ class QuoteController extends Controller
 
         $userId = $this->authUserId($request);
 
-        $rental = DB::transaction(function () use ($quote, $rentalItems, $conversionItems, $userId, $request, $customerType, $customerId, $customerSummary, $startsAt, $endsAt, $paymentFrequency, $renewals, $firstPaymentDate, $paymentSchedule, $commissionPayload, $isRotating) {
-            $subtotal = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->subtotal), 2);
-            $tax = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->tax_amount), 2);
-            $total = round((float) $conversionItems->sum(fn (QuoteItem $item) => (float) $item->total), 2);
-            $commissionBase = round(max(0, $total - $tax), 2);
+        try {
+        $rental = DB::transaction(function () use ($quote, $occupancyItems, $conversionItems, $userId, $request, $customerType, $customerId, $customerSummary, $startsAt, $endsAt, $paymentFrequency, $renewals, $firstPaymentDate, $paymentSchedule, $commissionPayload, $isRotating, $installmentAmounts, $taxRate, $rentPerPeriod, $oneTimeServices, $installmentConcepts) {
+            $periods = $occupancyItems->map(fn (QuoteItem $item) => [
+                'space_id' => (int) $item->space_id,
+                'start_date' => $startsAt,
+                'end_date' => $endsAt,
+            ])->all();
+
+            if (!empty($periods)) {
+                $spaceIds = collect($periods)->pluck('space_id')->unique()->sort()->values();
+                DB::table('spaces')->whereIn('id', $spaceIds)->lockForUpdate()->get();
+                $conflicts = $this->spaceAvailability->conflictingSpaceIds($periods);
+
+                if ($conflicts->isNotEmpty()) {
+                    throw new \DomainException('Espacios no disponibles para la vigencia: ' . $conflicts->implode(', ') . '.');
+                }
+            }
+
+            $subtotal = round(array_sum($installmentAmounts), 2);
+            $tax = round(array_sum(array_map(fn ($amount) => round($amount * $taxRate / 100, 2), $installmentAmounts)), 2);
+            $total = round($subtotal + $tax, 2);
+            $commissionBase = $subtotal;
             $commission = $this->commissionCalculator->calculate($commissionPayload, $commissionBase, $quote->agency);
 
             if (($quote->customer_type ?? null) === 'sin_cliente' || empty($quote->customer_id)) {
@@ -605,7 +732,9 @@ class QuoteController extends Controller
                 'agency_id' => $quote->agency_id,
                 'issuer_company_id' => $quote->issuer_company_id,
                 'created_by' => $userId,
-                'status' => 'draft',
+                // Al convertir desde una cotización aceptada la renta queda
+                // confirmada: espacios ocupados y cobros emitidos.
+                'status' => 'active',
                 'is_rotating' => $isRotating,
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
@@ -628,7 +757,14 @@ class QuoteController extends Controller
                     'customer' => $quote->snapshot_json['customer'] ?? null,
                     'company' => $quote->snapshot_json['company'] ?? null,
                     'agency' => $quote->snapshot_json['agency'] ?? null,
-                    'payment' => ['frequency' => $paymentFrequency, 'renewals' => $renewals],
+                    'payment' => [
+                        'frequency' => $paymentFrequency,
+                        'renewals' => $renewals,
+                        'rent_per_period' => $rentPerPeriod,
+                        'one_time_services' => $oneTimeServices,
+                        'installment_amounts' => $installmentAmounts,
+                        'tax_rate' => $taxRate,
+                    ],
                     'commission' => $commission,
                     'items' => $conversionItems->map(function (QuoteItem $item) {
                         return [
@@ -650,7 +786,7 @@ class QuoteController extends Controller
                 ],
             ]);
 
-            foreach ($rentalItems as $item) {
+            foreach ($occupancyItems as $item) {
                 RentalItem::create([
                     'rental_id' => $rental->id,
                     'quote_item_id' => $item->id,
@@ -664,6 +800,12 @@ class QuoteController extends Controller
                 ]);
             }
 
+            $this->paymentSchedule->createInvoicesFromAmounts($rental, $paymentSchedule, $installmentAmounts, $taxRate, $installmentConcepts);
+            $rental->invoices()
+                ->where('status', 'issued')
+                ->whereDate('due_date', '<', Carbon::today())
+                ->update(['status' => 'overdue']);
+
             $quote->converted_to_rental_at = Carbon::now();
             $quote->converted_to_rental_by = $userId;
             $quote->save();
@@ -674,7 +816,7 @@ class QuoteController extends Controller
                 toStatusId: $quote->quote_status_id,
                 request: $request,
                 reason: 'converted_to_rental',
-                notes: "Renta #{$rental->id} creada desde cotización aceptada.",
+                notes: "Renta #{$rental->id} creada y confirmada desde cotización aceptada.",
                 meta: [
                     'event' => 'converted_to_rental',
                     'rental_id' => $rental->id,
@@ -684,6 +826,9 @@ class QuoteController extends Controller
 
             return $rental->load('invoices');
         });
+        } catch (\DomainException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
         $quote->load(['items.space', 'items.service', 'status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser']);
 
@@ -691,6 +836,62 @@ class QuoteController extends Controller
             'message' => "Cotización convertida a renta #{$rental->id}.",
             'data' => $this->serializeQuote($quote, true),
         ]);
+    }
+
+    /** Columnas de la cotización que salen del cálculo (totales, IVA, vigencia, notas). */
+    private function calculatedQuoteAttributes(array $validated, array $calculated): array
+    {
+        return [
+            'includes_tax' => $calculated['resolved']['includes_tax'],
+            'tax_rate' => $calculated['resolved']['tax_rate'],
+            'rentals_subtotal' => $calculated['totals']['rentals_subtotal'],
+            'services_subtotal' => $calculated['totals']['services_subtotal'],
+            'subtotal' => $calculated['totals']['subtotal'],
+            'discount_base' => $calculated['totals']['discount_base'],
+            'discount_type' => $calculated['totals']['discount_type'],
+            'discount_value' => $calculated['totals']['discount_value'],
+            'discount' => $calculated['totals']['discount_amount'],
+            'commission_base' => $calculated['totals']['commission_base'],
+            'commission_type' => $calculated['totals']['commission_type'],
+            'commission_value' => $calculated['totals']['commission_value'],
+            'commission_amount' => $calculated['totals']['commission_amount'],
+            'tax' => $calculated['totals']['tax'],
+            'total' => $calculated['totals']['total'],
+            'valid_until' => $validated['valid_until'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'terms_html' => $calculated['resolved']['terms_html'],
+        ];
+    }
+
+    private function createQuoteItems(Quote $quote, array $items): void
+    {
+        $hasUnitColumn = $this->hasColumn('quote_items', 'unit');
+        foreach ($items as $item) {
+            QuoteItem::create(($hasUnitColumn ? ['unit' => $item['unit']] : []) + [
+                'quote_id' => $quote->id,
+                'space_id' => $item['space_id'],
+                'service_id' => $item['service_id'],
+                'item_type' => $item['item_type'],
+                'concept' => $item['concept'],
+                'description' => $item['description'],
+                'start_date' => $item['start_date'],
+                'end_date' => $item['end_date'],
+                'unit_price' => $item['unit_price'],
+                'qty' => $item['qty'],
+                'width_m' => $item['width_m'],
+                'height_m' => $item['height_m'],
+                'square_meters' => $item['square_meters'],
+                'subtotal' => $item['subtotal'],
+                'faces' => $item['faces'],
+                'production_cost' => $item['production_cost'],
+                'notes' => $item['notes'],
+                'sort_order' => $item['sort_order'],
+                'discount_applies' => $item['discount_applies'],
+                'tax_rate' => $item['tax_rate'],
+                'tax_amount' => $item['tax_amount'],
+                'total' => $item['total'],
+            ]);
+        }
     }
 
     private function validateAndResolvePayload(Request $request): array
@@ -709,6 +910,7 @@ class QuoteController extends Controller
             'discount.value' => ['nullable', 'numeric', 'min:0'],
             'terms_html' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
+            'duplicate_of_quote_id' => ['nullable', 'integer', 'exists:quotes,id'],
             'images' => ['nullable', 'array', 'max:10'],
             'images.*' => ['file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'items' => ['required', 'array', 'min:1'],
@@ -720,6 +922,7 @@ class QuoteController extends Controller
             'items.*.start_date' => ['nullable', 'date'],
             'items.*.end_date' => ['nullable', 'date'],
             'items.*.qty' => ['nullable', 'integer', 'min:1'],
+            'items.*.unit' => ['nullable', 'in:pieza,m2'],
             'items.*.width_m' => ['nullable', 'required_with:items.*.height_m', 'numeric', 'min:0.01'],
             'items.*.height_m' => ['nullable', 'required_with:items.*.width_m', 'numeric', 'min:0.01'],
             'items.*.square_meters' => ['nullable', 'numeric', 'min:0.01'],
@@ -855,10 +1058,16 @@ class QuoteController extends Controller
             ->get()
             ->keyBy('id');
 
-        return collect($items)->values()->map(function (array $item, int $index) use ($spaces, $services) {
+        return collect($items)->values()->map(function (array $item, int $index) use ($spaces, $services, $defaultSquareMeterPrice) {
             $type = $item['item_type'];
             $space = !empty($item['space_id']) ? $spaces->get((int)$item['space_id']) : null;
             $service = !empty($item['service_id']) ? $services->get((int)$item['service_id']) : null;
+            $unit = $type === 'service'
+                ? ($item['unit'] ?? ($service?->unit ?? 'm2'))
+                : 'pieza';
+            $defaultServicePrice = $unit === 'm2'
+                ? ($defaultSquareMeterPrice ?: (float)($service->base_price ?? 0))
+                : (float)($service->base_price ?? 0);
 
             return [
                 'item_type' => $type,
@@ -869,10 +1078,11 @@ class QuoteController extends Controller
                 'start_date' => $type === 'rental' ? ($item['start_date'] ?? null) : null,
                 'end_date' => $type === 'rental' ? ($item['end_date'] ?? null) : null,
                 'qty' => (int)($item['qty'] ?? 1),
+                'unit' => $unit,
                 'width_m' => $type === 'service' ? ($item['width_m'] ?? null) : null,
                 'height_m' => $type === 'service' ? ($item['height_m'] ?? null) : null,
                 'square_meters' => $item['square_meters'] ?? 1,
-                'unit_price' => $item['unit_price'] ?? ($service ? ($defaultSquareMeterPrice ?: ($service->base_price ?? 0)) : ($space?->price ?? 0)),
+                'unit_price' => $item['unit_price'] ?? ($type === 'service' ? $defaultServicePrice : ($space?->price ?? 0)),
                 'faces' => $item['faces'] ?? ($space?->faces ?? null),
                 'production_cost' => $item['production_cost'] ?? null,
                 'notes' => $item['notes'] ?? null,
@@ -975,6 +1185,7 @@ class QuoteController extends Controller
             'id' => $quote->id,
             'folio' => $quote->folio,
             'version' => $quote->version,
+            'duplicated_from_quote_id' => $quote->duplicated_from_quote_id ?? null,
             'quote_kind' => $quote->quote_kind ?: ($snapshot['quote_kind'] ?? 'space'),
             'customer_type' => $customerType,
             'customer_id' => $customerId,
@@ -1064,6 +1275,7 @@ class QuoteController extends Controller
                         'start_date' => optional($item->start_date)->format('Y-m-d'),
                         'end_date' => optional($item->end_date)->format('Y-m-d'),
                         'qty' => (int)$item->qty,
+                        'unit' => $item->unit ?? ($item->item_type === 'service' ? 'm2' : 'pieza'),
                         'width_m' => $item->width_m !== null ? (float)$item->width_m : null,
                         'height_m' => $item->height_m !== null ? (float)$item->height_m : null,
                         'square_meters' => (float)$item->square_meters,
@@ -1188,12 +1400,59 @@ class QuoteController extends Controller
             'draft' => ['sent', 'cancelled'],
             'sent' => ['draft', 'accepted', 'rejected', 'expired', 'cancelled'],
             'expired' => ['sent', 'cancelled'],
-            'accepted' => [],
+            // Aceptada puede terminar rechazada (el cliente se retracta de los
+            // términos) o cancelada (el servicio finalmente no se realizó).
+            'accepted' => ['rejected', 'cancelled'],
             'rejected' => [],
             'cancelled' => [],
         ];
 
         return in_array($toStatusKey, $transitions[$fromStatusKey] ?? [], true);
+    }
+
+    private function cancelReplacedQuote(Quote $sourceQuote, Quote $newQuote, ?QuoteStatus $cancelledStatus, Request $request): void
+    {
+        // Rechazada/cancelada ya son finales: se conservan y solo se registra
+        // en el historial qué folio la reemplazó.
+        $keepStatus = in_array($sourceQuote->status?->key, ['cancelled', 'rejected'], true) || !$cancelledStatus;
+        $fromStatusId = (int)$sourceQuote->quote_status_id;
+        $toStatusId = $keepStatus ? $fromStatusId : (int)$cancelledStatus->id;
+
+        if (!$keepStatus) {
+            $sourceQuote->quote_status_id = $toStatusId;
+            $sourceQuote->save();
+        }
+
+        $this->recordHistory(
+            quote: $sourceQuote,
+            fromStatusId: $fromStatusId,
+            toStatusId: $toStatusId,
+            request: $request,
+            reason: 'replaced_by_duplicate',
+            notes: "Reemplazada por la cotización {$newQuote->folio}",
+            meta: [
+                'snapshot_version' => $sourceQuote->version,
+                'replaced_by' => [
+                    'id' => $newQuote->id,
+                    'folio' => $newQuote->folio,
+                ],
+                'totals' => [
+                    'subtotal' => (float)$sourceQuote->subtotal,
+                    'discount' => (float)$sourceQuote->discount,
+                    'tax' => (float)$sourceQuote->tax,
+                    'total' => (float)$sourceQuote->total,
+                ],
+                'pdf_path' => $sourceQuote->pdf_path,
+            ],
+        );
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        static $cache = [];
+        $key = "{$table}.{$column}";
+
+        return $cache[$key] ??= Schema::hasTable($table) && Schema::hasColumn($table, $column);
     }
 
     private function recordHistory(

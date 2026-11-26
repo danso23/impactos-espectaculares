@@ -145,6 +145,109 @@ class GroundRentController extends Controller
         return response()->json(['message' => 'Pago de renta de piso marcado como pagado.', 'data' => $payment->fresh()]);
     }
 
+    /**
+     * Edita el importe de un pago (p. ej. ajuste anual por inflación).
+     * Con apply_to_following, el nuevo importe también se aplica a los pagos
+     * siguientes del mismo contrato que sigan pendientes o vencidos.
+     */
+    public function updatePaymentAmount(Request $request, $id)
+    {
+        $data = $this->validated($request, [
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'apply_to_following' => ['sometimes', 'boolean'],
+        ]);
+        $payment = GroundRentPayment::query()->findOrFail($id);
+        if (in_array($payment->status, ['paid', 'cancelled'], true)) {
+            return response()->json(['message' => 'Solo se puede modificar el importe de pagos pendientes o vencidos.'], 422);
+        }
+
+        $updated = DB::transaction(function () use ($payment, $data) {
+            $query = GroundRentPayment::query()
+                ->where('ground_rent_contract_id', $payment->ground_rent_contract_id)
+                ->whereIn('status', ['pending', 'overdue']);
+            if (!empty($data['apply_to_following'])) {
+                $query->where('installment_number', '>=', $payment->installment_number);
+            } else {
+                $query->whereKey($payment->id);
+            }
+            return $query->update(['amount' => round((float) $data['amount'], 2)]);
+        });
+
+        return response()->json([
+            'message' => $updated > 1 ? "Importe actualizado en {$updated} pagos." : 'Importe actualizado.',
+            'data' => $payment->fresh(),
+            'updated' => $updated,
+        ]);
+    }
+
+    /** Reporte de pagos a caseros por rango de fechas de vencimiento. */
+    public function paymentsReport(Request $request)
+    {
+        $data = $this->validated($request, [
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'status' => ['nullable', 'in:pending,paid,overdue,cancelled'],
+            'casero_id' => ['nullable', 'integer'],
+        ]);
+        $this->refreshOverduePayments();
+
+        $payments = GroundRentPayment::query()
+            ->with(['contract.property.casero', 'contract.property.spaces:id,ground_property_id,title,assigned_id'])
+            ->when($data['from'] ?? null, fn ($query, $from) => $query->whereDate('due_date', '>=', $from))
+            ->when($data['to'] ?? null, fn ($query, $to) => $query->whereDate('due_date', '<=', $to))
+            ->when($data['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+            ->when($data['casero_id'] ?? null, fn ($query, $caseroId) => $query->whereHas('contract.property', fn ($property) => $property->where('casero_id', $caseroId)))
+            ->orderBy('due_date')
+            ->orderBy('id')
+            ->get();
+
+        $rows = $payments->map(function (GroundRentPayment $payment) {
+            $contract = $payment->contract;
+            $property = $contract?->property;
+            $casero = $property?->casero;
+            return [
+                'id' => $payment->id,
+                'month' => $payment->due_date?->format('Y-m'),
+                'due_date' => $payment->due_date?->format('Y-m-d'),
+                'period_start' => $payment->period_start?->format('Y-m-d'),
+                'period_end' => $payment->period_end?->format('Y-m-d'),
+                'installment_number' => $payment->installment_number,
+                'payment_count' => $contract?->payment_count,
+                'amount' => (float) $payment->amount,
+                'status' => $payment->status,
+                'paid_at' => $payment->paid_at?->format('Y-m-d'),
+                'reference' => $payment->reference,
+                'contract_id' => $contract?->id,
+                'contract_number' => $contract?->contract_number,
+                'payment_frequency' => $contract?->payment_frequency,
+                'property_name' => $property?->name,
+                'property_address' => $property?->address,
+                'casero_id' => $casero?->id,
+                'casero_name' => $casero ? trim(implode(' ', array_filter([$casero->nombre, $casero->apellido_paterno, $casero->apellido_materno]))) : null,
+                'spaces' => $property ? $property->spaces->map(fn ($space) => ['id' => $space->id, 'assigned_id' => $space->assigned_id, 'title' => $space->title])->values() : [],
+            ];
+        })->values();
+
+        $months = $rows->groupBy('month')->map(fn ($items, $month) => [
+            'month' => $month,
+            'count' => $items->count(),
+            'total' => round($items->where('status', '!=', 'cancelled')->sum('amount'), 2),
+            'paid' => round($items->where('status', 'paid')->sum('amount'), 2),
+            'pending' => round($items->whereIn('status', ['pending', 'overdue'])->sum('amount'), 2),
+        ])->values();
+
+        return response()->json([
+            'data' => $rows,
+            'months' => $months,
+            'totals' => [
+                'count' => $rows->count(),
+                'total' => round($months->sum('total'), 2),
+                'paid' => round($months->sum('paid'), 2),
+                'pending' => round($months->sum('pending'), 2),
+            ],
+        ]);
+    }
+
     private function assignSpaces(GroundProperty $property, array $spaceIds): void
     {
         $spaceIds = collect($spaceIds)->map(fn ($id) => (int) $id)->unique()->values();

@@ -14,6 +14,7 @@ class Space extends Model
         'ground_property_id',
         'price',
         'type',
+        'subtype',
         'socioeconomic_level',
         'width_m',
         'height_m',
@@ -59,6 +60,44 @@ class Space extends Model
             END AS is_blocked_now",
             [$today, $today]
         );
+    }
+
+    /**
+     * Fecha hasta la que el espacio está rentado hoy (renta confirmada y
+     * partida activa que cubre el día de hoy). NULL si no está ocupado.
+     */
+    public function scopeWithOccupancy($query)
+    {
+        $today = Carbon::today()->toDateString();
+
+        return $query->selectRaw(
+            "(SELECT MAX(ri.end_date) FROM rental_items ri
+                INNER JOIN rentals r ON r.id = ri.rental_id
+              WHERE ri.space_id = spaces.id
+                AND ri.status = 'active'
+                AND r.status = 'active'
+                AND ri.start_date <= ?
+                AND ri.end_date >= ?) AS occupied_until",
+            [$today, $today]
+        );
+    }
+
+    /** Espacios rentados hoy (ver scopeWithOccupancy). */
+    public function scopeCurrentlyOccupied($query, bool $occupied = true)
+    {
+        $today = Carbon::today()->toDateString();
+        $method = $occupied ? 'whereExists' : 'whereNotExists';
+
+        return $query->{$method}(function ($sub) use ($today) {
+            $sub->selectRaw('1')
+                ->from('rental_items as ri')
+                ->join('rentals as r', 'r.id', '=', 'ri.rental_id')
+                ->whereColumn('ri.space_id', 'spaces.id')
+                ->where('ri.status', 'active')
+                ->where('r.status', 'active')
+                ->whereDate('ri.start_date', '<=', $today)
+                ->whereDate('ri.end_date', '>=', $today);
+        });
     }
 
     public function scopeCurrentlyBlocked($query)

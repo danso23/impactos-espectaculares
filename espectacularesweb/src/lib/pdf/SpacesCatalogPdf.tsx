@@ -1,3 +1,4 @@
+import { spaceTypeLabel } from "@/lib/helpers/spaceTypeHelper";
 import {
   Document,
   Image,
@@ -11,12 +12,12 @@ import type { Space, SpaceApi } from "@/types/Space";
 import {
   displayValue,
   formatCatalogDate,
-  formatCatalogPrice,
   getGoogleMapsUrl,
   getAvailabilityDate,
   getViewType,
   hasLights,
   isAvailable,
+  isOccupied,
   resolveSpaceImageUrl,
 } from "@/lib/catalog/catalogHelpers";
 
@@ -575,14 +576,16 @@ export function SpacesCatalogDocument({
                 <Text style={styles.availabilityBadge}>
                   {available
                     ? "DISPONIBILIDAD INMEDIATA"
-                    : space.blocked_until
+                    : isOccupied(space) && availableFrom
+                      ? `DISPONIBLE A PARTIR DE ${availabilityDate.toUpperCase()}`
+                      : space.blocked_until
                       ? `BLOQUEADO HASTA ${blockedUntil.toUpperCase()}`
                       : "CONSULTAR DISPONIBILIDAD"}
                 </Text>
                 <Text style={styles.idBadge}>ID {displayValue(space.assigned_id, String(space.id))}</Text>
               </View>
               <View style={styles.heroCaption}>
-                <Text style={styles.heroMeta}>{displayValue(space.type, "Espacio publicitario")} · Mérida, Yucatán</Text>
+                <Text style={styles.heroMeta}>{displayValue(spaceTypeLabel(space.type, space.subtype), "Espacio publicitario")} · Mérida, Yucatán</Text>
                 <Text style={styles.heroTitle}>{displayValue(space.title, "Espacio sin título")}</Text>
               </View>
             </View>
@@ -594,7 +597,7 @@ export function SpacesCatalogDocument({
                 <View style={styles.specs}>
                   <Spec label="Dimensiones" value={`${displayValue(space.width_m)} × ${displayValue(space.height_m)} m`} />
                   <Spec label="Caras" value={displayValue(space.faces)} />
-                  <Spec label="Tipo" value={displayValue(space.type)} />
+                  <Spec label="Tipo" value={displayValue(spaceTypeLabel(space.type, space.subtype))} />
                   <Spec label="Tipo de vista" value={displayValue(getViewType(space))} />
                   <Spec label="Nivel" value={displayValue(space.socioeconomic_level)} />
                   <Spec label="Iluminación" value={hasLights(space.has_lights) ? "Sí" : "No"} />
@@ -604,6 +607,11 @@ export function SpacesCatalogDocument({
               <View style={styles.locationPanel}>
                 <Text style={styles.sectionLabelLight}>UBICACIÓN</Text>
                 <Text style={styles.locationTitle}>Mérida, Yucatán</Text>
+                {/* La valla móvil no tiene coordenadas: sin QR ni liga al mapa. */}
+                {space.latitude == null || space.longitude == null ? (
+                  <Text style={styles.coordinates}>Ubicación móvil</Text>
+                ) : (
+                <>
                 <Text style={styles.coordinates}>{latitude}{"\n"}{longitude}</Text>
                 <View style={styles.qrRow}>
                   <Image src={qrUrl} style={styles.qr} />
@@ -613,6 +621,8 @@ export function SpacesCatalogDocument({
                   <Link src={googleMapsUrl} style={styles.mapLink}>Abrir en Google Maps →</Link>
                 ) : (
                   <Text style={styles.mapLink}>Abrir en Google Maps →</Text>
+                )}
+                </>
                 )}
               </View>
             </View>
@@ -644,8 +654,6 @@ export function SpacesCatalogDocument({
               </View>
 
               <View style={styles.valuePanel}>
-                <Text style={styles.valueLabel}>VALOR DEL ESPACIO</Text>
-                <Text style={styles.valuePrice}>{formatCatalogPrice(space.price)}</Text>
                 <Text style={styles.availabilityLabel}>
                   {!available && space.blocked_until ? "DISPONIBLE A PARTIR DE" : "FECHA DE DISPONIBILIDAD"}
                 </Text>

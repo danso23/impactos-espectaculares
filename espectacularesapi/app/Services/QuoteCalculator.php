@@ -25,11 +25,14 @@ class QuoteCalculator
             $qty = max(1, (int)($item['qty'] ?? 1));
             $width = isset($item['width_m']) ? max(0.01, $this->toFloat($item['width_m'])) : null;
             $height = isset($item['height_m']) ? max(0.01, $this->toFloat($item['height_m'])) : null;
+            $unit = $this->resolveUnit($itemType, $item['unit'] ?? null);
             $squareMeters = $itemType === 'service' && $width !== null && $height !== null
                 ? round($width * $height, 2)
                 : max(0.01, $this->toFloat($item['square_meters'] ?? 1));
             $unitPrice = $this->toFloat($item['unit_price'] ?? 0);
-            $lineMultiplier = $itemType === 'service' ? $qty * $squareMeters : $qty;
+            // Solo los servicios por m² multiplican por superficie; los que se
+            // cobran por pieza (instalación, anuncio, etc.) van por cantidad.
+            $lineMultiplier = $unit === 'm2' ? $qty * $squareMeters : $qty;
             $subtotal = round($lineMultiplier * $unitPrice, 2);
             $discountApplies = array_key_exists('discount_applies', $item)
                 ? filter_var($item['discount_applies'], FILTER_VALIDATE_BOOLEAN)
@@ -45,6 +48,7 @@ class QuoteCalculator
                 'start_date' => $item['start_date'] ?? null,
                 'end_date' => $item['end_date'] ?? null,
                 'qty' => $qty,
+                'unit' => $unit,
                 'width_m' => $itemType === 'service' ? $width : null,
                 'height_m' => $itemType === 'service' ? $height : null,
                 'unit_price' => $unitPrice,
@@ -124,6 +128,16 @@ class QuoteCalculator
                 'terms_html' => $payload['terms_html'] ?? ($company->default_terms_html ?? null),
             ],
         ];
+    }
+
+    private function resolveUnit(string $itemType, $unit): string
+    {
+        if ($itemType !== 'service') {
+            return 'pieza';
+        }
+
+        // Sin unidad explícita se conserva el comportamiento histórico (m²).
+        return in_array($unit, ['pieza', 'm2'], true) ? $unit : 'm2';
     }
 
     private function allocateDiscount(array $items, float $discountAmount, float $discountBase): array

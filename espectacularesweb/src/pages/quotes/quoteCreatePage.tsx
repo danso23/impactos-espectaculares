@@ -1,16 +1,18 @@
+import { calculateRentalEndDate } from "@/lib/helpers/rentalPaymentSchedule"
 import * as React from "react"
-import { useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { toast } from "sonner"
-import { ArrowLeft, FileDown, RefreshCw, Save, Search, Trash2, ImagePlus, X } from "lucide-react"
+import { ArrowLeft, Copy, FileDown, Info, RefreshCw, Save, Search, Trash2, ImagePlus, X } from "lucide-react"
 
 import {
   useCreateQuote,
+  useUpdateQuote,
   useQuoteCatalogs,
   useUpdateQuoteConfiguration,
 } from "@/lib/hooks/quoteHook"
 import { useSpaces } from "@/lib/hooks/spaceHook"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
-import { previewQuote } from "@/lib/services/quoteService"
+import { getQuote, previewQuote } from "@/lib/services/quoteService"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -43,6 +45,7 @@ import type {
   QuoteCreatePageSpaceSeed,
   QuoteCustomer,
   QuoteItemInput,
+  QuoteItemUnit,
   QuoteKind,
   QuotePayload,
   QuotePreviewData,
@@ -79,14 +82,27 @@ function plusDaysISO(days: number) {
   return date.toISOString().slice(0, 10)
 }
 
+// Fin de un periodo mensual: mismo día del mes siguiente menos 1 (24/11 → 23/12),
+// igual que calcula la renta. Así 1 renta mensual cubre exactamente lo cotizado.
+function oneMonthPeriodEndISO(startISO: string) {
+  return calculateRentalEndDate(startISO, "monthly", 1)
+}
+
 function normalizeSpaceSeed(space: QuoteCreatePageSpaceSeed, index: number): QuoteItemInput {
+  const width = toNumber(space.width_m)
+  const height = toNumber(space.height_m)
+
   return {
     item_type: "rental",
     space_id: Number(space.id),
     concept: space.title,
     start_date: todayISO(),
-    end_date: plusDaysISO(30),
+    end_date: oneMonthPeriodEndISO(todayISO()),
     qty: 1,
+    unit: "pieza",
+    // Medida de la lona: no afecta la renta, se usa para precargar la impresión.
+    width_m: width > 0 ? width : null,
+    height_m: height > 0 ? height : null,
     square_meters: 1,
     unit_price: toNumber(space.price),
     faces: space.faces ?? null,
@@ -96,13 +112,27 @@ function normalizeSpaceSeed(space: QuoteCreatePageSpaceSeed, index: number): Quo
   }
 }
 
+function itemUnit(item: QuoteItemInput): QuoteItemUnit {
+  if (item.item_type !== "service") return "pieza"
+  return item.unit === "pieza" ? "pieza" : "m2"
+}
+
+function serviceUnit(service: QuoteCatalogService): QuoteItemUnit {
+  if (service.unit === "m2" || service.unit === "pieza") return service.unit
+  // Catálogo sin columna de unidad (migración pendiente): solo impresión va por m².
+  return service.key === "impresion" ? "m2" : "pieza"
+}
+
+function unitLabel(unit: QuoteItemUnit) {
+  return unit === "m2" ? "m²" : "Pieza"
+}
+
 function calculateItemSubtotal(item: QuoteItemInput) {
   const quantity = Math.max(1, item.qty)
-  const squareMeters = calculateSquareMeters(item)
   const unitPrice = toNumber(item.unit_price)
 
-  if (item.item_type === "service") {
-    return quantity * squareMeters * unitPrice
+  if (itemUnit(item) === "m2") {
+    return quantity * calculateSquareMeters(item) * unitPrice
   }
 
   return quantity * unitPrice
@@ -112,11 +142,52 @@ function calculateSquareMeters(item: QuoteItemInput) {
   const width = toNumber(item.width_m)
   const height = toNumber(item.height_m)
 
-  if (item.item_type === "service" && width > 0 && height > 0) {
+  if (width > 0 && height > 0) {
     return Math.round(width * height * 100) / 100
   }
 
   return Math.max(0.01, toNumber(item.square_meters ?? 1))
+}
+
+function findBannerSize(items: QuoteItemInput[]) {
+  // Toma la medida de la lona del último anuncio/espacio agregado.
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index]
+    if (!item.space_id) continue
+    const width = toNumber(item.width_m)
+    const height = toNumber(item.height_m)
+    if (width > 0 && height > 0) return { width, height }
+  }
+
+  return null
+}
+
+function isDefaultSize(item: QuoteItemInput) {
+  return toNumber(item.width_m) === 1 && toNumber(item.height_m) === 1
+}
+
+function quoteItemFromRecord(item: QuoteRecord["items"][number], index: number): QuoteItemInput {
+  return {
+    item_type: item.item_type,
+    space_id: item.space_id ?? null,
+    service_id: item.service_id ?? null,
+    concept: item.concept ?? "",
+    description: item.description ?? null,
+    start_date: item.start_date ?? null,
+    end_date: item.end_date ?? null,
+    qty: Math.max(1, toNumber(item.qty)),
+    unit: item.item_type === "service" ? (item.unit === "pieza" ? "pieza" : "m2") : "pieza",
+    width_m: item.width_m ?? null,
+    height_m: item.height_m ?? null,
+    square_meters: toNumber(item.square_meters) || 1,
+    unit_price: toNumber(item.unit_price),
+    faces: item.faces ?? null,
+    production_cost: item.production_cost ?? null,
+    notes: item.notes ?? null,
+    sort_order: index,
+    discount_applies: item.discount_applies ?? item.item_type === "rental",
+    tax_rate: toNumber(item.tax_rate),
+  }
 }
 
 function isQuoteAmountType(value: string): value is QuoteAmountType {
@@ -141,10 +212,17 @@ function QuoteField({
 export default function QuoteCreatePage() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const seededSpaces = (location.state as QuoteLocationState | null)?.spaces ?? []
+  const params = useParams<{ id?: string }>()
+  const editId = Number(params.id) || null
+  const duplicateOfId = editId ? null : Number(searchParams.get("duplicar")) || null
+  const sourceId = editId ?? duplicateOfId
 
   const catalogsQuery = useQuoteCatalogs()
   const createQuoteMutation = useCreateQuote()
+  const updateQuoteMutation = useUpdateQuote()
+  const isSaving = createQuoteMutation.isPending || updateQuoteMutation.isPending
   const updateConfigurationMutation = useUpdateQuoteConfiguration()
 
   const [customerType, setCustomerType] = React.useState<CustomerType>("lead")
@@ -176,6 +254,9 @@ export default function QuoteCreatePage() {
   const [isPreviewLoading, setIsPreviewLoading] = React.useState(false)
   const [savedQuote, setSavedQuote] = React.useState<QuoteRecord | null>(null)
   const [exitDialogOpen, setExitDialogOpen] = React.useState(false)
+  const [sourceQuote, setSourceQuote] = React.useState<QuoteRecord | null>(null)
+  const [duplicateError, setDuplicateError] = React.useState<string | null>(null)
+  const isHydratingDuplicate = sourceId !== null && !sourceQuote && !duplicateError
   const previewRequestId = React.useRef(0)
   const initialFormFingerprint = React.useRef<string | null>(null)
   const allowNavigation = React.useRef(false)
@@ -222,6 +303,47 @@ export default function QuoteCreatePage() {
       urls.forEach((url) => URL.revokeObjectURL(url))
     }
   }, [quoteImages])
+
+  React.useEffect(() => {
+    if (!sourceId) return
+
+    let cancelled = false
+    getQuote(sourceId)
+      .then((response) => {
+        if (cancelled) return
+        const quote = response.data
+        const customer = quote.customer ?? null
+        const nextCustomerType = (quote.customer_type ?? customer?.type ?? "sin_cliente") as CustomerType
+
+        setQuoteKind(quote.quote_kind)
+        setCustomerType(nextCustomerType)
+        setSelectedCustomer(nextCustomerType === "sin_cliente" ? null : customer)
+        setCompanyId(quote.company?.id ?? null)
+        setLetterheadId(quote.letterhead?.id ?? null)
+        setAgencyId(quote.agency?.id ?? null)
+        setValidUntil(
+          editId
+            ? quote.valid_until ?? plusDaysISO(15)
+            : quote.valid_until && quote.valid_until >= todayISO() ? quote.valid_until : plusDaysISO(15),
+        )
+        setIncludeTax(quote.includes_tax)
+        setTaxRate(toNumber(quote.tax_rate))
+        setDiscountType(quote.totals.discount_type ?? "none")
+        setDiscountValue(toNumber(quote.totals.discount_value))
+        setTermsHtml(quote.terms_html ?? "")
+        setNotes(quote.notes ?? "")
+        setItems(quote.items.map(quoteItemFromRecord))
+        setSourceQuote(quote)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setDuplicateError(error instanceof Error ? error.message : editId ? "No fue posible cargar la cotización a editar." : "No fue posible cargar la cotización a duplicar.")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [sourceId, editId])
 
   const selectedCompany = React.useMemo(
     () => companies.find((company) => company.id === companyId) ?? null,
@@ -306,12 +428,14 @@ export default function QuoteCreatePage() {
   React.useEffect(() => {
     if (initialFormFingerprint.current !== null) return
     if (catalogsQuery.isLoading) return
+    if (isHydratingDuplicate) return
     if (companies.length > 0 && !companyId) return
     if (companyLetterheads.length > 0 && !letterheadId) return
 
     initialFormFingerprint.current = formFingerprint
   }, [
     catalogsQuery.isLoading,
+    isHydratingDuplicate,
     companies.length,
     companyId,
     companyLetterheads.length,
@@ -400,9 +524,11 @@ export default function QuoteCreatePage() {
       },
       terms_html: termsHtml || null,
       notes: notes || null,
+      duplicate_of_quote_id: editId ? null : sourceQuote?.id ?? null,
       items: items.map((item, index) => ({
         ...item,
-        qty: Math.max(1, item.qty),
+        qty: Math.max(1, Math.round(toNumber(item.qty))),
+        unit: itemUnit(item),
         width_m: item.item_type === "service" ? Math.max(0.01, toNumber(item.width_m ?? 1)) : null,
         height_m: item.item_type === "service" ? Math.max(0.01, toNumber(item.height_m ?? 1)) : null,
         square_meters: calculateSquareMeters(item),
@@ -412,6 +538,7 @@ export default function QuoteCreatePage() {
       })),
     }
   }, [
+    editId,
     agencyId,
     companyId,
     customerType,
@@ -424,6 +551,7 @@ export default function QuoteCreatePage() {
     notes,
     quoteKind,
     selectedCustomer,
+    sourceQuote?.id,
     taxRate,
     termsHtml,
     validUntil,
@@ -509,23 +637,34 @@ export default function QuoteCreatePage() {
   }
 
   const addService = (service: QuoteCatalogService) => {
-    setItems((prev) => [
-      ...prev,
-      {
-        item_type: "service",
-        service_id: service.id,
-        concept: service.name,
-        description: service.description ?? null,
-        qty: 1,
-        width_m: 1,
-        height_m: 1,
-        square_meters: 1,
-        unit_price: squareMeterPrice,
-        sort_order: prev.length,
-        discount_applies: false,
-        tax_rate: toNumber(service.tax_rate),
-      },
-    ])
+    const unit = serviceUnit(service)
+    const basePrice = toNumber(service.base_price)
+
+    setItems((prev) => {
+      const banner = unit === "m2" ? findBannerSize(prev) : null
+      const width = banner?.width ?? 1
+      const height = banner?.height ?? 1
+
+      return [
+        ...prev,
+        {
+          item_type: "service",
+          service_id: service.id,
+          concept: service.name,
+          description: service.description ?? null,
+          qty: 1,
+          unit,
+          width_m: width,
+          height_m: height,
+          square_meters: Math.round(width * height * 100) / 100,
+          // m²: precio global por m² (si existe); pieza: precio del catálogo.
+          unit_price: unit === "m2" ? squareMeterPrice || basePrice : basePrice,
+          sort_order: prev.length,
+          discount_applies: false,
+          tax_rate: toNumber(service.tax_rate),
+        },
+      ]
+    })
     setSelectedServiceId("")
   }
 
@@ -533,27 +672,42 @@ export default function QuoteCreatePage() {
     const assignedId = advertisement.assigned_id?.trim() || String(advertisement.id)
     const width = toNumber(advertisement.width_m)
     const height = toNumber(advertisement.height_m)
-    const squareMeters = width > 0 && height > 0 ? width * height : 1
+    const hasBannerSize = width > 0 && height > 0
+    const squareMeters = hasBannerSize ? Math.round(width * height * 100) / 100 : 1
 
-    setItems((prev) => [
-      ...prev,
-      {
-        item_type: "service",
-        service_id: service.id,
-        space_id: advertisement.id,
-        concept: `Anuncio ${assignedId}`,
-        description: advertisement.title,
-        qty: 1,
-        width_m: width > 0 ? width : 1,
-        height_m: height > 0 ? height : 1,
-        square_meters: squareMeters,
-        unit_price: squareMeterPrice || toNumber(service.base_price),
-        faces: toNumber(advertisement.faces) || null,
-        sort_order: prev.length,
-        discount_applies: false,
-        tax_rate: toNumber(service.tax_rate),
-      },
-    ])
+    setItems((prev) => {
+      // Si ya hay impresiones por m² con la medida por defecto (1×1),
+      // se ajustan automáticamente a la medida de la lona del anuncio.
+      const synced = hasBannerSize
+        ? prev.map((item) =>
+            itemUnit(item) === "m2" && !item.space_id && isDefaultSize(item)
+              ? { ...item, width_m: width, height_m: height, square_meters: squareMeters }
+              : item,
+          )
+        : prev
+
+      // El anuncio es la renta del espacio: misma partida que al cotizar desde
+      // Espacios (fechas, descuento, ocupación al convertir a renta).
+      return [
+        ...synced,
+        {
+          ...normalizeSpaceSeed(
+            {
+              id: advertisement.id,
+              title: advertisement.title,
+              price: toNumber(advertisement.price) || toNumber(service.base_price),
+              width_m: advertisement.width_m,
+              height_m: advertisement.height_m,
+              faces: toNumber(advertisement.faces) || null,
+            },
+            synced.length,
+          ),
+          concept: `Anuncio ${assignedId}`,
+          description: advertisement.title,
+          tax_rate: toNumber(service.tax_rate) || 16,
+        },
+      ]
+    })
     setSelectedServiceId("")
     setAdvertisementIdSearch("")
     setDebouncedAdvertisementId("")
@@ -567,10 +721,11 @@ export default function QuoteCreatePage() {
         concept: "",
         description: null,
         qty: 1,
+        unit: "pieza",
         width_m: 1,
         height_m: 1,
         square_meters: 1,
-        unit_price: squareMeterPrice,
+        unit_price: 0,
         sort_order: prev.length,
         discount_applies: false,
         tax_rate: taxRate,
@@ -639,6 +794,26 @@ export default function QuoteCreatePage() {
     }
   }
 
+  const updateItemUnit = (index: number, unit: QuoteItemUnit) => {
+    setItems((prev) =>
+      prev.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+        if (unit !== "m2" || !isDefaultSize(item)) return { ...item, unit }
+
+        const banner = findBannerSize(prev)
+        if (!banner) return { ...item, unit }
+
+        return {
+          ...item,
+          unit,
+          width_m: banner.width,
+          height_m: banner.height,
+          square_meters: Math.round(banner.width * banner.height * 100) / 100,
+        }
+      })
+    )
+  }
+
   const handleSave = async () => {
     if (!payload) {
       toast.error("Completa empresa e items antes de guardar.")
@@ -646,16 +821,24 @@ export default function QuoteCreatePage() {
     }
 
     try {
-      const response = await createQuoteMutation.mutateAsync({
-        payload,
-        images: quoteImages,
-      })
+      const request = { payload, images: quoteImages }
+      const response = editId
+        ? await updateQuoteMutation.mutateAsync({ id: editId, request })
+        : await createQuoteMutation.mutateAsync(request)
       setSavedQuote(response.data)
       setPreview(null)
       setQuoteImages([])
-      toast.success(`Cotización ${response.data.folio} guardada correctamente.`)
+      toast.success(
+        editId
+          ? `Cotización ${response.data.folio} actualizada.`
+          : sourceQuote
+            ? `Cotización ${response.data.folio} creada. ${sourceQuote.folio} quedó cancelada.`
+            : `Cotización ${response.data.folio} guardada correctamente.`,
+      )
       allowNavigation.current = true
-      if (window.history.length > 1) {
+      if (sourceQuote) {
+        navigate("/cotizaciones", { replace: true })
+      } else if (window.history.length > 1) {
         navigate(-1)
       } else {
         navigate("/cotizaciones", { replace: true })
@@ -722,9 +905,17 @@ export default function QuoteCreatePage() {
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold">Nueva cotización</h1>
+          <h1 className="text-2xl font-semibold">
+            {editId
+              ? `Editar cotización ${sourceQuote?.folio ?? ""}`.trim()
+              : duplicateOfId ? `Duplicar cotización ${sourceQuote?.folio ?? ""}`.trim() : "Nueva cotización"}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Esta pantalla ya consume catálogos y cálculo comercial desde el backend de cotizaciones.
+            {editId
+              ? "Se conserva el folio; los totales se recalculan y el cambio queda en el historial."
+              : duplicateOfId
+              ? "Se generará un folio nuevo. La cotización original pasará a Cancelada y conservará su historial."
+              : "Esta pantalla ya consume catálogos y cálculo comercial desde el backend de cotizaciones."}
           </p>
         </div>
         <Button type="button" variant="outline" onClick={handleBackToQuotes}>
@@ -732,6 +923,25 @@ export default function QuoteCreatePage() {
           Volver a cotizaciones
         </Button>
       </div>
+
+      {sourceId ? (
+        <div
+          className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
+            duplicateError ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
+          <Copy className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            {duplicateError
+              ? duplicateError
+              : isHydratingDuplicate
+                ? "Cargando la cotización original..."
+                : editId
+                  ? `Editando ${sourceQuote?.folio}. Las imágenes ya adjuntas se conservan; las que agregues se suman.`
+                  : `Duplicando ${sourceQuote?.folio}. Ajusta lo necesario y guarda; las imágenes adjuntas no se copian.`}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,380px)] xl:grid-cols-[minmax(0,2fr)_380px]">
         <div className="space-y-6">
@@ -741,21 +951,6 @@ export default function QuoteCreatePage() {
               <CardDescription>Cliente, empresa emisora, agencia y vigencia.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <QuoteField label="Tipo de cotización">
-                <Select
-                  value={quoteKind}
-                  onValueChange={(value) => setQuoteKind(value as QuoteKind)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="advertisement">Anuncio</SelectItem>
-                    <SelectItem value="space">Espacio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </QuoteField>
-
               <QuoteCustomerSelector
                 customerType={customerType}
                 selectedCustomer={selectedCustomer}
@@ -984,25 +1179,37 @@ export default function QuoteCreatePage() {
                 </div>
               ) : null}
 
+              <div className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  Editar el precio aquí <strong>solo cambia esta cotización</strong>. Para cambiarlo en todas las
+                  cotizaciones nuevas, edítalo en el catálogo de Servicios (o en el precio por m²).
+                </p>
+              </div>
+
               <div className="overflow-x-auto">
-                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1240px]" : "min-w-[1080px]"}`}>
+                <table className={`w-full text-sm ${showRentalDates ? "min-w-[1380px]" : "min-w-[1180px]"}`}>
                   <thead className="border-b text-muted-foreground">
                     <tr>
                       <th className="py-3 text-left">Tipo</th>
                       <th className="text-left">Concepto</th>
                       {showRentalDates ? <th className="text-left">Desde</th> : null}
                       {showRentalDates ? <th className="text-left">Hasta</th> : null}
+                      <th className="w-20 text-left">Cantidad</th>
+                      <th className="w-28 text-left">Unidad</th>
                       <th className="text-left">Ancho (m)</th>
                       <th className="text-left">Altura (m)</th>
                       <th className="text-right">Total m²</th>
-                      <th className="text-left">Precio / m2</th>
-                      <th className="text-right">Subtotal</th>
+                      <th className="text-left">Precio unitario</th>
+                      <th className="text-right">Total</th>
                       <th className="text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((item, index) => {
                       const subtotal = calculateItemSubtotal(item)
+                      const unit = itemUnit(item)
+                      const isSquareMeters = unit === "m2"
 
                       return (
                         <tr key={`${item.item_type}-${item.space_id ?? item.service_id ?? index}`} className="border-b align-top">
@@ -1052,7 +1259,28 @@ export default function QuoteCreatePage() {
                             </td>
                           ) : null}
                           <td className="py-4">
+                            <NumericInput
+                              value={item.qty}
+                              onValueChange={(value) => updateItem(index, { qty: Math.max(1, Math.round(value) || 1) })}
+                            />
+                          </td>
+                          <td className="py-4">
                             {item.item_type === "service" ? (
+                              <Select value={unit} onValueChange={(value) => updateItemUnit(index, value === "m2" ? "m2" : "pieza")}>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pieza">Pieza</SelectItem>
+                                  <SelectItem value="m2">m²</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className="py-2 text-muted-foreground">{unitLabel(unit)}</div>
+                            )}
+                          </td>
+                          <td className="py-4">
+                            {isSquareMeters ? (
                               <NumericInput
                                 value={item.width_m ?? 1}
                                 onValueChange={(value) => updateServiceDimension(index, "width_m", value)}
@@ -1062,7 +1290,7 @@ export default function QuoteCreatePage() {
                             )}
                           </td>
                           <td className="py-4">
-                            {item.item_type === "service" ? (
+                            {isSquareMeters ? (
                               <NumericInput
                                 value={item.height_m ?? 1}
                                 onValueChange={(value) => updateServiceDimension(index, "height_m", value)}
@@ -1072,7 +1300,7 @@ export default function QuoteCreatePage() {
                             )}
                           </td>
                           <td className="py-4 text-right font-medium">
-                            {item.item_type === "service" ? calculateSquareMeters(item).toFixed(2) : "—"}
+                            {isSquareMeters ? calculateSquareMeters(item).toFixed(2) : "—"}
                           </td>
                           <td className="py-4">
                             <NumericInput
@@ -1247,14 +1475,14 @@ export default function QuoteCreatePage() {
                 </Button>
                 <Button
                   onClick={handleSave}
-                  disabled={!preview || createQuoteMutation.isPending}
+                  disabled={!preview || isSaving}
                 >
-                  {createQuoteMutation.isPending ? (
+                  {isSaving ? (
                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
-                  Guardar cotización
+                  {editId ? "Guardar cambios" : "Guardar cotización"}
                 </Button>
               </div>
             </CardContent>

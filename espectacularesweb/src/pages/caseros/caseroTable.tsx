@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Landmark, Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
+import { excelDate } from "@/lib/exportExcel"
 import type { CaseroRecord } from "@/types/Casero"
 import { useRoles } from "@/hooks/useRoles"
 
@@ -103,6 +104,7 @@ export function useCaseroTable({
       {
         accessorKey: "active",
         header: "Estatus",
+        meta: { exportValue: (record) => (record.active ? "Activo" : "Inactivo") },
         cell: ({ row }) => {
           const active = row.original.active
           return (
@@ -121,6 +123,7 @@ export function useCaseroTable({
       {
         accessorKey: "created_at",
         header: "Alta",
+        meta: { exportValue: (record) => excelDate(record.created_at) },
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<CaseroRecord>({

@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table"
 import { Pencil, Trash2 } from "lucide-react"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
+import { excelDate } from "@/lib/exportExcel"
 import type { ProviderRecord } from "@/types/Provider"
 import { useRoles } from "@/hooks/useRoles"
 
@@ -74,6 +75,7 @@ export function useProviderTable({
       {
         accessorKey: "active",
         header: "Estatus",
+        meta: { exportValue: (record) => (record.active ? "Activo" : "Inactivo") },
         cell: ({ row }) => (
           <span
             className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${
@@ -89,6 +91,7 @@ export function useProviderTable({
       {
         accessorKey: "created_at",
         header: "Alta",
+        meta: { exportValue: (record) => excelDate(record.created_at) },
         cell: ({ row }) => formatDate(row.original.created_at),
       },
       createActionsColumn<ProviderRecord>({

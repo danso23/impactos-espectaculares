@@ -92,6 +92,9 @@ export function RentalCreateForm({
   const [frequency, setFrequency] = React.useState<PaymentFrequency>("monthly")
   const [renewalCount, setRenewalCount] = React.useState(1)
   const [firstPaymentDate, setFirstPaymentDate] = React.useState("")
+  // Mientras el usuario no edite el primer vencimiento, sigue a la fecha de inicio.
+  // Antes se copiaba solo en el primer cambio y, al teclear el año, quedaba "0002-...".
+  const [firstPaymentTouched, setFirstPaymentTouched] = React.useState(false)
   const [commissionType, setCommissionType] = React.useState<QuoteAmountType>("none")
   const [commissionValue, setCommissionValue] = React.useState(0)
   const [includesTax, setIncludesTax] = React.useState(true)
@@ -142,6 +145,7 @@ export function RentalCreateForm({
     setFrequency("monthly")
     setRenewalCount(1)
     setFirstPaymentDate("")
+    setFirstPaymentTouched(false)
     setCommissionType("none")
     setCommissionValue(0)
     setIncludesTax(true)
@@ -168,7 +172,7 @@ export function RentalCreateForm({
       return
     }
     if (!startsAt || !endsAt || normalizedRenewalCount < 1 || normalizedRenewalCount > 120) {
-      toast.error("Define la fecha de inicio y una cantidad válida de renovaciones.")
+      toast.error("Define la fecha de inicio y un número de rentas válido.")
       return
     }
     if (!firstPaymentDate || schedule.length === 0) {
@@ -336,12 +340,12 @@ export function RentalCreateForm({
                     value={startsAt}
                     onChange={(event) => {
                       setStartsAt(event.target.value)
-                      if (!firstPaymentDate) setFirstPaymentDate(event.target.value)
+                      if (!firstPaymentTouched) setFirstPaymentDate(event.target.value)
                     }}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Renovaciones</Label>
+                  <Label>Número de rentas</Label>
                   <Input
                     type="number"
                     min={1}
@@ -386,7 +390,14 @@ export function RentalCreateForm({
                 </div>
                 <div className="space-y-2">
                   <Label>Primer vencimiento</Label>
-                  <Input type="date" value={firstPaymentDate} onChange={(event) => setFirstPaymentDate(event.target.value)} />
+                  <Input
+                  type="date"
+                  value={firstPaymentDate}
+                  onChange={(event) => {
+                    setFirstPaymentDate(event.target.value)
+                    setFirstPaymentTouched(true)
+                  }}
+                />
                 </div>
                 <div className="space-y-2">
                   <Label>Comisión</Label>

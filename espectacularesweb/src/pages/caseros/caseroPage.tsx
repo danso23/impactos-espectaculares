@@ -1,9 +1,13 @@
 import * as React from "react"
-import { BadgeDollarSign, MailCheck, MapPinned, Search, UsersRound } from "lucide-react"
+import { BadgeDollarSign, CalendarRange, MailCheck, MapPinned, Search, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
+import { fetchAllPages } from "@/lib/fetchAllPages"
+import { getCaseros } from "@/lib/services/caseroService"
 import { Filter } from "@/components/generic/filter"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Input } from "@/components/ui/input"
@@ -19,6 +23,8 @@ import {
 import { CaseroForm } from "@/pages/caseros/caseroForm"
 import { useCaseroTable } from "@/pages/caseros/caseroTable"
 import { GroundRentalsDialog } from "@/pages/caseros/groundRentalsDialog"
+import { GroundRentReportDialog } from "@/pages/caseros/groundRentReportDialog"
+import { Button } from "@/components/ui/button"
 import type { CaseroFormValues, CaseroRecord } from "@/types/Casero"
 import { Can } from "@/components/auth/Can"
 import { useRoles } from "@/hooks/useRoles"
@@ -40,6 +46,7 @@ export default function CaseroPage() {
   const [editOpen, setEditOpen] = React.useState(false)
   const [deleteRecord, setDeleteRecord] = React.useState<CaseroRecord | null>(null)
   const [groundRentRecord, setGroundRentRecord] = React.useState<CaseroRecord | null>(null)
+  const [reportOpen, setReportOpen] = React.useState(false)
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -102,6 +109,13 @@ export default function CaseroPage() {
     }
   }
 
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(caseros)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof caseros)[number]>(), ...columns],
+    [columns],
+  )
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
@@ -127,11 +141,11 @@ export default function CaseroPage() {
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div><CardTitle className="text-xl">Búsqueda rápida</CardTitle><CardDescription>Filtra por nombre, teléfono, email, RFC, ciudad o banco.</CardDescription></div>
-            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto"><div className="relative w-full lg:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar casero..." className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500" /></div><ExcelExportButton columns={columns} data={caseros} filename="caseros" disabled={caserosQuery.isFetching} /></div>
+            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto"><div className="relative w-full lg:w-80"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar casero..." className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500" /></div><Button type="button" variant="outline" className="border-violet-200 bg-violet-50 text-violet-700 shadow-sm hover:bg-violet-100" onClick={() => setReportOpen(true)}><CalendarRange className="h-4 w-4" />Reporte de pagos</Button><ExcelExportButton columns={columns} data={caseros} filename="caseros" selected={selection.selected} onClearSelection={selection.clear} disabled={caserosQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getCaseros({ ...params, page: nextPage, per_page: size }))} /></div>
           </div>
           <Separator />
         </CardHeader>
-        <CardContent className="space-y-6 pt-0"><Filter title="Filtros avanzados" enableDateRange={false} defaultOpen={false} dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]} initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }} onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }} onReset={() => { setActiveFilter("all"); setPage(1) }} /><DataTable columns={columns} data={caseros} enableSearch={false} enableExport={false} pageSize={perPage} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)} isLoading={caserosQuery.isFetching} /></CardContent>
+        <CardContent className="space-y-6 pt-0"><Filter title="Filtros avanzados" enableDateRange={false} defaultOpen={false} dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]} initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }} onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }} onReset={() => { setActiveFilter("all"); setPage(1) }} /><DataTable columns={selectableColumns} data={caseros} rowSelection={selection.rowSelection} onRowSelectionChange={selection.setRowSelection} getRowId={selection.getRowId} enableRowSelection enableSearch={false} enableExport={false} pageSize={perPage} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)} isLoading={caserosQuery.isFetching} /></CardContent>
       </Card>
 
       {/* Edit dialog */}
@@ -169,6 +183,8 @@ export default function CaseroPage() {
         onOpenChange={(open) => { if (!open) setGroundRentRecord(null) }}
         canEdit={can("caseros.edit")}
       />
+
+      <GroundRentReportDialog open={reportOpen} onOpenChange={setReportOpen} />
     </div>
   )
 }

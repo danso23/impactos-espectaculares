@@ -3,6 +3,10 @@ import { MailCheck, Search, FileText, UsersRound } from "lucide-react"
 
 import { DataTable } from "@/components/generic/data-table"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
+import { createSelectColumn } from "@/components/generic/select-column"
+import { useTableSelection } from "@/hooks/useTableSelection"
+import { fetchAllPages } from "@/lib/fetchAllPages"
+import { getClients } from "@/lib/services/crmService"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -56,6 +60,13 @@ export default function ClientsPage() {
   const totalClients = meta?.total ?? 0
   const visibleWithEmail = clients.filter((client) => !!client.email).length
   const visibleWithRfc = clients.filter((client) => !!client.rfc).length
+
+  // Selección de filas: si hay seleccionadas, se exportan solo esas.
+  const selection = useTableSelection(clients)
+  const selectableColumns = React.useMemo(
+    () => [createSelectColumn<(typeof clients)[number]>(), ...columns],
+    [columns],
+  )
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -128,7 +139,7 @@ export default function ClientsPage() {
                 />
               </div>
             </div>
-            <ExcelExportButton columns={columns} data={clients} filename="clientes" disabled={clientsQuery.isFetching} />
+            <ExcelExportButton columns={columns} data={clients} filename="clientes" selected={selection.selected} onClearSelection={selection.clear} disabled={clientsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getClients({ ...params, page: nextPage, per_page: size }))} />
           </div>
 
           <Separator />
@@ -136,8 +147,12 @@ export default function ClientsPage() {
 
         <CardContent className="pt-0">
           <DataTable
-            columns={columns}
+            columns={selectableColumns}
             data={clients}
+            rowSelection={selection.rowSelection}
+            onRowSelectionChange={selection.setRowSelection}
+            getRowId={selection.getRowId}
+            enableRowSelection
             enableSearch={false}
             enableExport={false}
             pageSize={perPage}
