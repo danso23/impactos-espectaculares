@@ -49,6 +49,11 @@ class ServiceController extends BaseCrudController
             $query->where('is_active', (int) $request->get('is_active'));
         }
 
+        // Unidad de medida: pieza o m2.
+        if (in_array($request->get('unit'), ['pieza', 'm2'], true)) {
+            $query->where('unit', $request->get('unit'));
+        }
+
         if ($request->filled('q')) {
             $term = trim((string) $request->get('q'));
             $query->where(function ($inner) use ($term) {

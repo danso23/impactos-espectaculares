@@ -182,10 +182,11 @@ class QuoteController extends Controller
         $status = $request->query('status');
         $q = trim((string)$request->query('q', ''));
 
+        // El folio se arma con el id, así que ordenar por id es ordenar por folio.
+        $direction = $request->query('direction') === 'asc' ? 'asc' : 'desc';
         $query = Quote::query()
             ->with(['status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser'])
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->orderBy('id', $direction);
 
         if ($status) {
             $query->whereHas('status', function ($inner) use ($status) {

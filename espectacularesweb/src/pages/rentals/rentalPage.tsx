@@ -87,6 +87,7 @@ export default function RentalPage() {
   // "cliente:3" o "lead:5".
   const [customerFilter, setCustomerFilter] = React.useState("all")
   const [spaceFilter, setSpaceFilter] = React.useState("all")
+  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("desc")
   // Rangos de inicio y fin: qué se instala y qué se retira en un periodo.
   const [dateFilters, setDateFilters] = React.useState<Record<string, string | undefined>>({})
   const perPage = 10
@@ -122,8 +123,9 @@ export default function RentalPage() {
       starts_to: dateFilters.starts_to,
       ends_from: dateFilters.ends_from,
       ends_to: dateFilters.ends_to,
+      direction: sortDirection,
     }
-  }, [customerFilter, dateFilters, page, perPage, rotatingFilter, search, spaceFilter, statusFilter])
+  }, [customerFilter, dateFilters, page, perPage, rotatingFilter, search, sortDirection, spaceFilter, statusFilter])
 
   const filterOptionsQuery = useRentalFilterOptions()
   const customerTypeLabel: Record<string, string> = { cliente: "Cliente", lead: "Prospecto" }
@@ -154,11 +156,18 @@ export default function RentalPage() {
     setDeleteDialogOpen(true)
   }, [])
 
+  const toggleSort = React.useCallback(() => {
+    setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+    setPage(1)
+  }, [])
+
   const columns = useRentalTable({
     onEdit: handleEdit,
     onDelete: handleDelete,
     onViewPayments: setPaymentPlanRecord,
     onConfirm: setRentalToConfirm,
+    sortDirection,
+    onToggleSort: toggleSort,
   })
 
   async function handleConfirmRental() {

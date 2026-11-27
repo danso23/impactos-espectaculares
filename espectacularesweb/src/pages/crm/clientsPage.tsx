@@ -10,7 +10,9 @@ import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getClients } from "@/lib/services/crmService"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useClients, useCreateClient } from "@/lib/hooks/crmHook"
+import { useClientFilterOptions, useClients, useCreateClient } from "@/lib/hooks/crmHook"
+import { Filter } from "@/components/generic/filter"
+import type { FilterValues } from "@/types/Filter"
 import { CrmForm } from "@/pages/crm/crmForm"
 import { useClientTable } from "@/pages/crm/crmTable"
 import type { ClientFormValues } from "@/types/Crm"
@@ -27,6 +29,8 @@ export default function ClientsPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
+  const [filterValues, setFilterValues] = React.useState<FilterValues>({ selects: {}, checks: {} })
+  const filterOptionsQuery = useClientFilterOptions()
   const perPage = 10
   const [editRecord, setEditRecord] = React.useState<ClientRecord | null>(null)
   const [deleteRecord, setDeleteRecord] = React.useState<ClientRecord | null>(null)
@@ -45,8 +49,13 @@ export default function ClientsPage() {
       page,
       per_page: perPage,
       q: search || undefined,
+      rfc: filterValues.texts?.rfc?.trim() || undefined,
+      source: filterValues.selects.fuente,
+      usuario: filterValues.selects.usuario,
+      date_from: filterValues.dateFrom,
+      date_to: filterValues.dateTo,
     }),
-    [page, perPage, search]
+    [filterValues, page, perPage, search]
   )
 
   const clientsQuery = useClients(params)
@@ -126,6 +135,34 @@ export default function ClientsPage() {
         selectedCount={selection.selected.length}
         itemLabel={["cliente", "clientes"]}
         onClearSelection={selection.clear}
+        activeFilters={
+          (filterValues.texts?.rfc?.trim() ? 1 : 0) +
+          (filterValues.selects.fuente ? 1 : 0) +
+          (filterValues.selects.usuario ? 1 : 0) +
+          (filterValues.dateFrom || filterValues.dateTo ? 1 : 0)
+        }
+        filters={
+          <Filter
+            hideHeader
+            defaultOpen
+            dateRangeLabel="Fecha de alta"
+            textFields={[{ key: "rfc", label: "RFC", placeholder: "Ej. XAXX010101000" }]}
+            dropdowns={[
+              {
+                key: "fuente",
+                label: "Fuente",
+                options: (filterOptionsQuery.data?.data.sources ?? []).map((source) => ({ label: source, value: source })),
+              },
+              {
+                key: "usuario",
+                label: "Registrado por",
+                options: (filterOptionsQuery.data?.data.users ?? []).map((user) => ({ label: user.name, value: user.username })),
+              },
+            ]}
+            initialValues={filterValues}
+            onApply={(values) => { setFilterValues(values); setPage(1) }}
+          />
+        }
         exports={<ExcelExportButton columns={columns} data={clients} filename="clientes" selected={selection.selected} disabled={clientsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getClients({ ...params, page: nextPage, per_page: size }))} />}
       >
           <DataTable

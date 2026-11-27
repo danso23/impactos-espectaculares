@@ -1,11 +1,11 @@
 import { spaceTypeLabel } from "@/lib/helpers/spaceTypeHelper";
 import { excelDate } from "@/lib/exportExcel";
 import * as React from "react";
+import { SortHeader, type SortDirection } from "@/components/generic/sort-header";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { TableAction } from "@/types/TableAction";
 import type { Space } from "@/types/Space";
 
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { createActionsColumn } from "@/components/generic/create-actions-column";
 import { Pencil, Eye, Trash2, FileText } from "lucide-react";
@@ -17,6 +17,8 @@ type BuildSpaceTableOptions = {
   onView?: (row: Space) => void;
   onEdit?: (row: Space) => void;
   onDelete?: (row: Space) => Promise<void> | void;
+  sortDirection?: SortDirection;
+  onToggleSort?: () => void;
 };
 
 function formatShortDate(value: string) {
@@ -108,15 +110,9 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "assigned_id",
         meta: { exportLabel: "ID anuncio" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            ID Asignado
-          </Button>
-        ),
+        header: () => opts.onToggleSort
+          ? <SortHeader label="ID Asignado" direction={opts.sortDirection ?? "asc"} onToggle={opts.onToggleSort} />
+          : "ID Asignado",
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("assigned_id")}</div>
         ),
@@ -124,15 +120,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "title",
         meta: { exportLabel: "Nombre" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Título
-          </Button>
-        ),
+        header: "Título",
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("title")}</div>
         ),
@@ -140,15 +128,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "status",
         meta: { exportLabel: "Estatus" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Estatus
-          </Button>
-        ),
+        header: "Estatus",
         cell: ({ row }) => {
           const status = row.original.status;
           const tone =
@@ -174,15 +154,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "type",
         meta: { exportLabel: "Tipo", exportValue: (space) => spaceTypeLabel(space.type, space.subtype) },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Tipo
-          </Button>
-        ),
+        header: "Tipo",
         cell: ({ row }) => (
           <div className="font-medium">{spaceTypeLabel(row.original.type, row.original.subtype)}</div>
         ),
@@ -190,15 +162,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "width_m",
         meta: { exportLabel: "Ancho (m)", exportValue: (space) => space.width_m ?? "" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Ancho (m)
-          </Button>
-        ),
+        header: "Ancho (m)",
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("width_m")}</div>
         ),
@@ -206,15 +170,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "height_m",
         meta: { exportLabel: "Alto (m)", exportValue: (space) => space.height_m ?? "" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Alto (m)
-          </Button>
-        ),
+        header: "Alto (m)",
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("height_m")}</div>
         ),
@@ -222,15 +178,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "faces",
         meta: { exportLabel: "Caras" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            No. de caras
-          </Button>
-        ),
+        header: "No. de caras",
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("faces")}</div>
         ),
@@ -238,15 +186,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "has_lights",
         meta: { exportLabel: "Iluminación" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Tiene luces?
-          </Button>
-        ),
+        header: "Tiene luces?",
         cell: ({ row }) => (
           <div className="font-medium">
             {row.getValue("has_lights") ? "Sí" : "No"}
@@ -265,15 +205,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "price",
         meta: { exportLabel: "Precio", exportValue: (space) => (space.price === undefined || space.price === null ? "" : Number(space.price)) },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Precio
-          </Button>
-        ),
+        header: "Precio",
         cell: ({ row }) => {
           const rawValue = row.getValue<string | null>("price");
 
@@ -296,15 +228,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "socioeconomic_level",
         meta: { exportLabel: "Nivel socioeconómico" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Nivel socioeconómico
-          </Button>
-        ),
+        header: "Nivel socioeconómico",
         cell: ({ row }) => (
           <div className="font-medium">
             {row.getValue("socioeconomic_level")}
@@ -314,15 +238,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "viewType",
         meta: { exportLabel: "Tipo de vista" },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Tipo de vista
-          </Button>
-        ),
+        header: "Tipo de vista",
         cell: ({ row }) => (
           <div className="font-medium">{row.getValue("viewType")}</div>
         ),
@@ -339,15 +255,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
       {
         accessorKey: "createdAt",
         meta: { exportLabel: "Alta", exportValue: (space) => excelDate(space.createdAt) },
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            className="-ml-3"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Creado
-          </Button>
-        ),
+        header: "Creado",
       },
       createActionsColumn<Space>({
         header: "Acciones",
@@ -355,7 +263,7 @@ export function useSpaceTable(opts: BuildSpaceTableOptions = {}) {
         align: "end",
       }),
     ];
-  }, [actions]);
+  }, [actions, opts.sortDirection, opts.onToggleSort]);
 
   return { columns, actions };
 }

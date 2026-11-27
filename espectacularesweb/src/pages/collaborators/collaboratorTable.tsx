@@ -14,6 +14,7 @@ export function useCollaboratorTable({ onEdit, onDelete }: { onEdit: (row: Colla
     return [
       { accessorKey: "name", header: "Colaborador", meta: { exportColumns: [{ label: "Colaborador", value: (r) => r.name }, { label: "Puesto", value: (r) => r.position ?? "" }] }, cell: ({ row }) => <div><div className="font-medium">{row.original.name}</div><div className="text-xs text-muted-foreground">{row.original.position || "Sin puesto"}</div></div> },
       { accessorKey: "phone", header: "Teléfono", cell: ({ row }) => row.original.phone || "—" },
+      { accessorKey: "rfc", header: "RFC", cell: ({ row }) => row.original.rfc || "—" },
       { accessorKey: "email", header: "Email", cell: ({ row }) => row.original.email || "—" },
       { accessorKey: "notes", header: "Notas", cell: ({ row }) => row.original.notes || "—" },
       { accessorKey: "active", header: "Estatus", meta: { exportValue: (r) => (r.active ? "Activo" : "Inactivo") }, cell: ({ row }) => <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-medium ${row.original.active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>{row.original.active ? "Activo" : "Inactivo"}</span> },

@@ -299,6 +299,8 @@ export type QuoteListParams = {
   customer_type?: string
   customer_id?: number
   issuer_company_id?: number
+  /** Orden por folio (id): "desc" = más recientes primero. */
+  direction?: "asc" | "desc"
 }
 
 export type QuoteListResponse = ApiListResponse<QuoteRecord>

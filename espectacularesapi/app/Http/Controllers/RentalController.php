@@ -129,6 +129,12 @@ class RentalController extends BaseCrudController
         }
     }
 
+    /** Orden por ID: `direction=asc` del más antiguo al más reciente; por defecto, más recientes primero. */
+    protected function indexOrder($query, Request $request)
+    {
+        return $query->orderBy('id', $request->get('direction') === 'asc' ? 'asc' : 'desc');
+    }
+
     protected function applyIndexQuery($query, Request $request)
     {
         if ($request->filled('status')) {

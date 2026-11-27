@@ -1,4 +1,5 @@
 import * as React from "react"
+import { SortHeader, type SortDirection } from "@/components/generic/sort-header"
 import type { ColumnDef } from "@tanstack/react-table"
 import { Copy, Eye, FileDown, Pencil, PencilLine, ReceiptText, Trash2 } from "lucide-react"
 
@@ -40,6 +41,8 @@ export function useQuoteTable({
   onDuplicate,
   onEdit,
   onDelete,
+  sortDirection = "desc",
+  onToggleSort,
 }: {
   onView: (quote: QuoteRecord) => void
   onDownload: (quote: QuoteRecord) => Promise<void> | void
@@ -48,6 +51,8 @@ export function useQuoteTable({
   onDuplicate: (quote: QuoteRecord) => void
   onEdit: (quote: QuoteRecord) => void
   onDelete: (quote: QuoteRecord) => void
+  sortDirection?: SortDirection
+  onToggleSort?: () => void
 }) {
   const { can } = useRoles()
 
@@ -106,7 +111,9 @@ export function useQuoteTable({
       return [
       {
         accessorKey: "folio",
-        header: "Folio",
+        header: () => onToggleSort
+          ? <SortHeader label="Folio" direction={sortDirection} onToggle={onToggleSort} />
+          : "Folio",
         cell: ({ row }) => (
           <div className="space-y-1">
             <div className="font-medium">{row.original.folio}</div>
@@ -204,6 +211,6 @@ export function useQuoteTable({
         actions,
       }),
     ]},
-    [onView, onChangeStatus, onConvertToRental, onDownload, onDuplicate, onEdit, onDelete, can]
+    [onView, onChangeStatus, onConvertToRental, onDownload, onDuplicate, onEdit, onDelete, can, sortDirection, onToggleSort]
   )
 }

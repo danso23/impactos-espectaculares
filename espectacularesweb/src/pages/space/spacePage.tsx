@@ -99,6 +99,8 @@ export default function SpacePage() {
   const navigate = useNavigate();
   const [filters, setFilters] = React.useState<FilterValues>(initialFilters);
   const [page, setPage] = React.useState(1);
+  // Orden por ID asignado (en el servidor): ascendente por defecto.
+  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("asc");
   const [searchInput, setSearchInput] = React.useState("");
   const [search, setSearch] = React.useState("");
   const perPage = 10;
@@ -151,8 +153,8 @@ export default function SpacePage() {
   };
 
   const params = React.useMemo(
-    () => buildSpacesParams(filters, page, perPage, search),
-    [filters, page, perPage, search],
+    () => buildSpacesParams(filters, page, perPage, search, sortDirection),
+    [filters, page, perPage, search, sortDirection],
   );
 
   const spacesQuery = useSpaces(params);
@@ -180,6 +182,11 @@ export default function SpacePage() {
     (space) => space.status === "Ocupado",
   ).length;
   const visibleLitSpaces = data.filter((space) => space.has_lights).length;
+
+  const toggleSort = React.useCallback(() => {
+    setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+    setPage(1);
+  }, []);
 
   const { columns } = useSpaceTable({
     onQuote: (row) => {
@@ -210,6 +217,8 @@ export default function SpacePage() {
       setSpaceToDelete(row);
       setDeleteDialogOpen(true);
     },
+    sortDirection,
+    onToggleSort: toggleSort,
   });
 
   const handleConfirmDelete = async () => {
@@ -531,9 +540,10 @@ export default function SpacePage() {
                 presets={SPACE_EXPORT_PRESETS}
                 fetchAll={async () => {
                   const rows = await fetchAllPages((nextPage, size) =>
-                    getSpaces(buildSpacesParams(filters, nextPage, size, search)),
+                    getSpaces(buildSpacesParams(filters, nextPage, size, search, sortDirection)),
                   );
-                  return sortByAssignedId(rows.map(apiToUiSpace));
+                  const sorted = sortByAssignedId(rows.map(apiToUiSpace));
+                  return sortDirection === "asc" ? sorted : sorted.reverse();
                 }}
               />
               <Button

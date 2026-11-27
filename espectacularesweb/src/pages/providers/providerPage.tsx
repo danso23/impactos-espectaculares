@@ -10,6 +10,8 @@ import { useTableSelection } from "@/hooks/useTableSelection"
 import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getProviders } from "@/lib/services/providerService"
 import { Filter } from "@/components/generic/filter"
+import { countFilterValues, EMPTY_FILTER_VALUES } from "@/lib/filterValues"
+import type { FilterValues } from "@/types/Filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -32,7 +34,7 @@ export default function ProviderPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
-  const [activeFilter, setActiveFilter] = React.useState("all")
+  const [filterValues, setFilterValues] = React.useState<FilterValues>(EMPTY_FILTER_VALUES)
   const perPage = 10
 
   const [editRecord, setEditRecord] = React.useState<ProviderRecord | null>(null)
@@ -54,9 +56,9 @@ export default function ProviderPage() {
       page,
       per_page: perPage,
       q: search || undefined,
-      active: activeFilter === "all" ? undefined : activeFilter,
+      active: filterValues.selects.activo, date_from: filterValues.dateFrom, date_to: filterValues.dateTo,
     }),
-    [activeFilter, page, perPage, search]
+    [filterValues, page, perPage, search]
   )
 
   const providersQuery = useProviders(params)
@@ -183,15 +185,14 @@ export default function ProviderPage() {
         itemLabel={["proveedor", "proveedores"]}
         onClearSelection={selection.clear}
         exports={<ExcelExportButton columns={columns} data={providers} filename="proveedores" selected={selection.selected} disabled={providersQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getProviders({ ...params, page: nextPage, per_page: size }))} />}
-        activeFilters={activeFilter === "all" ? 0 : 1}
+        activeFilters={countFilterValues(filterValues)}
         filters={<Filter
           hideHeader
           defaultOpen
-          enableDateRange={false}
+          dateRangeLabel="Fecha de alta"
           dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]}
-          initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }}
-          onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }}
-          onReset={() => { setActiveFilter("all"); setPage(1) }}
+          initialValues={filterValues}
+          onApply={(values) => { setFilterValues(values); setPage(1) }}
         />}
       >
           <DataTable

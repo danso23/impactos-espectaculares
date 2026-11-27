@@ -10,6 +10,8 @@ import { useTableSelection } from "@/hooks/useTableSelection"
 import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getCaseros } from "@/lib/services/caseroService"
 import { Filter } from "@/components/generic/filter"
+import { countFilterValues, EMPTY_FILTER_VALUES, filterText } from "@/lib/filterValues"
+import type { FilterValues } from "@/types/Filter"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
@@ -37,7 +39,7 @@ export default function CaseroPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
-  const [activeFilter, setActiveFilter] = React.useState("all")
+  const [filterValues, setFilterValues] = React.useState<FilterValues>(EMPTY_FILTER_VALUES)
   const perPage = 10
 
   // Edit dialog state
@@ -61,9 +63,9 @@ export default function CaseroPage() {
       page,
       per_page: perPage,
       q: search || undefined,
-      active: activeFilter === "all" ? undefined : activeFilter,
+      active: filterValues.selects.activo, rfc: filterText(filterValues, "rfc"), telefono: filterText(filterValues, "telefono"), date_from: filterValues.dateFrom, date_to: filterValues.dateTo,
     }),
-    [activeFilter, page, perPage, search]
+    [filterValues, page, perPage, search]
   )
 
   const caserosQuery = useCaseros(params)
@@ -147,8 +149,16 @@ export default function CaseroPage() {
         itemLabel={["casero", "caseros"]}
         onClearSelection={selection.clear}
         exports={<ExcelExportButton columns={columns} data={caseros} filename="caseros" selected={selection.selected} disabled={caserosQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getCaseros({ ...params, page: nextPage, per_page: size }))} />}
-        activeFilters={activeFilter === "all" ? 0 : 1}
-        filters={<Filter hideHeader defaultOpen enableDateRange={false} dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]} initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }} onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }} onReset={() => { setActiveFilter("all"); setPage(1) }} />}
+        activeFilters={countFilterValues(filterValues)}
+        filters={<Filter
+          hideHeader
+          defaultOpen
+          dateRangeLabel="Fecha de alta"
+          textFields={[{ key: "rfc", label: "RFC", placeholder: "Ej. XAXX010101000" }, { key: "telefono", label: "Teléfono", placeholder: "Ej. 9991234567" }]}
+          dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]}
+          initialValues={filterValues}
+          onApply={(values) => { setFilterValues(values); setPage(1) }}
+        />}
       >
         <DataTable columns={selectableColumns} data={caseros} rowSelection={selection.rowSelection} onRowSelectionChange={selection.setRowSelection} getRowId={selection.getRowId} enableRowSelection enableSearch={false} enableExport={false} pageSize={perPage} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)} isLoading={caserosQuery.isFetching} />
       </ListingPanel>

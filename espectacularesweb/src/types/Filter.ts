@@ -29,6 +29,13 @@ export type FilterDateRangeConfig = {
     toKey: string
 }
 
+/** Campo de texto libre; guarda su valor en `values.texts[key]`. */
+export type FilterTextFieldConfig = {
+    key: string
+    label: string
+    placeholder?: string
+}
+
 export type FilterValues = {
     dateFrom?: string // YYYY-MM-DD
     dateTo?: string // YYYY-MM-DD
@@ -36,4 +43,6 @@ export type FilterValues = {
     dates?: Record<string, string | undefined>
     selects: Record<string, string | undefined>
     checks: Record<string, boolean | undefined>
+    /** Valores de los campos configurados con `textFields`. */
+    texts?: Record<string, string | undefined>
 }

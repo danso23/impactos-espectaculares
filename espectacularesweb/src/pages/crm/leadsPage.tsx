@@ -28,6 +28,7 @@ export default function LeadsPage() {
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL)
+  const [priorityFilter, setPriorityFilter] = React.useState<string>(ALL)
   const perPage = 10
 
   React.useEffect(() => {
@@ -45,8 +46,9 @@ export default function LeadsPage() {
       per_page: perPage,
       q: search || undefined,
       status_id: statusFilter === ALL ? undefined : statusFilter,
+      priority: priorityFilter === ALL ? undefined : priorityFilter,
     }),
-    [page, perPage, search, statusFilter]
+    [page, perPage, priorityFilter, search, statusFilter]
   )
 
   const leadsQuery = useLeads(params)
@@ -111,8 +113,31 @@ export default function LeadsPage() {
         itemLabel={["prospecto", "prospectos"]}
         onClearSelection={selection.clear}
         exports={<ExcelExportButton columns={columns} data={leads} filename="prospectos" selected={selection.selected} disabled={leadsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getLeads({ ...params, page: nextPage, per_page: size }))} />}
-        activeFilters={statusFilter === ALL ? 0 : 1}
-        filters={<Filter hideHeader defaultOpen enableDateRange={false} dropdowns={[{ key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) }]} initialValues={{ selects: { estatus: statusFilter === ALL ? undefined : statusFilter }, checks: {} }} onApply={(values) => { setStatusFilter(values.selects.estatus ?? ALL); setPage(1) }} onReset={() => { setStatusFilter(ALL); setPage(1) }} />}
+        activeFilters={(statusFilter === ALL ? 0 : 1) + (priorityFilter === ALL ? 0 : 1)}
+        filters={
+          <Filter
+            hideHeader
+            defaultOpen
+            enableDateRange={false}
+            dropdowns={[
+              { key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) },
+              { key: "prioridad", label: "Prioridad", options: [{ label: "Alta", value: "1" }, { label: "Media", value: "2" }, { label: "Baja", value: "3" }] },
+            ]}
+            initialValues={{
+              selects: {
+                estatus: statusFilter === ALL ? undefined : statusFilter,
+                prioridad: priorityFilter === ALL ? undefined : priorityFilter,
+              },
+              checks: {},
+            }}
+            onApply={(values) => {
+              setStatusFilter(values.selects.estatus ?? ALL)
+              setPriorityFilter(values.selects.prioridad ?? ALL)
+              setPage(1)
+            }}
+            onReset={() => { setStatusFilter(ALL); setPriorityFilter(ALL); setPage(1) }}
+          />
+        }
       >
           <DataTable
             columns={selectableColumns}

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { SortHeader, type SortDirection } from "@/components/generic/sort-header"
 import type { ColumnDef } from "@tanstack/react-table"
 import { CircleCheckBig, CreditCard, Pencil, Trash2 } from "lucide-react"
 
@@ -84,11 +85,15 @@ export function useRentalTable({
   onDelete,
   onViewPayments,
   onConfirm,
+  sortDirection = "desc",
+  onToggleSort,
 }: {
   onEdit: (row: RentalRecord) => void
   onDelete: (row: RentalRecord) => Promise<void> | void
   onViewPayments: (row: RentalRecord) => void
   onConfirm: (row: RentalRecord) => void
+  sortDirection?: SortDirection
+  onToggleSort?: () => void
 }) {
   const { can } = useRoles()
 
@@ -128,7 +133,9 @@ export function useRentalTable({
       return [
       {
         accessorKey: "id",
-        header: "ID",
+        header: () => onToggleSort
+          ? <SortHeader label="ID" direction={sortDirection} onToggle={onToggleSort} />
+          : "ID",
         cell: ({ row }) => row.original.id,
       },
       {
@@ -272,6 +279,6 @@ export function useRentalTable({
         actions,
       }),
     ]},
-    [onConfirm, onDelete, onEdit, onViewPayments, can]
+    [onConfirm, onDelete, onEdit, onViewPayments, can, sortDirection, onToggleSort]
   )
 }

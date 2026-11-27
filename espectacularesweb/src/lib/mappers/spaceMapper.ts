@@ -104,11 +104,13 @@ export function buildSpacesParams(
   filters: FilterValues,
   page: number,
   perPage: number,
-  search?: string
+  search?: string,
+  direction: "asc" | "desc" = "asc"
 ) {
   const params: QueryParams = {
     page,
     per_page: perPage,
+    direction,
   }
 
   // Search (server-side)

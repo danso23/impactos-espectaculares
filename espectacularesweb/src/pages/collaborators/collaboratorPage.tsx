@@ -10,6 +10,8 @@ import { useTableSelection } from "@/hooks/useTableSelection"
 import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getCollaborators } from "@/lib/services/collaboratorService"
 import { Filter } from "@/components/generic/filter"
+import { countFilterValues, EMPTY_FILTER_VALUES, filterText } from "@/lib/filterValues"
+import type { FilterValues } from "@/types/Filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,11 +23,11 @@ import { useCollaboratorTable } from "./collaboratorTable"
 export default function CollaboratorPage() {
   const createMutation = useCreateCollaborator(), updateMutation = useUpdateCollaborator(), deleteMutation = useDeleteCollaborator()
   const [page, setPage] = React.useState(1), [searchInput, setSearchInput] = React.useState(""), [search, setSearch] = React.useState("")
-  const [activeFilter, setActiveFilter] = React.useState("all")
+  const [filterValues, setFilterValues] = React.useState<FilterValues>(EMPTY_FILTER_VALUES)
   const [editRecord, setEditRecord] = React.useState<CollaboratorRecord | null>(null), [editOpen, setEditOpen] = React.useState(false)
   const [deleteRecord, setDeleteRecord] = React.useState<CollaboratorRecord | null>(null), [deleteOpen, setDeleteOpen] = React.useState(false)
   React.useEffect(() => { const timer = window.setTimeout(() => { setSearch(searchInput); setPage(1) }, 350); return () => window.clearTimeout(timer) }, [searchInput])
-  const params = React.useMemo(() => ({ page, per_page: 10, q: search || undefined, active: activeFilter === "all" ? undefined : activeFilter }), [activeFilter, page, search])
+  const params = React.useMemo(() => ({ page, per_page: 10, q: search || undefined, active: filterValues.selects.activo, rfc: filterText(filterValues, "rfc"), phone: filterText(filterValues, "telefono"), date_from: filterValues.dateFrom, date_to: filterValues.dateTo }), [filterValues, page, search])
   const query = useCollaborators(params), records = query.data?.data ?? [], meta = query.data?.meta
   const columns = useCollaboratorTable({ onEdit: React.useCallback((row) => { setEditRecord(row); setEditOpen(true) }, []), onDelete: React.useCallback((row) => { setDeleteRecord(row); setDeleteOpen(true) }, []) })
 
@@ -48,7 +50,7 @@ export default function CollaboratorPage() {
     </div>
     <ListingPanel
       title="Colaboradores registrados"
-      description="Busca por nombre, puesto, teléfono, email o notas."
+      description="Busca por nombre, puesto, teléfono, email, RFC o notas."
       searchValue={searchInput}
       onSearchChange={setSearchInput}
       searchPlaceholder="Buscar colaborador..."
@@ -56,8 +58,16 @@ export default function CollaboratorPage() {
       itemLabel={["colaborador", "colaboradores"]}
       onClearSelection={selection.clear}
       exports={<ExcelExportButton columns={columns} data={records} filename="colaboradores" selected={selection.selected} disabled={query.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getCollaborators({ ...params, page: nextPage, per_page: size }))} />}
-      activeFilters={activeFilter === "all" ? 0 : 1}
-      filters={<Filter hideHeader defaultOpen enableDateRange={false} dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]} initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }} onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }} onReset={() => { setActiveFilter("all"); setPage(1) }} />}
+      activeFilters={countFilterValues(filterValues)}
+      filters={<Filter
+        hideHeader
+        defaultOpen
+        dateRangeLabel="Fecha de alta"
+        textFields={[{ key: "rfc", label: "RFC", placeholder: "Ej. XAXX010101000" }, { key: "telefono", label: "Teléfono", placeholder: "Ej. 9991234567" }]}
+        dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]}
+        initialValues={filterValues}
+        onApply={(values) => { setFilterValues(values); setPage(1) }}
+      />}
     >
       <DataTable columns={selectableColumns} data={records} rowSelection={selection.rowSelection} onRowSelectionChange={selection.setRowSelection} getRowId={selection.getRowId} enableRowSelection enableSearch={false} enableExport={false} pageSize={10} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(index) => setPage(index + 1)} isLoading={query.isFetching} />
     </ListingPanel>

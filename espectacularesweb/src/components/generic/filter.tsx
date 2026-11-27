@@ -28,6 +28,7 @@ import type {
     FilterCheckboxConfig,
     FilterDateFieldConfig,
     FilterDateRangeConfig,
+    FilterTextFieldConfig,
     FilterDropdownConfig,
     FilterValues,
 } from "@/types/Filter"
@@ -39,6 +40,8 @@ type Props = {
     dateRangeLabel?: string
     /** Rangos adicionales en un solo selector cada uno (p. ej. Inicio y Fin de una renta). */
     dateRanges?: FilterDateRangeConfig[]
+    /** Campos de texto libre (p. ej. RFC). */
+    textFields?: FilterTextFieldConfig[]
     dropdowns?: FilterDropdownConfig[]
     checkboxes?: FilterCheckboxConfig[]
     /** Campos de fecha adicionales (p. ej. inicio desde/hasta, fin desde/hasta). */
@@ -76,6 +79,7 @@ function buildInitialState(params: {
         dateFrom: params.initialValues?.dateFrom,
         dateTo: params.initialValues?.dateTo,
         dates: { ...(params.initialValues?.dates ?? {}) },
+        texts: { ...(params.initialValues?.texts ?? {}) },
         selects: { ...selects, ...(params.initialValues?.selects ?? {}) },
         checks: { ...checks, ...(params.initialValues?.checks ?? {}) },
     }
@@ -92,6 +96,7 @@ export function Filter({
     enableDateRange = true,
     dateRangeLabel = "Rango de fechas",
     dateRanges = [],
+    textFields = [],
     dropdowns = [],
     checkboxes = [],
     dateFields = [],
@@ -120,8 +125,9 @@ export function Filter({
         checkboxes,
         dateFields,
         dateRanges,
+        textFields,
         })
-    }, [enableDateRange, initialValues, dropdowns, checkboxes, dateFields, dateRanges])
+    }, [enableDateRange, initialValues, dropdowns, checkboxes, dateFields, dateRanges, textFields])
 
     React.useEffect(() => {
         setValues(buildInitialState({ dropdowns, checkboxes, initialValues }))
@@ -180,6 +186,7 @@ export function Filter({
         (values.dateFrom ? 1 : 0) +
         (values.dateTo ? 1 : 0) +
         Object.values(values.dates ?? {}).filter(Boolean).length +
+        Object.values(values.texts ?? {}).filter((v) => v?.trim()).length +
         Object.values(values.selects).filter(Boolean).length +
         Object.values(values.checks).filter((v) => v !== undefined).length
 
@@ -237,6 +244,22 @@ export function Filter({
                     <CardContent className={cn("space-y-6 px-6 pb-6 animate-in", hideHeader ? "pt-6" : "pt-2", "slide-in-from-top-2 duration-200")}>
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                             {/* Dropdowns */}
+                            {textFields.map((field) => (
+                                <div key={field.key} className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">{field.label}</Label>
+                                    <Input
+                                        className="rounded-lg border-gray-300 bg-white shadow-sm"
+                                        placeholder={field.placeholder}
+                                        value={values.texts?.[field.key] ?? ""}
+                                        onChange={(e) => {
+                                            const next = e.target.value
+                                            setValues((p) => ({ ...p, texts: { ...(p.texts ?? {}), [field.key]: next || undefined } }))
+                                        }}
+                                        onKeyDown={(e) => { if (e.key === "Enter") handleApply() }}
+                                    />
+                                </div>
+                            ))}
+
                             {dropdowns.map((d) => (
                                 <div key={d.key} className="space-y-2">
                                     <Label className="text-sm font-semibold text-gray-700">{d.label}</Label>

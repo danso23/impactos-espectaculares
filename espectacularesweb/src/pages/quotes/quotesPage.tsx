@@ -47,6 +47,7 @@ export default function QuotesPage() {
   // "cliente:3", "lead:5" o "sin_cliente".
   const [customerFilter, setCustomerFilter] = React.useState<string>(ALL)
   const [companyFilter, setCompanyFilter] = React.useState<string>(ALL)
+  const [sortDirection, setSortDirection] = React.useState<"asc" | "desc">("desc")
   const [selectedQuote, setSelectedQuote] = React.useState<QuoteRecord | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false)
   const [convertDialogOpen, setConvertDialogOpen] = React.useState(false)
@@ -87,8 +88,9 @@ export default function QuotesPage() {
       customer_type: customerType,
       customer_id: customerId ? Number(customerId) : undefined,
       issuer_company_id: companyFilter === ALL ? undefined : Number(companyFilter),
+      direction: sortDirection,
     }
-  }, [companyFilter, customerFilter, dateFrom, dateTo, page, perPage, search, statusFilter])
+  }, [companyFilter, customerFilter, dateFrom, dateTo, page, perPage, search, sortDirection, statusFilter])
 
   const quotesQuery = useQuotes(params)
   const statuses = catalogsQuery.data?.data.statuses ?? []
@@ -147,6 +149,11 @@ export default function QuotesPage() {
     }
   }
 
+  const toggleSort = React.useCallback(() => {
+    setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
+    setPage(1)
+  }, [])
+
   const columns = useQuoteTable({
     onView: handleView,
     onDownload: handleDownload,
@@ -155,6 +162,8 @@ export default function QuotesPage() {
     onDuplicate: handleDuplicate,
     onEdit: handleEdit,
     onDelete: setQuoteToDelete,
+    sortDirection,
+    onToggleSort: toggleSort,
   })
 
   // Selección de filas: si hay seleccionadas, se exportan solo esas.

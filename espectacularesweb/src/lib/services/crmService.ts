@@ -50,6 +50,17 @@ export function convertLeadToClient(id: number) {
   })
 }
 
+export type ClientFilterOptions = {
+  data: {
+    sources: string[]
+    users: { username: string; name: string }[]
+  }
+}
+
+export function getClientFilterOptions() {
+  return apiFetch<ClientFilterOptions>("/api/clientes/filter-options")
+}
+
 export function getClients(params?: QueryParams) {
   return apiFetch<ClientsResponse>(`/api/clientes${toQueryString(params)}`)
 }

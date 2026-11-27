@@ -38,6 +38,29 @@ class ClientController extends Controller
             });
         }
 
+        $rfc = trim((string) $request->query('rfc', ''));
+        if ($rfc !== '') {
+            $query->where('rfc', 'like', "%{$rfc}%");
+        }
+
+        $source = trim((string) $request->query('source', ''));
+        if ($source !== '') {
+            $query->where('source', $source);
+        }
+
+        $usuario = trim((string) $request->query('usuario', ''));
+        if ($usuario !== '') {
+            $query->where('usuario', $usuario);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->query('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->query('date_to'));
+        }
+
         $page = $query->paginate($perPage);
 
         return response()->json([
@@ -51,6 +74,40 @@ class ClientController extends Controller
                 'totalPages' => $page->lastPage(),
             ],
         ]);
+    }
+
+    /** Opciones de los filtros: fuentes y usuarios que han registrado clientes. */
+    public function filterOptions()
+    {
+        if (!Schema::hasTable('clientes')) {
+            return response()->json(['data' => ['sources' => [], 'users' => []]]);
+        }
+
+        $sources = DB::table('clientes')
+            ->whereNotNull('source')
+            ->where('source', '<>', '')
+            ->distinct()
+            ->orderBy('source')
+            ->pluck('source')
+            ->values();
+
+        $usernames = DB::table('clientes')
+            ->whereNotNull('usuario')
+            ->where('usuario', '<>', '')
+            ->distinct()
+            ->pluck('usuario');
+
+        $names = DB::table('users')->whereIn('username', $usernames)->pluck('name', 'username');
+
+        $users = $usernames
+            ->map(fn ($username) => [
+                'username' => $username,
+                'name' => ($names[$username] ?? null) ?: $username,
+            ])
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return response()->json(['data' => ['sources' => $sources, 'users' => $users]]);
     }
 
     public function store(Request $request)
