@@ -6,7 +6,6 @@ import {
   CircleDollarSign,
   Download,
   FileText,
-  Search,
   TriangleAlert,
   WalletCards,
 } from "lucide-react"
@@ -14,6 +13,7 @@ import { toast } from "sonner"
 
 import { createActionsColumn } from "@/components/generic/create-actions-column"
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
@@ -313,7 +313,7 @@ export default function PaymentPage() {
   )
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
+    <div className="mx-auto max-w-7xl space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Pagos"
         badge="Control de cobranza"
@@ -348,37 +348,33 @@ export default function PaymentPage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">Cuentas por cobrar</CardTitle>
-              <CardDescription>Consulta cada parcialidad y registra abonos o liquidaciones.</CardDescription>
-            </div>
-            <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
-              <div className="relative sm:w-80">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder="Buscar renta o cliente..." className="pl-10" />
-              </div>
-              <ExcelExportButton
-                columns={columns}
-                data={rows}
-                filename="pagos" selected={selection.selected} onClearSelection={selection.clear}
-                disabled={receivablesQuery.isFetching}
-                fetchAll={() => fetchAllPages((nextPage, size) => getReceivables({ ...params, page: nextPage, per_page: size }))}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <div className="px-6 pb-6">
-          <Filter
-            title="Filtros avanzados"
-            defaultOpen={false}
-            dropdowns={[{ key: "estatus", label: "Estatus", options: [{ label: "Pendientes", value: "pending" }, { label: "Vencidos", value: "overdue" }, { label: "Pagados", value: "paid" }, { label: "Cancelados", value: "cancelled" }] }]}
-            initialValues={{ dateFrom, dateTo, selects: { estatus: status === ALL_STATUSES ? undefined : status }, checks: {} }}
-            onApply={(values) => { setStatus(values.selects.estatus ?? ALL_STATUSES); setDateFrom(values.dateFrom); setDateTo(values.dateTo); setPage(1) }}
-            onReset={() => { setStatus(ALL_STATUSES); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
-          />
+      <ListingPanel
+        title="Cuentas por cobrar"
+        description="Consulta cada parcialidad y registra abonos o liquidaciones."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar renta o cliente..."
+        selectedCount={selection.selected.length}
+        itemLabel={["pago", "pagos"]}
+        onClearSelection={selection.clear}
+        exports={<ExcelExportButton
+          columns={columns}
+          data={rows}
+          filename="pagos" selected={selection.selected}
+          disabled={receivablesQuery.isFetching}
+          fetchAll={() => fetchAllPages((nextPage, size) => getReceivables({ ...params, page: nextPage, per_page: size }))}
+        />}
+        activeFilters={(status === ALL_STATUSES ? 0 : 1) + (dateFrom || dateTo ? 1 : 0)}
+        filters={<Filter
+          hideHeader
+          defaultOpen
+          dateRangeLabel="Vencimiento"
+          dropdowns={[{ key: "estatus", label: "Estatus", options: [{ label: "Pendientes", value: "pending" }, { label: "Vencidos", value: "overdue" }, { label: "Pagados", value: "paid" }, { label: "Cancelados", value: "cancelled" }] }]}
+          initialValues={{ dateFrom, dateTo, selects: { estatus: status === ALL_STATUSES ? undefined : status }, checks: {} }}
+          onApply={(values) => { setStatus(values.selects.estatus ?? ALL_STATUSES); setDateFrom(values.dateFrom); setDateTo(values.dateTo); setPage(1) }}
+          onReset={() => { setStatus(ALL_STATUSES); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
+        />}
+      >
           <DataTable
             columns={selectableColumns}
             data={rows}
@@ -398,8 +394,7 @@ export default function PaymentPage() {
             onPageChange={(nextPage) => setPage(nextPage + 1)}
             isLoading={receivablesQuery.isFetching}
           />
-        </div>
-      </Card>
+      </ListingPanel>
 
       <Dialog open={selectedReceivable !== null} onOpenChange={(open) => { if (!open) setSelectedReceivable(null) }}>
         <DialogContent className="max-w-xl">

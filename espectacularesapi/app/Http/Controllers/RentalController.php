@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Entities\Rental;
 use App\Models\Entities\RentalItem;
+use App\Models\Entities\Space;
 use App\Models\Entities\Lead;
 use App\Models\Entities\Agency;
 use App\Services\CustomerNameResolver;
@@ -136,6 +137,15 @@ class RentalController extends BaseCrudController
 
         if ($request->filled('customer_type')) {
             $query->where('customer_type', $request->get('customer_type'));
+        }
+
+        if ($request->filled('customer_id')) {
+            $query->where('customer_id', (int) $request->get('customer_id'));
+        }
+
+        if ($request->filled('space_id')) {
+            $spaceId = (int) $request->get('space_id');
+            $query->whereHas('items', fn ($items) => $items->where('space_id', $spaceId));
         }
 
         if ($request->filled('is_rotating')) {
@@ -537,6 +547,44 @@ class RentalController extends BaseCrudController
         }
 
         return response()->json(['message' => 'Actualizado correctamente', 'data' => $rental]);
+    }
+
+    /**
+     * Opciones para los filtros del listado: clientes y espacios que aparecen en alguna renta.
+     */
+    public function filterOptions()
+    {
+        $names = new CustomerNameResolver();
+
+        $customers = Rental::query()
+            ->whereNotNull('customer_id')
+            ->orderByDesc('id')
+            ->get(['id', 'customer_type', 'customer_id', 'snapshot_json'])
+            ->unique(fn (Rental $rental) => $rental->customer_type . ':' . $rental->customer_id)
+            ->map(function (Rental $rental) use ($names) {
+                $snapshot = is_array($rental->snapshot_json) ? $rental->snapshot_json : [];
+                $name = trim((string) ($snapshot['customer']['display_name'] ?? ''));
+
+                return [
+                    'type' => (string) $rental->customer_type,
+                    'id' => (int) $rental->customer_id,
+                    'name' => $name !== '' ? $name : $names->resolve((string) $rental->customer_type, (int) $rental->customer_id),
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $spaces = Space::query()
+            ->whereIn('id', RentalItem::query()->whereNotNull('space_id')->select('space_id'))
+            ->get(['id', 'assigned_id', 'title'])
+            ->map(fn (Space $space) => [
+                'id' => (int) $space->id,
+                'name' => trim(($space->assigned_id ? $space->assigned_id . ' · ' : '') . ($space->title ?? '')),
+            ])
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        return response()->json(['data' => ['customers' => $customers, 'spaces' => $spaces]]);
     }
 
     public function index(Request $request)

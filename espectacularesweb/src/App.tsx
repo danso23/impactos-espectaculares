@@ -267,7 +267,7 @@ function AppLayout() {
 
           {/* Contenido principal con scroll */}
           <main className="flex-1 overflow-y-auto">
-            <div className="p-8 h-full">
+            <div className="h-full p-3 sm:p-6 lg:p-8">
                <Outlet />
             </div>
           </main>

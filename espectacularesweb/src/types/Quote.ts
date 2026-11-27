@@ -99,6 +99,8 @@ export type QuoteCatalogs = {
   services: QuoteCatalogService[]
   configuration?: QuoteCatalogConfiguration | null
   statuses: QuoteStatus[]
+  /** Clientes con al menos una cotización (para el filtro del listado). */
+  quoted_customers?: { type: string; id: number; name: string }[]
 }
 
 export type QuoteCatalogsResponse = ApiResponse<QuoteCatalogs>
@@ -294,6 +296,9 @@ export type QuoteListParams = {
   status?: string | number
   date_from?: string
   date_to?: string
+  customer_type?: string
+  customer_id?: number
+  issuer_company_id?: number
 }
 
 export type QuoteListResponse = ApiListResponse<QuoteRecord>

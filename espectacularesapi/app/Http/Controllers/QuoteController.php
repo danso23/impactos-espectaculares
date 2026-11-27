@@ -72,8 +72,43 @@ class QuoteController extends Controller
                     ->where('is_active', true)
                     ->orderBy('id')
                     ->get(),
+                'quoted_customers' => $this->quotedCustomers(),
             ],
         ]);
+    }
+
+    /**
+     * Clientes que ya tienen al menos una cotización, para el filtro del listado.
+     * El nombre sale del snapshot de su cotización más reciente (el mismo que muestra la tabla).
+     */
+    private function quotedCustomers(): array
+    {
+        $latestIds = Quote::query()
+            ->whereNotNull('customer_type')
+            ->where('customer_type', '<>', 'sin_cliente')
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_type', 'customer_id')
+            ->selectRaw('MAX(id) as id')
+            ->pluck('id');
+
+        return Quote::query()
+            ->whereIn('id', $latestIds)
+            ->get(['id', 'customer_type', 'customer_id', 'snapshot_json'])
+            ->map(function (Quote $quote) {
+                $snapshot = is_array($quote->snapshot_json)
+                    ? $quote->snapshot_json
+                    : (json_decode((string) $quote->snapshot_json, true) ?: []);
+                $name = trim((string) ($snapshot['customer']['display_name'] ?? ''));
+
+                return [
+                    'type' => $quote->customer_type,
+                    'id' => (int) $quote->customer_id,
+                    'name' => $name !== '' ? $name : ucfirst((string) $quote->customer_type) . ' #' . $quote->customer_id,
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
     }
 
     public function searchCustomers(Request $request)

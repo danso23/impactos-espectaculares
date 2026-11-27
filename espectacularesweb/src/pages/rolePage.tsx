@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { FileSpreadsheet, Plus, Pencil, Search, Trash2, ShieldCheck } from "lucide-react"
+import { FileSpreadsheet, Plus, Pencil, Trash2, ShieldCheck } from "lucide-react"
 import {
   roleService,
   type PermissionAction,
@@ -28,6 +28,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { Can } from "@/components/auth/Can"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { cn } from "@/lib/utils"
 import { exportRowsToExcel } from "@/lib/exportExcel"
@@ -197,7 +198,7 @@ const RolePage = () => {
   })
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-6xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Roles"
         badge="Control de permisos"
@@ -214,18 +215,18 @@ const RolePage = () => {
         </Can>}
       />
 
-      {/* Tabla Estilo Figma */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-        <div className="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-md">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filtrar roles..." className="pl-10" />
-          </div>
-          <Button type="button" variant="outline" onClick={exportRoles} disabled={loading || filteredRoles.length === 0} className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800">
-            <FileSpreadsheet className="h-4 w-4" />
-            Exportar
-          </Button>
-        </div>
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por nombre del rol."
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar rol..."
+        exports={<Button type="button" variant="outline" onClick={exportRoles} disabled={loading || filteredRoles.length === 0} className="border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm hover:bg-emerald-100 hover:text-emerald-800">
+          <FileSpreadsheet className="h-4 w-4" />
+          XLS
+        </Button>}
+      >
+        <div className="overflow-hidden rounded-xl border border-gray-200">
         <Table>
           <TableHeader className="bg-gradient-to-r from-purple-600 to-indigo-600">
             <TableRow className="hover:bg-transparent border-none">
@@ -302,7 +303,8 @@ const RolePage = () => {
             )}
           </TableBody>
         </Table>
-      </div>
+        </div>
+      </ListingPanel>
 
       {/* Modal Estilo Shadcn Refinado */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>

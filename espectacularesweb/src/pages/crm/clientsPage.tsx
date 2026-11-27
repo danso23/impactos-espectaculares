@@ -1,16 +1,15 @@
 import * as React from "react"
-import { MailCheck, Search, FileText, UsersRound } from "lucide-react"
+import { MailCheck, FileText, UsersRound } from "lucide-react"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
 import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getClients } from "@/lib/services/crmService"
 import { ModuleHeader } from "@/components/generic/module-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useClients, useCreateClient } from "@/lib/hooks/crmHook"
 import { CrmForm } from "@/pages/crm/crmForm"
 import { useClientTable } from "@/pages/crm/crmTable"
@@ -69,7 +68,7 @@ export default function ClientsPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Clientes"
         badge="Catálogo de clientes"
@@ -118,34 +117,17 @@ export default function ClientsPage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">Búsqueda rápida</CardTitle>
-              <CardDescription>
-                Filtra por nombre, teléfono, email, RFC, fuente o usuario registrado.
-              </CardDescription>
-            </div>
-
-            <div className="w-full lg:max-w-md">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar cliente..."
-                  className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-            <ExcelExportButton columns={columns} data={clients} filename="clientes" selected={selection.selected} onClearSelection={selection.clear} disabled={clientsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getClients({ ...params, page: nextPage, per_page: size }))} />
-          </div>
-
-          <Separator />
-        </CardHeader>
-
-        <CardContent className="pt-0">
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por nombre, teléfono, email, RFC, fuente o usuario registrado."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar cliente..."
+        selectedCount={selection.selected.length}
+        itemLabel={["cliente", "clientes"]}
+        onClearSelection={selection.clear}
+        exports={<ExcelExportButton columns={columns} data={clients} filename="clientes" selected={selection.selected} disabled={clientsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getClients({ ...params, page: nextPage, per_page: size }))} />}
+      >
           <DataTable
             columns={selectableColumns}
             data={clients}
@@ -163,8 +145,7 @@ export default function ClientsPage() {
             onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
             isLoading={clientsQuery.isFetching}
           />
-        </CardContent>
-      </Card>
+      </ListingPanel>
 
       <CrmForm
         mode="client"

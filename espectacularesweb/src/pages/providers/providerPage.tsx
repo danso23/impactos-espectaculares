@@ -1,8 +1,9 @@
 import * as React from "react"
-import { Search, UserCheck2, UserX, UsersRound } from "lucide-react"
+import { UserCheck2, UserX, UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
@@ -11,9 +12,7 @@ import { getProviders } from "@/lib/services/providerService"
 import { Filter } from "@/components/generic/filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   useCreateProvider,
   useDeleteProvider,
@@ -131,7 +130,7 @@ export default function ProviderPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Proveedores"
         badge="Catálogo de proveedores"
@@ -174,45 +173,27 @@ export default function ProviderPage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">Búsqueda rápida</CardTitle>
-              <CardDescription>
-                Filtra por nombre, contacto, teléfono, email, dirección o notas.
-              </CardDescription>
-            </div>
-
-            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-              <div className="w-full lg:w-80">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="Buscar proveedor..."
-                    className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-              <ExcelExportButton columns={columns} data={providers} filename="proveedores" selected={selection.selected} onClearSelection={selection.clear} disabled={providersQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getProviders({ ...params, page: nextPage, per_page: size }))} />
-            </div>
-          </div>
-
-          <Separator />
-        </CardHeader>
-
-        <CardContent className="pt-0">
-          <Filter
-            title="Filtros avanzados"
-            enableDateRange={false}
-            defaultOpen={false}
-            dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]}
-            initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }}
-            onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }}
-            onReset={() => { setActiveFilter("all"); setPage(1) }}
-          />
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por nombre, contacto, teléfono, email, dirección o notas."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar proveedor..."
+        selectedCount={selection.selected.length}
+        itemLabel={["proveedor", "proveedores"]}
+        onClearSelection={selection.clear}
+        exports={<ExcelExportButton columns={columns} data={providers} filename="proveedores" selected={selection.selected} disabled={providersQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getProviders({ ...params, page: nextPage, per_page: size }))} />}
+        activeFilters={activeFilter === "all" ? 0 : 1}
+        filters={<Filter
+          hideHeader
+          defaultOpen
+          enableDateRange={false}
+          dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]}
+          initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }}
+          onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }}
+          onReset={() => { setActiveFilter("all"); setPage(1) }}
+        />}
+      >
           <DataTable
             columns={selectableColumns}
             data={providers}
@@ -230,8 +211,7 @@ export default function ProviderPage() {
             onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
             isLoading={providersQuery.isFetching}
           />
-        </CardContent>
-      </Card>
+      </ListingPanel>
 
       <ProviderForm
         editRecord={editRecord}

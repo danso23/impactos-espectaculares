@@ -94,6 +94,7 @@ $router->group(['prefix' => 'api'], function () use ($router) {
 
         /** RENTALS **/
         $router->get('rentals', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@index']);
+        $router->get('rentals/filter-options', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@filterOptions']);
         $router->get('rentals/{id}', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@find']);
         $router->post('rentals', ['middleware' => 'permission:rentals.edit', 'uses' => 'RentalController@store']);
         $router->post('rentals/{id}/confirm', ['middleware' => 'permission:rentals.edit', 'uses' => 'RentalController@confirm']);

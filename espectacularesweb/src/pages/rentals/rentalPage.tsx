@@ -1,8 +1,9 @@
 import * as React from "react"
-import { CalendarDays, CreditCard, Search, ReceiptText, CircleCheckBig, CircleDashed } from "lucide-react"
+import { CalendarDays, CreditCard, ReceiptText, CircleCheckBig, CircleDashed } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
@@ -11,9 +12,7 @@ import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getRentals } from "@/lib/services/rentalService"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -36,8 +35,7 @@ import {
   useConfirmRental,
   useDeleteRental,
   useRentals,
-  useUpdateRental,
-} from "@/lib/hooks/rentalHook"
+  useUpdateRental, useRentalFilterOptions } from "@/lib/hooks/rentalHook"
 import type { RentalCreatePayload, RentalFormValues, RentalRecord } from "@/types/Rental"
 import { RentalCreateForm } from "./rentalCreateForm"
 import { RentalForm } from "./rentalForm"
@@ -86,6 +84,9 @@ export default function RentalPage() {
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [rotatingFilter, setRotatingFilter] = React.useState("all")
+  // "cliente:3" o "lead:5".
+  const [customerFilter, setCustomerFilter] = React.useState("all")
+  const [spaceFilter, setSpaceFilter] = React.useState("all")
   // Rangos de inicio y fin: qué se instala y qué se retira en un periodo.
   const [dateFilters, setDateFilters] = React.useState<Record<string, string | undefined>>({})
   const perPage = 10
@@ -106,20 +107,34 @@ export default function RentalPage() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  const params = React.useMemo(
-    () => ({
+  const params = React.useMemo(() => {
+    const [customerType, customerId] = customerFilter === "all" ? [] : customerFilter.split(":")
+    return {
       page,
       per_page: perPage,
       q: search || undefined,
       status: statusFilter === "all" ? undefined : statusFilter,
       is_rotating: rotatingFilter === "all" ? undefined : rotatingFilter,
+      customer_type: customerType,
+      customer_id: customerId,
+      space_id: spaceFilter === "all" ? undefined : spaceFilter,
       starts_from: dateFilters.starts_from,
       starts_to: dateFilters.starts_to,
       ends_from: dateFilters.ends_from,
       ends_to: dateFilters.ends_to,
-    }),
-    [dateFilters, page, perPage, rotatingFilter, search, statusFilter]
-  )
+    }
+  }, [customerFilter, dateFilters, page, perPage, rotatingFilter, search, spaceFilter, statusFilter])
+
+  const filterOptionsQuery = useRentalFilterOptions()
+  const customerTypeLabel: Record<string, string> = { cliente: "Cliente", lead: "Prospecto" }
+  const customerOptions = (filterOptionsQuery.data?.data.customers ?? []).map((customer) => ({
+    label: `${customer.name} · ${customerTypeLabel[customer.type] ?? customer.type}`,
+    value: `${customer.type}:${customer.id}`,
+  }))
+  const spaceOptions = (filterOptionsQuery.data?.data.spaces ?? []).map((space) => ({
+    label: space.name,
+    value: String(space.id),
+  }))
 
   const rentalsQuery = useRentals(params)
   const rentals = rentalsQuery.data?.data ?? []
@@ -214,7 +229,7 @@ export default function RentalPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Rentas"
         badge="Control de rentas"
@@ -267,58 +282,59 @@ export default function RentalPage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">Búsqueda rápida</CardTitle>
-              <CardDescription>
-                Filtra por ID, cliente, anuncio, nota o estatus; usa los filtros para ver qué inicia o termina en un periodo.
-              </CardDescription>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar por renta, cliente o anuncio..."
-                  className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-              <ExcelExportButton
-                columns={columns}
-                data={rentals}
-                filename="rentas" selected={selection.selected} onClearSelection={selection.clear}
-                disabled={rentalsQuery.isFetching}
-                fetchAll={() => fetchAllPages((nextPage, size) => getRentals({ ...params, page: nextPage, per_page: size }))}
-              />
-            </div>
-          </div>
-
-          <Separator />
-        </CardHeader>
-
-        <CardContent className="pt-0">
-          <Filter
-            title="Filtros avanzados"
-            enableDateRange={false}
-            defaultOpen={false}
-            dropdowns={[
-              { key: "estatus", label: "Estatus", options: [{ label: "Borrador", value: "draft" }, { label: "Confirmada", value: "active" }, { label: "Completada", value: "completed" }, { label: "Cancelada", value: "cancelled" }] },
-              { key: "rotativa", label: "Tipo de renta", options: [{ label: "Rotativa", value: "1" }, { label: "No rotativa", value: "0" }] },
-            ]}
-            dateFields={[
-              { key: "starts_from", label: "Inicio desde" },
-              { key: "starts_to", label: "Inicio hasta" },
-              { key: "ends_from", label: "Fin desde" },
-              { key: "ends_to", label: "Fin hasta" },
-            ]}
-            initialValues={{ selects: { estatus: statusFilter === "all" ? undefined : statusFilter, rotativa: rotatingFilter === "all" ? undefined : rotatingFilter }, checks: {}, dates: dateFilters }}
-            onApply={(values) => { setStatusFilter(values.selects.estatus ?? "all"); setRotatingFilter(values.selects.rotativa ?? "all"); setDateFilters({ ...(values.dates ?? {}) }); setPage(1) }}
-            onReset={() => { setStatusFilter("all"); setRotatingFilter("all"); setDateFilters({}); setPage(1) }}
-          />
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por ID, cliente, espacio, nota o estatus; usa los filtros para ver qué inicia o termina en un periodo."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar por renta, cliente o anuncio..."
+        selectedCount={selection.selected.length}
+        itemLabel={["renta", "rentas"]}
+        feminine
+        onClearSelection={selection.clear}
+        exports={<ExcelExportButton
+          columns={columns}
+          data={rentals}
+          filename="rentas" selected={selection.selected}
+          disabled={rentalsQuery.isFetching}
+          fetchAll={() => fetchAllPages((nextPage, size) => getRentals({ ...params, page: nextPage, per_page: size }))}
+        />}
+        activeFilters={(statusFilter === "all" ? 0 : 1) + (rotatingFilter === "all" ? 0 : 1) + (customerFilter === "all" ? 0 : 1) + (spaceFilter === "all" ? 0 : 1) + (dateFilters.starts_from || dateFilters.starts_to ? 1 : 0) + (dateFilters.ends_from || dateFilters.ends_to ? 1 : 0)}
+        filters={<Filter
+          hideHeader
+          defaultOpen
+          enableDateRange={false}
+          dropdowns={[
+            { key: "estatus", label: "Estatus", options: [{ label: "Borrador", value: "draft" }, { label: "Confirmada", value: "active" }, { label: "Completada", value: "completed" }, { label: "Cancelada", value: "cancelled" }] },
+            { key: "rotativa", label: "Rotativa", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] },
+            { key: "cliente", label: "Cliente", options: customerOptions },
+            { key: "espacio", label: "Espacio", options: spaceOptions },
+          ]}
+          dateRanges={[
+            { label: "Inicio de la renta", fromKey: "starts_from", toKey: "starts_to" },
+            { label: "Fin de la renta", fromKey: "ends_from", toKey: "ends_to" },
+          ]}
+          initialValues={{
+            selects: {
+              estatus: statusFilter === "all" ? undefined : statusFilter,
+              rotativa: rotatingFilter === "all" ? undefined : rotatingFilter,
+              cliente: customerFilter === "all" ? undefined : customerFilter,
+              espacio: spaceFilter === "all" ? undefined : spaceFilter,
+            },
+            checks: {},
+            dates: dateFilters,
+          }}
+          onApply={(values) => {
+            setStatusFilter(values.selects.estatus ?? "all")
+            setRotatingFilter(values.selects.rotativa ?? "all")
+            setCustomerFilter(values.selects.cliente ?? "all")
+            setSpaceFilter(values.selects.espacio ?? "all")
+            setDateFilters({ ...(values.dates ?? {}) })
+            setPage(1)
+          }}
+          onReset={() => { setStatusFilter("all"); setRotatingFilter("all"); setCustomerFilter("all"); setSpaceFilter("all"); setDateFilters({}); setPage(1) }}
+        />}
+      >
           <DataTable
             columns={selectableColumns}
             data={rentals}
@@ -338,8 +354,7 @@ export default function RentalPage() {
             onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
             isLoading={rentalsQuery.isFetching}
           />
-        </CardContent>
-      </Card>
+      </ListingPanel>
 
       <Dialog
         open={paymentPlanRecord !== null}

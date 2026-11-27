@@ -1,8 +1,9 @@
 import * as React from "react"
-import { CircleDollarSign, Search, Settings } from "lucide-react"
+import { CircleDollarSign, Settings } from "lucide-react"
 import { toast } from "sonner"
 import { Can } from "@/components/auth/Can"
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
@@ -11,9 +12,7 @@ import { getServices } from "@/lib/services/serviceService"
 import { Filter } from "@/components/generic/filter"
 import { DeleteConfirmDialog } from "@/components/generic/delete-confirm-dialog"
 import { ModuleHeader } from "@/components/generic/module-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useCreateService, useDeleteService, useServices, useUpdateService } from "@/lib/hooks/serviceHook"
 import type { ServiceFormValues, ServiceRecord } from "@/types/Service"
 import { ServiceForm } from "./serviceForm"
@@ -41,13 +40,27 @@ export default function ServicePage() {
     [columns],
   )
 
-  return <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
+  return <div className="mx-auto max-w-7xl space-y-5 sm:space-y-8 animate-in fade-in duration-500">
     <ModuleHeader title="Servicios" badge="Catálogo de servicios" description="Administra los conceptos, precios e impuestos disponibles en las cotizaciones." icon={Settings} actions={<Can permission="services.edit"><ServiceForm isSubmitting={createMutation.isPending} onSubmit={create} /></Can>} />
     <div className="grid gap-4 sm:grid-cols-2">
       <Card><CardHeader><CardDescription>Total registrados</CardDescription><CardTitle className="flex items-center gap-2 text-3xl"><Settings className="h-5 w-5 text-purple-600" />{meta?.total ?? 0}</CardTitle></CardHeader></Card>
       <Card><CardHeader><CardDescription>Activos en esta página</CardDescription><CardTitle className="flex items-center gap-2 text-3xl"><CircleDollarSign className="h-5 w-5 text-emerald-600" />{records.filter((item) => item.is_active).length}</CardTitle></CardHeader></Card>
     </div>
-    <Card className="shadow-lg"><CardHeader className="space-y-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><CardTitle>Servicios registrados</CardTitle><CardDescription>Busca por nombre, clave o descripción.</CardDescription></div><div className="flex w-full items-center gap-3 lg:w-auto"><div className="relative w-full lg:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-10" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Buscar servicio..." /></div><ExcelExportButton columns={columns} data={records} filename="servicios" selected={selection.selected} onClearSelection={selection.clear} disabled={query.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getServices({ ...params, page: nextPage, per_page: size }))} /></div></div><Separator /></CardHeader><CardContent className="space-y-6"><Filter title="Filtros avanzados" enableDateRange={false} defaultOpen={false} dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]} initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }} onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }} onReset={() => { setActiveFilter("all"); setPage(1) }} /><DataTable columns={selectableColumns} data={records} rowSelection={selection.rowSelection} onRowSelectionChange={selection.setRowSelection} getRowId={selection.getRowId} enableRowSelection enableSearch={false} enableExport={false} pageSize={10} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(index) => setPage(index + 1)} isLoading={query.isFetching} /></CardContent></Card>
+    <ListingPanel
+      title="Servicios registrados"
+      description="Busca por nombre, clave o descripción."
+      searchValue={searchInput}
+      onSearchChange={setSearchInput}
+      searchPlaceholder="Buscar servicio..."
+      selectedCount={selection.selected.length}
+      itemLabel={["servicio", "servicios"]}
+      onClearSelection={selection.clear}
+      exports={<ExcelExportButton columns={columns} data={records} filename="servicios" selected={selection.selected} disabled={query.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getServices({ ...params, page: nextPage, per_page: size }))} />}
+      activeFilters={activeFilter === "all" ? 0 : 1}
+      filters={<Filter hideHeader defaultOpen enableDateRange={false} dropdowns={[{ key: "activo", label: "Activo", options: [{ label: "Sí", value: "1" }, { label: "No", value: "0" }] }]} initialValues={{ selects: { activo: activeFilter === "all" ? undefined : activeFilter }, checks: {} }} onApply={(values) => { setActiveFilter(values.selects.activo ?? "all"); setPage(1) }} onReset={() => { setActiveFilter("all"); setPage(1) }} />}
+    >
+      <DataTable columns={selectableColumns} data={records} rowSelection={selection.rowSelection} onRowSelectionChange={selection.setRowSelection} getRowId={selection.getRowId} enableRowSelection enableSearch={false} enableExport={false} pageSize={10} enablePagination manualPagination pageIndex={(meta?.page ?? page) - 1} pageCount={meta?.totalPages ?? 1} onPageChange={(index) => setPage(index + 1)} isLoading={query.isFetching} />
+    </ListingPanel>
     <ServiceForm editRecord={editRecord} isSubmitting={updateMutation.isPending} onSubmit={update} open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) setEditRecord(null) }} showTrigger={false} />
     <DeleteConfirmDialog open={deleteOpen} onOpenChange={setDeleteOpen} onConfirm={remove} itemName={deleteRecord?.name} loading={deleteMutation.isPending} />
   </div>

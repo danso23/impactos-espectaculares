@@ -8,12 +8,12 @@ import { useNavigate } from "react-router-dom";
 import { DataTable } from "@/components/generic/data-table";
 import { ExcelExportButton } from "@/components/generic/excel-export-button";
 import { Filter } from "@/components/generic/filter";
+import { ListingPanel } from "@/components/generic/listing-panel";
 import { ModuleHeader } from "@/components/generic/module-header";
 
 import {
   createSpacesCatalogPdf,
   saveSpacesCatalogPdf,
-  type SpacesCatalogVersion,
 } from "@/lib/pdf/downloadSpacesCatalog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,12 +26,10 @@ import {
 } from "@/components/ui/select";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -63,7 +61,6 @@ import {
   LoaderCircle,
   MapPinned,
   Plus,
-  Search,
   Share2,
 } from "lucide-react";
 import type { RowSelectionState } from "@tanstack/react-table";
@@ -112,8 +109,6 @@ export default function SpacePage() {
   const [catalogPreviewUrl, setCatalogPreviewUrl] = React.useState<string | null>(null);
   const [catalogPreviewBlob, setCatalogPreviewBlob] = React.useState<Blob | null>(null);
   const [catalogPreviewSpaces, setCatalogPreviewSpaces] = React.useState<Space[]>([]);
-  const [catalogPreviewVersion, setCatalogPreviewVersion] =
-    React.useState<SpacesCatalogVersion>("v2");
   const [isCatalogPreviewLoading, setIsCatalogPreviewLoading] = React.useState(false);
   const [isCatalogDownloadLoading, setIsCatalogDownloadLoading] = React.useState(false);
   const [shareDialogOpen, setShareDialogOpen] = React.useState(false);
@@ -139,6 +134,11 @@ export default function SpacePage() {
   }, [searchInput]);
 
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  const activeFiltersCount =
+    (filters.dateFrom || filters.dateTo ? 1 : 0) +
+    Object.values(filters.selects).filter(Boolean).length +
+    Object.values(filters.checks).filter((v) => v !== undefined).length;
 
   const handleApplyFilters = (v: FilterValues) => {
     setFilters(v);
@@ -258,17 +258,16 @@ export default function SpacePage() {
     };
   }, [catalogPreviewUrl]);
 
-  const handlePreviewCatalog = async (version: SpacesCatalogVersion) => {
+  const handlePreviewCatalog = async () => {
     setIsCatalogPreviewLoading(true);
 
     try {
       const previewSpaces = [...selectedSpaces];
-      const blob = await createSpacesCatalogPdf(previewSpaces, version, {
+      const blob = await createSpacesCatalogPdf(previewSpaces, {
         enableMapLinks: false,
       });
       setCatalogPreviewBlob(blob);
       setCatalogPreviewSpaces(previewSpaces);
-      setCatalogPreviewVersion(version);
       setCatalogPreviewUrl(URL.createObjectURL(blob));
       setCatalogPreviewOpen(true);
     } catch (error) {
@@ -308,12 +307,10 @@ export default function SpacePage() {
     setIsCatalogDownloadLoading(true);
 
     try {
-      const blob = await createSpacesCatalogPdf(
-        catalogPreviewSpaces,
-        catalogPreviewVersion,
-        { enableMapLinks: true }
-      );
-      saveSpacesCatalogPdf(blob, catalogPreviewVersion);
+      const blob = await createSpacesCatalogPdf(catalogPreviewSpaces, {
+        enableMapLinks: true,
+      });
+      saveSpacesCatalogPdf(blob);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -383,7 +380,7 @@ export default function SpacePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Espacios"
         badge="Control de espacios"
@@ -442,161 +439,134 @@ export default function SpacePage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <CardTitle className="text-xl">Búsqueda rápida</CardTitle>
-              <CardDescription>
-                Filtra por ID, título, tipo o estatus.
-              </CardDescription>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 lg:flex-row xl:w-auto xl:items-center">
-              <div className="relative w-full lg:min-w-80 xl:w-96">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar espacio..."
-                  className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <ExcelExportButton
-                  columns={columns}
-                  data={data}
-                  filename="espacios"
-                  disabled={spacesQuery.isFetching}
-                  selected={sortedSelectedSpaces}
-                  onClearSelection={() => setRowSelection({})}
-                  presets={SPACE_EXPORT_PRESETS}
-                  fetchAll={async () => {
-                    const rows = await fetchAllPages((nextPage, size) =>
-                      getSpaces(buildSpacesParams(filters, nextPage, size, search)),
-                    );
-                    return sortByAssignedId(rows.map(apiToUiSpace));
-                  }}
-                />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="flex gap-2 rounded-lg border-gray-300 shadow-sm hover:bg-purple-50 hover:text-purple-600"
-                      disabled={selectedSpaces.length === 0 || isCatalogPreviewLoading}
-                      title="Previsualizar PDF"
-                    >
-                      {isCatalogPreviewLoading ? (
-                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <FileDown className="h-4 w-4" />
-                      )}
-                      {isCatalogPreviewLoading ? "Generando..." : "PDF"}
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-56">
-                    <DropdownMenuLabel>Versión del catálogo</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => handlePreviewCatalog("v2")}>
-                      <div>
-                        <p className="font-medium">Diseño nuevo · V2</p>
-                        <p className="text-xs text-muted-foreground">Formato editorial actualizado</p>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handlePreviewCatalog("v1")}>
-                      <div>
-                        <p className="font-medium">Diseño anterior · V1</p>
-                        <p className="text-xs text-muted-foreground">Formato clásico del catálogo</p>
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-lg border-violet-200 text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
-                  disabled={selectedSpaces.length === 0}
-                  onClick={() => setShareDialogOpen(true)}
-                  title="Compartir catálogo"
-                >
-                  <Share2 className="h-4 w-4" />
-                  Compartir
-                </Button>
-
-                <Button
-                  className="rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transition-all hover:from-purple-700 hover:to-indigo-700"
-                  disabled={selectedSpaces.length === 0 || hasBlockedSelection}
-                  title={
-                    hasBlockedSelection
-                      ? "Los espacios bloqueados pueden incluirse en el catálogo, pero no en una cotización."
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por ID, título, tipo o estatus."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar espacio..."
+        actions={
+              <Button
+                className="h-11 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md transition-all hover:from-purple-700 hover:to-indigo-700"
+                disabled={selectedSpaces.length === 0 || hasBlockedSelection}
+                title={
+                  hasBlockedSelection
+                    ? "Los espacios bloqueados pueden incluirse en el catálogo, pero no en una cotización."
+                    : selectedSpaces.length === 0
+                      ? "Selecciona espacios para cotizar"
                       : "Crear cotización"
-                  }
-                  onClick={() => {
-                    navigate("/cotizaciones/nueva", {
-                      state: { spaces: selectedSpaces },
-                    });
-                  }}
-                >
-                  Crear cotización
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-        </CardHeader>
-
-        <CardContent className="space-y-6 pt-0">
-          <Filter
-            title="Filtros avanzados"
-            enableDateRange
-            initialValues={filters}
-            defaultOpen={false}
-            className="border-gray-200 bg-slate-50/60 shadow-none"
-            dropdowns={[
-              {
-                key: "estatus",
-                label: "Estatus",
-                placeholder: "Selecciona",
-                options: [
-                  { label: "Disponible", value: "disponible" },
-                  { label: "Ocupado (rentado)", value: "ocupado" },
-                  { label: "Bloqueado", value: "bloqueado" },
-                ],
-              },
-              {
-                key: "tipo",
-                label: "Tipo",
-                placeholder: "Selecciona tipo",
-                options: SPACE_TYPE_OPTIONS,
-              },
-              {
-                key: "subtipo",
-                label: "Subtipo (espectacular)",
-                placeholder: "Selecciona subtipo",
-                options: SPACE_SUBTYPE_OPTIONS,
-              },
-              {
-                key: "conLuz",
-                label: "Con luz",
-                placeholder: "Selecciona",
-                options: [
-                  { label: "Sí", value: "1" },
-                  { label: "No", value: "0" },
-                ],
-              },
-            ]}
-            checkboxes={[
-              { key: "activo", label: "Activo" },
-              { key: "rotativo", label: "Es rotativo" },
-            ]}
-            onApply={handleApplyFilters}
-            onReset={handleResetFilters}
-            applyOnReset={true}
-          />
-
+                }
+                onClick={() => {
+                  navigate("/cotizaciones/nueva", {
+                    state: { spaces: selectedSpaces },
+                  });
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Cotización
+              </Button>
+        }
+        activeFilters={activeFiltersCount}
+        filters={
+            <Filter
+              hideHeader
+              defaultOpen
+              enableDateRange
+              dateRangeLabel="Fecha de alta"
+              initialValues={filters}
+              className="border-gray-200 bg-slate-50/60 shadow-none"
+              dropdowns={[
+                {
+                  key: "estatus",
+                  label: "Estatus",
+                  placeholder: "Selecciona",
+                  options: [
+                    { label: "Disponible", value: "disponible" },
+                    { label: "Ocupado (rentado)", value: "ocupado" },
+                    { label: "Bloqueado", value: "bloqueado" },
+                  ],
+                },
+                {
+                  key: "tipo",
+                  label: "Tipo",
+                  placeholder: "Selecciona tipo",
+                  options: SPACE_TYPE_OPTIONS,
+                },
+                {
+                  key: "subtipo",
+                  label: "Subtipo (espectacular)",
+                  placeholder: "Selecciona subtipo",
+                  options: SPACE_SUBTYPE_OPTIONS,
+                },
+                {
+                  key: "conLuz",
+                  label: "Con luz",
+                  placeholder: "Selecciona",
+                  options: [
+                    { label: "Sí", value: "1" },
+                    { label: "No", value: "0" },
+                  ],
+                },
+              ]}
+              checkboxes={[
+                { key: "activo", label: "Activo" },
+                { key: "rotativo", label: "Es rotativo" },
+              ]}
+              onApply={handleApplyFilters}
+              onReset={handleResetFilters}
+              applyOnReset={true}
+            />
+        }
+        selectedCount={selectedSpaces.length}
+        itemLabel={["espacio", "espacios"]}
+        onClearSelection={() => setRowSelection({})}
+        exports={
+          <>
+              <ExcelExportButton
+                columns={columns}
+                data={data}
+                filename="espacios"
+                disabled={spacesQuery.isFetching}
+                selected={sortedSelectedSpaces}
+                presets={SPACE_EXPORT_PRESETS}
+                fetchAll={async () => {
+                  const rows = await fetchAllPages((nextPage, size) =>
+                    getSpaces(buildSpacesParams(filters, nextPage, size, search)),
+                  );
+                  return sortByAssignedId(rows.map(apiToUiSpace));
+                }}
+              />
+              <Button
+                variant="outline"
+                className="flex gap-2 rounded-lg border-gray-300 bg-white text-red-700 shadow-sm hover:bg-red-50 hover:text-red-800"
+                disabled={selectedSpaces.length === 0 || isCatalogPreviewLoading}
+                title={selectedSpaces.length === 0 ? "Selecciona espacios para el catálogo PDF" : "Previsualizar PDF"}
+                onClick={() => void handlePreviewCatalog()}
+              >
+                {isCatalogPreviewLoading ? (
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4" />
+                )}
+                {isCatalogPreviewLoading ? "Generando..." : "PDF"}
+              </Button>
+          </>
+        }
+        selectionActions={
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-lg border-gray-300 bg-white text-violet-700 shadow-sm hover:bg-violet-50 hover:text-violet-800"
+                size="icon"
+                disabled={selectedSpaces.length === 0}
+                onClick={() => setShareDialogOpen(true)}
+                title="Compartir catálogo"
+                aria-label="Compartir catálogo"
+              >
+                <Share2 className="h-4 w-4" />
+              </Button>
+        }
+      >
           <DataTable
             columns={columns}
             data={data}
@@ -614,8 +584,7 @@ export default function SpacePage() {
             onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
             isLoading={spacesQuery.isFetching}
           />
-        </CardContent>
-      </Card>
+      </ListingPanel>
 
       <Dialog
         open={viewOpen}
@@ -797,7 +766,7 @@ export default function SpacePage() {
           <DialogHeader className="m-0 px-5 py-4 sm:m-0 sm:px-7 sm:py-5">
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-violet-600" />
-              Vista previa del catálogo {catalogPreviewVersion.toUpperCase()}
+              Vista previa del catálogo
             </DialogTitle>
             <DialogDescription>
               Revisa el documento antes de guardarlo en tu equipo.
@@ -808,7 +777,7 @@ export default function SpacePage() {
             {catalogPreviewUrl ? (
               <iframe
                 src={`${catalogPreviewUrl}#toolbar=1&navpanes=0&view=FitH`}
-                title={`Vista previa del catálogo ${catalogPreviewVersion.toUpperCase()}`}
+                title="Vista previa del catálogo"
                 className="h-full w-full rounded-lg border border-slate-200 bg-white"
               />
             ) : null}

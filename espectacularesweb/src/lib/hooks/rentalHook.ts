@@ -6,6 +6,7 @@ import {
   createRental,
   confirmRental,
   deleteRental,
+  getRentalFilterOptions,
   getRentals,
   updateRental,
 } from "@/lib/services/rentalService"
@@ -22,6 +23,17 @@ export function useRentals(params: QueryParams) {
     enabled: !!access,
     staleTime: 10_000,
     placeholderData: (prev) => prev,
+  })
+}
+
+export function useRentalFilterOptions() {
+  const access = tokenStore.getAccess()
+
+  return useQuery({
+    queryKey: ["rentals", "filter-options"],
+    queryFn: getRentalFilterOptions,
+    enabled: !!access,
+    staleTime: 60_000,
   })
 }
 

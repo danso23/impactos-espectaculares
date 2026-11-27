@@ -22,6 +22,13 @@ export type FilterDateFieldConfig = {
     label: string
 }
 
+/** Un rango de fechas en un solo selector; guarda sus extremos en `values.dates[fromKey|toKey]`. */
+export type FilterDateRangeConfig = {
+    label: string
+    fromKey: string
+    toKey: string
+}
+
 export type FilterValues = {
     dateFrom?: string // YYYY-MM-DD
     dateTo?: string // YYYY-MM-DD

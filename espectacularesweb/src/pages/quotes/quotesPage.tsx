@@ -11,7 +11,6 @@ import { Filter } from "@/components/generic/filter"
 import { ListingPanel } from "@/components/generic/listing-panel"
 import { ModuleHeader } from "@/components/generic/module-header"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { downloadQuotePdf } from "@/lib/pdf/downloadQuotePdf"
 import { useDeleteQuote, useQuoteCatalogs, useQuotes } from "@/lib/hooks/quoteHook"
 import { QuoteConvertToRentalDialog } from "@/pages/quotes/quoteConvertToRentalDialog"
@@ -45,6 +44,9 @@ export default function QuotesPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL)
   const [dateFrom, setDateFrom] = React.useState<string | undefined>()
   const [dateTo, setDateTo] = React.useState<string | undefined>()
+  // "cliente:3", "lead:5" o "sin_cliente".
+  const [customerFilter, setCustomerFilter] = React.useState<string>(ALL)
+  const [companyFilter, setCompanyFilter] = React.useState<string>(ALL)
   const [selectedQuote, setSelectedQuote] = React.useState<QuoteRecord | null>(null)
   const [statusDialogOpen, setStatusDialogOpen] = React.useState(false)
   const [convertDialogOpen, setConvertDialogOpen] = React.useState(false)
@@ -73,20 +75,32 @@ export default function QuotesPage() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  const params = React.useMemo(
-    () => ({
+  const params = React.useMemo(() => {
+    const [customerType, customerId] = customerFilter === ALL ? [] : customerFilter.split(":")
+    return {
       page,
       per_page: perPage,
       q: search || undefined,
       status: statusFilter === ALL ? undefined : statusFilter,
       date_from: dateFrom,
       date_to: dateTo,
-    }),
-    [dateFrom, dateTo, page, perPage, search, statusFilter]
-  )
+      customer_type: customerType,
+      customer_id: customerId ? Number(customerId) : undefined,
+      issuer_company_id: companyFilter === ALL ? undefined : Number(companyFilter),
+    }
+  }, [companyFilter, customerFilter, dateFrom, dateTo, page, perPage, search, statusFilter])
 
   const quotesQuery = useQuotes(params)
   const statuses = catalogsQuery.data?.data.statuses ?? []
+  const companies = catalogsQuery.data?.data.companies ?? []
+  const customerTypeLabel: Record<string, string> = { cliente: "Cliente", lead: "Prospecto", proveedor: "Proveedor" }
+  const customerOptions = [
+    { label: "Sin cliente", value: "sin_cliente" },
+    ...(catalogsQuery.data?.data.quoted_customers ?? []).map((customer) => ({
+      label: `${customer.name} · ${customerTypeLabel[customer.type] ?? customer.type}`,
+      value: `${customer.type}:${customer.id}`,
+    })),
+  ]
   const quotes = quotesQuery.data?.data ?? []
   const meta = quotesQuery.data?.meta
   const handleDownload = React.useCallback(async (quote: QuoteRecord) => {
@@ -151,7 +165,7 @@ export default function QuotesPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Cotizaciones"
         badge="Control de cotizaciones"
@@ -169,32 +183,51 @@ export default function QuotesPage() {
 
       <ListingPanel
         title="Búsqueda rápida"
-        description="Filtra por folio, nota, estatus o fecha de alta."
-        search={
-          <div className="relative w-full xl:w-96">
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Buscar por folio o nota..."
-              className="rounded-xl border-gray-300 bg-white shadow-sm focus:border-purple-500 focus:ring-purple-500"
-            />
-          </div>
-        }
-        actions={<ExcelExportButton
+        description="Filtra por folio, nota, estatus, cliente, empresa o fecha de alta."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar por folio o nota..."
+        selectedCount={selection.selected.length}
+        itemLabel={["cotización", "cotizaciones"]}
+        feminine
+        onClearSelection={selection.clear}
+        exports={<ExcelExportButton
           columns={columns}
           data={quotes}
-          filename="cotizaciones" selected={selection.selected} onClearSelection={selection.clear}
+          filename="cotizaciones" selected={selection.selected}
           disabled={quotesQuery.isFetching}
           fetchAll={() => fetchAllPages((nextPage, size) => getQuotes({ ...params, page: nextPage, per_page: size }))}
         />}
+        activeFilters={(statusFilter === ALL ? 0 : 1) + (customerFilter === ALL ? 0 : 1) + (companyFilter === ALL ? 0 : 1) + (dateFrom || dateTo ? 1 : 0)}
         filters={<Filter
-          title="Filtros avanzados"
-          defaultOpen={false}
+          hideHeader
+          defaultOpen
+          dateRangeLabel="Fecha de alta"
           className="border-gray-200 bg-slate-50/60 shadow-none"
-          dropdowns={[{ key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) }]}
-          initialValues={{ dateFrom, dateTo, selects: { estatus: statusFilter === ALL ? undefined : statusFilter }, checks: {} }}
-          onApply={(values) => { setStatusFilter(values.selects.estatus ?? ALL); setDateFrom(values.dateFrom); setDateTo(values.dateTo); setPage(1) }}
-          onReset={() => { setStatusFilter(ALL); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
+          dropdowns={[
+            { key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) },
+            { key: "cliente", label: "Cliente", options: customerOptions },
+            { key: "empresa", label: "Empresa", options: companies.map((company) => ({ label: company.name, value: String(company.id) })) },
+          ]}
+          initialValues={{
+            dateFrom,
+            dateTo,
+            selects: {
+              estatus: statusFilter === ALL ? undefined : statusFilter,
+              cliente: customerFilter === ALL ? undefined : customerFilter,
+              empresa: companyFilter === ALL ? undefined : companyFilter,
+            },
+            checks: {},
+          }}
+          onApply={(values) => {
+            setStatusFilter(values.selects.estatus ?? ALL)
+            setCustomerFilter(values.selects.cliente ?? ALL)
+            setCompanyFilter(values.selects.empresa ?? ALL)
+            setDateFrom(values.dateFrom)
+            setDateTo(values.dateTo)
+            setPage(1)
+          }}
+          onReset={() => { setStatusFilter(ALL); setCustomerFilter(ALL); setCompanyFilter(ALL); setDateFrom(undefined); setDateTo(undefined); setPage(1) }}
           applyOnReset
         />}
       >

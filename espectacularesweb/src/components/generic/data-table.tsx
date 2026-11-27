@@ -242,7 +242,7 @@ export function DataTable<TData>({
                   <TableHead
                     key={header.id}
                     className={cn(
-                      "px-6 py-4 text-white font-semibold uppercase tracking-wider text-xs",
+                      "px-3 py-3 text-white font-semibold uppercase tracking-wider text-xs sm:px-6 sm:py-4",
                       noWrap && "whitespace-nowrap",
                       header.column.id === "actions" &&
                         "sticky right-0 z-30 bg-gradient-to-r from-purple-600 to-indigo-600 shadow-[-10px_0_12px_-12px_rgba(0,0,0,0.35)]",
@@ -277,7 +277,7 @@ export function DataTable<TData>({
                     <TableCell
                       key={cell.id}
                       className={cn(
-                        "px-6 py-4 text-gray-700",
+                        "px-3 py-3 text-gray-700 sm:px-6 sm:py-4",
                         noWrap && "whitespace-nowrap",
                         cell.column.id === "actions" &&
                           "sticky right-0 z-10 bg-white shadow-[-10px_0_12px_-12px_rgba(0,0,0,0.25)]",
@@ -306,7 +306,7 @@ export function DataTable<TData>({
         </Table>
 
         {enablePagination && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+          <div className="flex items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4 border-t border-gray-100 bg-gray-50/50">
             <div className="text-sm font-medium text-gray-600">
               Página <span className="text-purple-600">{currentPage}</span> de <span className="text-purple-600">{totalPages}</span>
             </div>

@@ -144,7 +144,7 @@ export function ExcelExportButton<TData>({
     }
   }
 
-  const label = selectedCount > 0 ? `Exportar (${selectedCount} seleccionados)` : "Exportar"
+  const label = selectedCount > 0 ? `XLS (${selectedCount})` : "XLS"
   const title = selectedCount > 0
     ? "Exporta solo los registros seleccionados"
     : "Exporta todos los registros con los filtros aplicados"
