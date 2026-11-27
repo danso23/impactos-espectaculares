@@ -11,6 +11,7 @@ import {
   getLeadCatalogs,
   getLeads,
   updateClient,
+  getClientFilterOptions,
 } from "@/lib/services/crmService"
 import type { ClientFormValues, LeadFormValues } from "@/types/Crm"
 import type { QueryParams } from "@/types/QueryParam"
@@ -36,6 +37,18 @@ export function useLeads(params: QueryParams) {
     enabled: !!access,
     staleTime: 10_000,
     placeholderData: (prev) => prev,
+  })
+}
+
+/** Fuentes y usuarios para los filtros de Clientes (comparte prefijo para invalidarse con la lista). */
+export function useClientFilterOptions() {
+  const access = tokenStore.getAccess()
+
+  return useQuery({
+    queryKey: ["crm", "clients", "filter-options"],
+    queryFn: getClientFilterOptions,
+    enabled: !!access,
+    staleTime: 60_000,
   })
 }
 

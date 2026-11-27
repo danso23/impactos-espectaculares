@@ -19,6 +19,7 @@ class CollaboratorController extends BaseCrudController
             'position' => ['nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:150'],
+            'rfc' => ['nullable', 'string', 'max:13'],
             'notes' => ['nullable', 'string'],
             'active' => ['nullable', 'boolean'],
         ];
@@ -31,9 +32,31 @@ class CollaboratorController extends BaseCrudController
             'position' => ['sometimes', 'nullable', 'string', 'max:120'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:50'],
             'email' => ['sometimes', 'nullable', 'email', 'max:150'],
+            'rfc' => ['sometimes', 'nullable', 'string', 'max:13'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'active' => ['sometimes', 'boolean'],
         ];
+    }
+
+    protected function beforeStore(array $data, Request $request): array
+    {
+        return $this->normalizeRfc($data);
+    }
+
+    protected function beforeUpdate(array $data, Request $request, \Illuminate\Database\Eloquent\Model $model): array
+    {
+        return $this->normalizeRfc($data);
+    }
+
+    /** RFC en mayúsculas y sin espacios; vacío se guarda como null. */
+    private function normalizeRfc(array $data): array
+    {
+        if (array_key_exists('rfc', $data)) {
+            $rfc = strtoupper(preg_replace('/\s+/', '', (string) $data['rfc']));
+            $data['rfc'] = $rfc === '' ? null : $rfc;
+        }
+
+        return $data;
     }
 
     protected function applyIndexQuery($query, Request $request)
@@ -42,10 +65,27 @@ class CollaboratorController extends BaseCrudController
             $query->where('active', (int) $request->get('active'));
         }
 
+        if ($request->filled('rfc')) {
+            $query->where('rfc', 'like', '%' . trim((string) $request->get('rfc')) . '%');
+        }
+
+        if ($request->filled('phone')) {
+            $query->where('phone', 'like', '%' . trim((string) $request->get('phone')) . '%');
+        }
+
+        // Fecha de alta en rango.
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->get('date_to'));
+        }
+
         if ($request->filled('q')) {
             $term = trim((string) $request->get('q'));
             $query->where(function ($inner) use ($term) {
                 $inner->where('name', 'like', "%{$term}%")
+                    ->orWhere('rfc', 'like', "%{$term}%")
                     ->orWhere('position', 'like', "%{$term}%")
                     ->orWhere('phone', 'like', "%{$term}%")
                     ->orWhere('email', 'like', "%{$term}%")

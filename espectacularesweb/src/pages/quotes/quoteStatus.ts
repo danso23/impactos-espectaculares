@@ -15,7 +15,7 @@ export const QUOTE_STATUS_HINTS: Record<string, string> = {
   cancelled: "El servicio no se realizó (o la cotización fue reemplazada por otra).",
 }
 
-function isConvertedToRental(quote: QuoteRecord) {
+export function isConvertedToRental(quote: QuoteRecord) {
   return Boolean(quote.converted_to_rental_at || quote.rental)
 }
 
@@ -29,8 +29,10 @@ export function canChangeQuoteStatus(quote: QuoteRecord) {
   return getAllowedQuoteStatusKeys(quote.status?.key).length > 0
 }
 
-export function canDuplicateQuote(quote: QuoteRecord) {
-  return !isConvertedToRental(quote)
+// Cualquier cotización se puede duplicar; una convertida a renta se copia sin
+// cancelarse (por ejemplo, para revender el espacio).
+export function canDuplicateQuote() {
+  return true
 }
 
 /** Solo Borrador o Enviada, y sin renta generada. */

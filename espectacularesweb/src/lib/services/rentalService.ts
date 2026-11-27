@@ -17,6 +17,16 @@ function toQueryString(params?: QueryParams) {
   return qs ? `?${qs}` : ""
 }
 
+export type RentalFilterOptions = {
+  customers: { type: string; id: number; name: string }[]
+  spaces: { id: number; name: string }[]
+}
+
+/** Clientes y espacios que aparecen en alguna renta, para los filtros del listado. */
+export function getRentalFilterOptions() {
+  return apiFetch<{ data: RentalFilterOptions }>("/api/rentals/filter-options")
+}
+
 export function getRentals(params?: QueryParams) {
   return apiFetch<RentalsResponse>(`/api/rentals${toQueryString(params)}`)
 }

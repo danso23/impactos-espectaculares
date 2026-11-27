@@ -6,6 +6,7 @@ export type CollaboratorRecord = {
   position?: string | null
   phone?: string | null
   email?: string | null
+  rfc?: string | null
   notes?: string | null
   active: boolean
   created_at?: string | null
@@ -17,6 +18,7 @@ export type CollaboratorFormValues = {
   position: string
   phone: string
   email: string
+  rfc: string
   notes: string
   active: boolean
 }

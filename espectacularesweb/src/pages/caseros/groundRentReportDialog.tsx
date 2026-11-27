@@ -125,7 +125,7 @@ export function GroundRentReportDialog({ open, onOpenChange }: { open: boolean; 
       <DialogHeader>
         <div className="flex flex-wrap items-center justify-between gap-3 pr-6">
           <DialogTitle className="flex items-center gap-2"><CalendarRange className="h-5 w-5 text-violet-600" />Reporte de pagos a caseros</DialogTitle>
-          <Button type="button" variant="outline" size="sm" className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" disabled={report.isFetching || rows.length === 0} onClick={exportExcel}><FileSpreadsheet className="mr-2 h-4 w-4" />Exportar</Button>
+          <Button type="button" variant="outline" size="sm" className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" disabled={report.isFetching || rows.length === 0} onClick={exportExcel}><FileSpreadsheet className="mr-2 h-4 w-4" />XLS</Button>
         </div>
         <DialogDescription>Pagos de renta de piso por mes, según su fecha de vencimiento.</DialogDescription>
       </DialogHeader>

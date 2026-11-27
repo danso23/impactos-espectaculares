@@ -1,7 +1,6 @@
 import { pdf } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
 import { SpacesCatalogDocument, type CatalogSpace } from "./SpacesCatalogPdf";
-import { SpacesCatalogDocumentV1 } from "./SpacesCatalogPdfV1";
 import { env } from "@/config/env";
 import { getToken } from "@/lib/auth";
 import { sortByAssignedId } from "@/lib/catalog/catalogHelpers";
@@ -51,34 +50,22 @@ async function hydrateSpaceImages(spaces: CatalogSpace[]) {
   )
 }
 
-export type SpacesCatalogVersion = "v1" | "v2";
-
 export const createSpacesCatalogPdf = async (
   spaces: CatalogSpace[],
-  version: SpacesCatalogVersion = "v2",
   options: { enableMapLinks?: boolean } = {}
 ) => {
   // El PDF de fichas se envía al cliente: nunca incluye precios.
   const clientSpaces = sortByAssignedId(spaces).map((space) => ({ ...space, price: undefined }))
   const hydratedSpaces = await hydrateSpaceImages(clientSpaces)
   const enableMapLinks = options.enableMapLinks ?? true
-  const document = version === "v1"
-    ? <SpacesCatalogDocumentV1 spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />
-    : <SpacesCatalogDocument spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />
-  return await pdf(document).toBlob();
+  return await pdf(<SpacesCatalogDocument spaces={hydratedSpaces} enableMapLinks={enableMapLinks} />).toBlob();
 };
 
-export const saveSpacesCatalogPdf = (
-  blob: Blob,
-  version: SpacesCatalogVersion = "v2"
-) => {
-  saveAs(blob, `catalogo-espacios-${version.toUpperCase()}.pdf`);
+export const saveSpacesCatalogPdf = (blob: Blob) => {
+  saveAs(blob, "catalogo-espacios.pdf");
 };
 
-export const downloadSpacesCatalog = async (
-  spaces: CatalogSpace[],
-  version: SpacesCatalogVersion = "v2"
-) => {
-  const blob = await createSpacesCatalogPdf(spaces, version);
-  saveSpacesCatalogPdf(blob, version);
+export const downloadSpacesCatalog = async (spaces: CatalogSpace[]) => {
+  const blob = await createSpacesCatalogPdf(spaces);
+  saveSpacesCatalogPdf(blob);
 };

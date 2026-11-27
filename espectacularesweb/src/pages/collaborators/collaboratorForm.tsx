@@ -5,12 +5,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PhoneInput } from "@/components/ui/phone-input"
+import { RfcInput } from "@/components/ui/mexican-id-input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import type { CollaboratorFormValues, CollaboratorRecord } from "@/types/Collaborator"
 
-const EMPTY: CollaboratorFormValues = { name: "", position: "", phone: "", email: "", notes: "", active: true }
-const toForm = (record: CollaboratorRecord): CollaboratorFormValues => ({ name: record.name, position: record.position ?? "", phone: record.phone ?? "", email: record.email ?? "", notes: record.notes ?? "", active: record.active !== false })
+const EMPTY: CollaboratorFormValues = { name: "", position: "", phone: "", email: "", rfc: "", notes: "", active: true }
+const toForm = (record: CollaboratorRecord): CollaboratorFormValues => ({ name: record.name, position: record.position ?? "", phone: record.phone ?? "", email: record.email ?? "", rfc: record.rfc ?? "", notes: record.notes ?? "", active: record.active !== false })
 
 type Props = { editRecord?: CollaboratorRecord | null; isSubmitting: boolean; onSubmit: (payload: CollaboratorFormValues) => Promise<void>; open?: boolean; onOpenChange?: (open: boolean) => void; showTrigger?: boolean }
 
@@ -31,6 +32,7 @@ export function CollaboratorForm({ editRecord, isSubmitting, onSubmit, open: con
         <div className="space-y-2"><Label>Puesto</Label><Input value={form.position} onChange={(e) => update("position", e.target.value)} /></div>
         <div className="space-y-2"><Label>Teléfono</Label><PhoneInput value={form.phone} onValueChange={(value) => update("phone", value)} /></div>
         <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => update("email", e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="collaborator-rfc">RFC</Label><RfcInput id="collaborator-rfc" value={form.rfc} onValueChange={(value) => update("rfc", value)} /></div>
       </div>
       <div className="space-y-2"><Label>Notas</Label><Textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} /></div>
       <div className="flex items-center justify-between rounded-md border px-4 py-3"><div><p className="text-sm font-medium">Activo</p><p className="text-xs text-muted-foreground">Permite ocultarlo sin borrar sus datos.</p></div><Switch checked={form.active} onCheckedChange={(value) => update("active", value)} /></div>

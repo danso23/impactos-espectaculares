@@ -49,6 +49,12 @@ class LeadController extends Controller
             $query->where('assigned_to', (int) $assignedTo);
         }
 
+        // Prioridad: 1 Alta, 2 Media, 3 Baja.
+        $priority = (int) $request->query('priority', 0);
+        if (in_array($priority, [1, 2, 3], true)) {
+            $query->where('priority', $priority);
+        }
+
         if ($q !== '') {
             $query->where(function ($inner) use ($q) {
                 $inner->where('nombre', 'like', "%{$q}%")

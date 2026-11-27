@@ -182,12 +182,16 @@ class SpaceController extends BaseCrudController
     /** Orden natural por ID asignado: numéricos primero (2, 10, 233), luego texto. */
     protected function indexOrder($query, Request $request)
     {
+        // Orden natural por ID asignado; `direction=desc` lo invierte. Los vacíos siempre al final.
+        $direction = $request->get('direction') === 'desc' ? 'desc' : 'asc';
+        $numericFirst = $direction === 'asc' ? 'DESC' : 'ASC';
+
         return $query
             ->orderByRaw("(spaces.assigned_id IS NULL OR spaces.assigned_id = '')")
-            ->orderByRaw("(spaces.assigned_id REGEXP '^[0-9]') DESC")
-            ->orderByRaw('CAST(spaces.assigned_id AS UNSIGNED)')
-            ->orderBy('spaces.assigned_id')
-            ->orderBy('spaces.id');
+            ->orderByRaw("(spaces.assigned_id REGEXP '^[0-9]') {$numericFirst}")
+            ->orderByRaw("CAST(spaces.assigned_id AS UNSIGNED) {$direction}")
+            ->orderBy('spaces.assigned_id', $direction)
+            ->orderBy('spaces.id', $direction);
     }
 
     // --- override store ---

@@ -78,6 +78,24 @@ class CaseroController extends BaseCrudController
             $query->where('active', (int) $request->get('active'));
         }
 
+        if ($request->filled('rfc')) {
+            $query->where('rfc', 'like', '%' . trim((string) $request->get('rfc')) . '%');
+        }
+
+        // Teléfono: busca en el principal y en el secundario.
+        if ($request->filled('telefono')) {
+            $phone = '%' . trim((string) $request->get('telefono')) . '%';
+            $query->where(fn ($inner) => $inner->where('telefono', 'like', $phone)->orWhere('telefono_2', 'like', $phone));
+        }
+
+        // Fecha de alta en rango.
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->get('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->get('date_to'));
+        }
+
         // Búsqueda general
         if ($request->filled('q')) {
             $term = $request->get('q');

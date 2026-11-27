@@ -311,7 +311,7 @@ export function GroundRentalsDialog({ casero, open, onOpenChange, canEdit }: { c
       <DialogHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <DialogTitle className="flex items-center gap-2"><Landmark className="h-5 w-5 text-violet-600" />Predios y rentas de piso</DialogTitle>
-          <Button type="button" variant="outline" size="sm" disabled={properties.length === 0} onClick={() => downloadReport(casero, properties)}><Download className="mr-2 h-4 w-4" />Generar Excel</Button>
+          <Button type="button" variant="outline" size="sm" disabled={properties.length === 0} onClick={() => downloadReport(casero, properties)}><Download className="mr-2 h-4 w-4" />XLS</Button>
         </div>
         <DialogDescription>Administra los inmuebles de {casero ? [casero.nombre, casero.apellido_paterno, casero.apellido_materno].filter(Boolean).join(" ") : "este casero"}, sus espacios y los pagos que se le realizarán.</DialogDescription>
       </DialogHeader>

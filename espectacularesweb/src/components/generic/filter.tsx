@@ -23,9 +23,12 @@ import {
     CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { DateRangePicker } from "@/components/generic/date-range-picker"
 import type {
     FilterCheckboxConfig,
     FilterDateFieldConfig,
+    FilterDateRangeConfig,
+    FilterTextFieldConfig,
     FilterDropdownConfig,
     FilterValues,
 } from "@/types/Filter"
@@ -33,6 +36,12 @@ import type {
 type Props = {
     title?: string
     enableDateRange?: boolean
+    /** Etiqueta del rango general (dateFrom/dateTo). */
+    dateRangeLabel?: string
+    /** Rangos adicionales en un solo selector cada uno (p. ej. Inicio y Fin de una renta). */
+    dateRanges?: FilterDateRangeConfig[]
+    /** Campos de texto libre (p. ej. RFC). */
+    textFields?: FilterTextFieldConfig[]
     dropdowns?: FilterDropdownConfig[]
     checkboxes?: FilterCheckboxConfig[]
     /** Campos de fecha adicionales (p. ej. inicio desde/hasta, fin desde/hasta). */
@@ -45,6 +54,11 @@ type Props = {
     className?: string
     applyOnReset?: boolean
     defaultOpen?: boolean
+    /** Abierto/cerrado controlado desde fuera (por ejemplo, un botón Filtros propio). */
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+    /** Oculta el encabezado con título y botón; el panel solo se muestra abierto. */
+    hideHeader?: boolean
     actions?: React.ReactNode
 }
 
@@ -65,6 +79,7 @@ function buildInitialState(params: {
         dateFrom: params.initialValues?.dateFrom,
         dateTo: params.initialValues?.dateTo,
         dates: { ...(params.initialValues?.dates ?? {}) },
+        texts: { ...(params.initialValues?.texts ?? {}) },
         selects: { ...selects, ...(params.initialValues?.selects ?? {}) },
         checks: { ...checks, ...(params.initialValues?.checks ?? {}) },
     }
@@ -79,6 +94,9 @@ function triLabel(v: boolean | undefined) {
 export function Filter({
     title = "Filtros",
     enableDateRange = true,
+    dateRangeLabel = "Rango de fechas",
+    dateRanges = [],
+    textFields = [],
     dropdowns = [],
     checkboxes = [],
     dateFields = [],
@@ -90,6 +108,9 @@ export function Filter({
     className,
     applyOnReset = true,
     defaultOpen = false,
+    open: openProp,
+    onOpenChange,
+    hideHeader = false,
     actions,
 }: Props) {
     const [values, setValues] = React.useState<FilterValues>(() =>
@@ -103,8 +124,10 @@ export function Filter({
         dropdowns,
         checkboxes,
         dateFields,
+        dateRanges,
+        textFields,
         })
-    }, [enableDateRange, initialValues, dropdowns, checkboxes, dateFields])
+    }, [enableDateRange, initialValues, dropdowns, checkboxes, dateFields, dateRanges, textFields])
 
     React.useEffect(() => {
         setValues(buildInitialState({ dropdowns, checkboxes, initialValues }))
@@ -163,15 +186,23 @@ export function Filter({
         (values.dateFrom ? 1 : 0) +
         (values.dateTo ? 1 : 0) +
         Object.values(values.dates ?? {}).filter(Boolean).length +
+        Object.values(values.texts ?? {}).filter((v) => v?.trim()).length +
         Object.values(values.selects).filter(Boolean).length +
         Object.values(values.checks).filter((v) => v !== undefined).length
 
-    const [open, setOpen] = React.useState(defaultOpen)
+    const [openState, setOpenState] = React.useState(defaultOpen)
+    const open = openProp ?? openState
+    const setOpen = (next: boolean) => {
+        setOpenState(next)
+        onOpenChange?.(next)
+    }
+
+    if (hideHeader && !open) return null
 
     return (
         <Card className={cn("rounded-xl shadow-md border-gray-200 overflow-hidden bg-white/80 backdrop-blur-sm", className)}>
             <Collapsible open={open} onOpenChange={setOpen}>
-                <CardHeader className="px-5 py-3">
+                {hideHeader ? null : <CardHeader className="px-5 py-3">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-center gap-3">
                             <CardTitle className="text-xl font-bold text-gray-800">{title}</CardTitle>
@@ -207,12 +238,28 @@ export function Filter({
                             </CollapsibleTrigger>
                         </div>
                     </div>
-                </CardHeader>
+                </CardHeader>}
 
                 <CollapsibleContent>
-                    <CardContent className="space-y-6 px-6 pb-6 pt-2 animate-in slide-in-from-top-2 duration-200">
+                    <CardContent className={cn("space-y-6 px-6 pb-6 animate-in", hideHeader ? "pt-6" : "pt-2", "slide-in-from-top-2 duration-200")}>
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                             {/* Dropdowns */}
+                            {textFields.map((field) => (
+                                <div key={field.key} className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">{field.label}</Label>
+                                    <Input
+                                        className="rounded-lg border-gray-300 bg-white shadow-sm"
+                                        placeholder={field.placeholder}
+                                        value={values.texts?.[field.key] ?? ""}
+                                        onChange={(e) => {
+                                            const next = e.target.value
+                                            setValues((p) => ({ ...p, texts: { ...(p.texts ?? {}), [field.key]: next || undefined } }))
+                                        }}
+                                        onKeyDown={(e) => { if (e.key === "Enter") handleApply() }}
+                                    />
+                                </div>
+                            ))}
+
                             {dropdowns.map((d) => (
                                 <div key={d.key} className="space-y-2">
                                     <Label className="text-sm font-semibold text-gray-700">{d.label}</Label>
@@ -243,28 +290,30 @@ export function Filter({
 
                             {/* Date range */}
                             {enableDateRange && (
-                                <>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold text-gray-700">Fecha inicial</Label>
-                                        <Input
-                                            type="date"
-                                            className="rounded-lg border-gray-300 bg-white shadow-sm"
-                                            value={values.dateFrom ?? ""}
-                                            onChange={(e) => setDateFrom(e.target.value || undefined)}
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label className="text-sm font-semibold text-gray-700">Fecha final</Label>
-                                        <Input
-                                            type="date"
-                                            className="rounded-lg border-gray-300 bg-white shadow-sm"
-                                            value={values.dateTo ?? ""}
-                                            onChange={(e) => setDateTo(e.target.value || undefined)}
-                                        />
-                                    </div>
-                                </>
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">{dateRangeLabel}</Label>
+                                    <DateRangePicker
+                                        value={{ from: values.dateFrom, to: values.dateTo }}
+                                        onChange={(range) => {
+                                            setDateFrom(range.from)
+                                            setDateTo(range.to)
+                                        }}
+                                    />
+                                </div>
                             )}
+
+                            {dateRanges.map((range) => (
+                                <div key={range.fromKey} className="space-y-2">
+                                    <Label className="text-sm font-semibold text-gray-700">{range.label}</Label>
+                                    <DateRangePicker
+                                        value={{ from: values.dates?.[range.fromKey], to: values.dates?.[range.toKey] }}
+                                        onChange={(next) => setValues((p) => ({
+                                            ...p,
+                                            dates: { ...(p.dates ?? {}), [range.fromKey]: next.from, [range.toKey]: next.to },
+                                        }))}
+                                    />
+                                </div>
+                            ))}
 
                             {dateFields.map((field) => (
                                 <div key={field.key} className="space-y-2">

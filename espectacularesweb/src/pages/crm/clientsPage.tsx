@@ -1,17 +1,18 @@
 import * as React from "react"
-import { MailCheck, Search, FileText, UsersRound } from "lucide-react"
+import { MailCheck, FileText, UsersRound } from "lucide-react"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
 import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getClients } from "@/lib/services/crmService"
 import { ModuleHeader } from "@/components/generic/module-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { useClients, useCreateClient } from "@/lib/hooks/crmHook"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useClientFilterOptions, useClients, useCreateClient } from "@/lib/hooks/crmHook"
+import { Filter } from "@/components/generic/filter"
+import type { FilterValues } from "@/types/Filter"
 import { CrmForm } from "@/pages/crm/crmForm"
 import { useClientTable } from "@/pages/crm/crmTable"
 import type { ClientFormValues } from "@/types/Crm"
@@ -28,6 +29,8 @@ export default function ClientsPage() {
   const [page, setPage] = React.useState(1)
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
+  const [filterValues, setFilterValues] = React.useState<FilterValues>({ selects: {}, checks: {} })
+  const filterOptionsQuery = useClientFilterOptions()
   const perPage = 10
   const [editRecord, setEditRecord] = React.useState<ClientRecord | null>(null)
   const [deleteRecord, setDeleteRecord] = React.useState<ClientRecord | null>(null)
@@ -46,8 +49,13 @@ export default function ClientsPage() {
       page,
       per_page: perPage,
       q: search || undefined,
+      rfc: filterValues.texts?.rfc?.trim() || undefined,
+      source: filterValues.selects.fuente,
+      usuario: filterValues.selects.usuario,
+      date_from: filterValues.dateFrom,
+      date_to: filterValues.dateTo,
     }),
-    [page, perPage, search]
+    [filterValues, page, perPage, search]
   )
 
   const clientsQuery = useClients(params)
@@ -69,7 +77,7 @@ export default function ClientsPage() {
   )
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Clientes"
         badge="Catálogo de clientes"
@@ -118,34 +126,45 @@ export default function ClientsPage() {
         </Card>
       </div>
 
-      <Card className="border-gray-200 shadow-lg">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-xl">Búsqueda rápida</CardTitle>
-              <CardDescription>
-                Filtra por nombre, teléfono, email, RFC, fuente o usuario registrado.
-              </CardDescription>
-            </div>
-
-            <div className="w-full lg:max-w-md">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar cliente..."
-                  className="rounded-xl border-gray-300 bg-white pl-10 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                />
-              </div>
-            </div>
-            <ExcelExportButton columns={columns} data={clients} filename="clientes" selected={selection.selected} onClearSelection={selection.clear} disabled={clientsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getClients({ ...params, page: nextPage, per_page: size }))} />
-          </div>
-
-          <Separator />
-        </CardHeader>
-
-        <CardContent className="pt-0">
+      <ListingPanel
+        title="Búsqueda rápida"
+        description="Filtra por nombre, teléfono, email, RFC, fuente o usuario registrado."
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar cliente..."
+        selectedCount={selection.selected.length}
+        itemLabel={["cliente", "clientes"]}
+        onClearSelection={selection.clear}
+        activeFilters={
+          (filterValues.texts?.rfc?.trim() ? 1 : 0) +
+          (filterValues.selects.fuente ? 1 : 0) +
+          (filterValues.selects.usuario ? 1 : 0) +
+          (filterValues.dateFrom || filterValues.dateTo ? 1 : 0)
+        }
+        filters={
+          <Filter
+            hideHeader
+            defaultOpen
+            dateRangeLabel="Fecha de alta"
+            textFields={[{ key: "rfc", label: "RFC", placeholder: "Ej. XAXX010101000" }]}
+            dropdowns={[
+              {
+                key: "fuente",
+                label: "Fuente",
+                options: (filterOptionsQuery.data?.data.sources ?? []).map((source) => ({ label: source, value: source })),
+              },
+              {
+                key: "usuario",
+                label: "Registrado por",
+                options: (filterOptionsQuery.data?.data.users ?? []).map((user) => ({ label: user.name, value: user.username })),
+              },
+            ]}
+            initialValues={filterValues}
+            onApply={(values) => { setFilterValues(values); setPage(1) }}
+          />
+        }
+        exports={<ExcelExportButton columns={columns} data={clients} filename="clientes" selected={selection.selected} disabled={clientsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getClients({ ...params, page: nextPage, per_page: size }))} />}
+      >
           <DataTable
             columns={selectableColumns}
             data={clients}
@@ -163,8 +182,7 @@ export default function ClientsPage() {
             onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
             isLoading={clientsQuery.isFetching}
           />
-        </CardContent>
-      </Card>
+      </ListingPanel>
 
       <CrmForm
         mode="client"

@@ -72,8 +72,43 @@ class QuoteController extends Controller
                     ->where('is_active', true)
                     ->orderBy('id')
                     ->get(),
+                'quoted_customers' => $this->quotedCustomers(),
             ],
         ]);
+    }
+
+    /**
+     * Clientes que ya tienen al menos una cotización, para el filtro del listado.
+     * El nombre sale del snapshot de su cotización más reciente (el mismo que muestra la tabla).
+     */
+    private function quotedCustomers(): array
+    {
+        $latestIds = Quote::query()
+            ->whereNotNull('customer_type')
+            ->where('customer_type', '<>', 'sin_cliente')
+            ->whereNotNull('customer_id')
+            ->groupBy('customer_type', 'customer_id')
+            ->selectRaw('MAX(id) as id')
+            ->pluck('id');
+
+        return Quote::query()
+            ->whereIn('id', $latestIds)
+            ->get(['id', 'customer_type', 'customer_id', 'snapshot_json'])
+            ->map(function (Quote $quote) {
+                $snapshot = is_array($quote->snapshot_json)
+                    ? $quote->snapshot_json
+                    : (json_decode((string) $quote->snapshot_json, true) ?: []);
+                $name = trim((string) ($snapshot['customer']['display_name'] ?? ''));
+
+                return [
+                    'type' => $quote->customer_type,
+                    'id' => (int) $quote->customer_id,
+                    'name' => $name !== '' ? $name : ucfirst((string) $quote->customer_type) . ' #' . $quote->customer_id,
+                ];
+            })
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
     }
 
     public function searchCustomers(Request $request)
@@ -147,10 +182,11 @@ class QuoteController extends Controller
         $status = $request->query('status');
         $q = trim((string)$request->query('q', ''));
 
+        // El folio se arma con el id, así que ordenar por id es ordenar por folio.
+        $direction = $request->query('direction') === 'asc' ? 'asc' : 'desc';
         $query = Quote::query()
             ->with(['status', 'company', 'letterhead', 'agency', 'rental', 'acceptedByUser', 'convertedToRentalByUser'])
-            ->orderByDesc('created_at')
-            ->orderByDesc('id');
+            ->orderBy('id', $direction);
 
         if ($status) {
             $query->whereHas('status', function ($inner) use ($status) {
@@ -329,17 +365,14 @@ class QuoteController extends Controller
         $sourceQuote = null;
         if (!empty($validated['duplicate_of_quote_id'])) {
             $sourceQuote = Quote::query()->with(['status', 'rental'])->findOrFail($validated['duplicate_of_quote_id']);
-
-            if ($sourceQuote->converted_to_rental_at || $sourceQuote->rental) {
-                return response()->json([
-                    'message' => 'No se puede duplicar una cotización que ya fue convertida a renta.',
-                ], 422);
-            }
         }
+        // Una cotización convertida se puede copiar (p. ej. para revender el espacio),
+        // pero no se cancela: su renta sigue vigente.
+        $sourceIsConverted = $sourceQuote && ($sourceQuote->converted_to_rental_at || $sourceQuote->rental);
 
         $cancelledStatus = QuoteStatus::query()->where('key', 'cancelled')->first();
 
-        $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request, $sourceQuote, $cancelledStatus) {
+        $quote = DB::transaction(function () use ($validated, $company, $letterhead, $agency, $customerSummary, $calculated, $draftStatus, $request, $sourceQuote, $cancelledStatus, $sourceIsConverted) {
             $duplicateColumn = $sourceQuote && $this->hasColumn('quotes', 'duplicated_from_quote_id')
                 ? ['duplicated_from_quote_id' => $sourceQuote->id]
                 : [];
@@ -391,7 +424,7 @@ class QuoteController extends Controller
                 ],
             );
 
-            if ($sourceQuote) {
+            if ($sourceQuote && !$sourceIsConverted) {
                 $this->cancelReplacedQuote($sourceQuote, $quote, $cancelledStatus, $request);
             }
 

@@ -3,6 +3,7 @@ import { UsersRound } from "lucide-react"
 import { toast } from "sonner"
 
 import { DataTable } from "@/components/generic/data-table"
+import { ListingPanel } from "@/components/generic/listing-panel"
 import { ExcelExportButton } from "@/components/generic/excel-export-button"
 import { createSelectColumn } from "@/components/generic/select-column"
 import { useTableSelection } from "@/hooks/useTableSelection"
@@ -10,7 +11,6 @@ import { fetchAllPages } from "@/lib/fetchAllPages"
 import { getLeads } from "@/lib/services/crmService"
 import { Filter } from "@/components/generic/filter"
 import { ModuleHeader } from "@/components/generic/module-header"
-import { Card, CardContent } from "@/components/ui/card"
 import { useConvertLeadToClient, useCreateLead, useLeadCatalogs, useLeads } from "@/lib/hooks/crmHook"
 import { CrmForm } from "@/pages/crm/crmForm"
 import { useLeadTable } from "@/pages/crm/crmTable"
@@ -28,6 +28,7 @@ export default function LeadsPage() {
   const [searchInput, setSearchInput] = React.useState("")
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState<string>(ALL)
+  const [priorityFilter, setPriorityFilter] = React.useState<string>(ALL)
   const perPage = 10
 
   React.useEffect(() => {
@@ -45,8 +46,9 @@ export default function LeadsPage() {
       per_page: perPage,
       q: search || undefined,
       status_id: statusFilter === ALL ? undefined : statusFilter,
+      priority: priorityFilter === ALL ? undefined : priorityFilter,
     }),
-    [page, perPage, search, statusFilter]
+    [page, perPage, priorityFilter, search, statusFilter]
   )
 
   const leadsQuery = useLeads(params)
@@ -82,7 +84,7 @@ export default function LeadsPage() {
   )
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-500">
+    <div className="mx-auto max-w-7xl space-y-5 sm:space-y-8 animate-in fade-in duration-500">
       <ModuleHeader
         title="Prospectos"
         badge="Seguimiento comercial"
@@ -101,25 +103,51 @@ export default function LeadsPage() {
         </Can>}
       />
 
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <div className="flex justify-end"><ExcelExportButton columns={columns} data={leads} filename="prospectos" selected={selection.selected} onClearSelection={selection.clear} disabled={leadsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getLeads({ ...params, page: nextPage, per_page: size }))} /></div>
-          <Filter title="Filtros avanzados" enableDateRange={false} defaultOpen={false} dropdowns={[{ key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) }]} initialValues={{ selects: { estatus: statusFilter === ALL ? undefined : statusFilter }, checks: {} }} onApply={(values) => { setStatusFilter(values.selects.estatus ?? ALL); setPage(1) }} onReset={() => { setStatusFilter(ALL); setPage(1) }} />
-
+      <ListingPanel
+        title="Búsqueda rápida"
+        description={`${meta?.total ?? leads.length} prospectos registrados en el CRM.`}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Buscar prospecto..."
+        selectedCount={selection.selected.length}
+        itemLabel={["prospecto", "prospectos"]}
+        onClearSelection={selection.clear}
+        exports={<ExcelExportButton columns={columns} data={leads} filename="prospectos" selected={selection.selected} disabled={leadsQuery.isFetching} fetchAll={() => fetchAllPages((nextPage, size) => getLeads({ ...params, page: nextPage, per_page: size }))} />}
+        activeFilters={(statusFilter === ALL ? 0 : 1) + (priorityFilter === ALL ? 0 : 1)}
+        filters={
+          <Filter
+            hideHeader
+            defaultOpen
+            enableDateRange={false}
+            dropdowns={[
+              { key: "estatus", label: "Estatus", options: statuses.map((status) => ({ label: status.name, value: String(status.id) })) },
+              { key: "prioridad", label: "Prioridad", options: [{ label: "Alta", value: "1" }, { label: "Media", value: "2" }, { label: "Baja", value: "3" }] },
+            ]}
+            initialValues={{
+              selects: {
+                estatus: statusFilter === ALL ? undefined : statusFilter,
+                prioridad: priorityFilter === ALL ? undefined : priorityFilter,
+              },
+              checks: {},
+            }}
+            onApply={(values) => {
+              setStatusFilter(values.selects.estatus ?? ALL)
+              setPriorityFilter(values.selects.prioridad ?? ALL)
+              setPage(1)
+            }}
+            onReset={() => { setStatusFilter(ALL); setPriorityFilter(ALL); setPage(1) }}
+          />
+        }
+      >
           <DataTable
-            title={`Prospectos (${meta?.total ?? leads.length})`}
-            description="Listado de prospectos registrados en el CRM."
             columns={selectableColumns}
             data={leads}
             rowSelection={selection.rowSelection}
             onRowSelectionChange={selection.setRowSelection}
             getRowId={selection.getRowId}
             enableRowSelection
-            enableSearch
+            enableSearch={false}
             enableExport={false}
-            searchPlaceholder="Buscar prospecto..."
-            searchValue={searchInput}
-            onSearchChange={setSearchInput}
             pageSize={perPage}
             enablePagination
             manualPagination
@@ -128,8 +156,7 @@ export default function LeadsPage() {
             onPageChange={(nextPageIndex) => setPage(nextPageIndex + 1)}
             isLoading={leadsQuery.isFetching}
           />
-        </CardContent>
-      </Card>
+      </ListingPanel>
     </div>
   )
 }

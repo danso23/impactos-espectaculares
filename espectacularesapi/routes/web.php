@@ -94,6 +94,7 @@ $router->group(['prefix' => 'api'], function () use ($router) {
 
         /** RENTALS **/
         $router->get('rentals', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@index']);
+        $router->get('rentals/filter-options', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@filterOptions']);
         $router->get('rentals/{id}', ['middleware' => 'permission:rentals.view', 'uses' => 'RentalController@find']);
         $router->post('rentals', ['middleware' => 'permission:rentals.edit', 'uses' => 'RentalController@store']);
         $router->post('rentals/{id}/confirm', ['middleware' => 'permission:rentals.edit', 'uses' => 'RentalController@confirm']);
@@ -114,6 +115,7 @@ $router->group(['prefix' => 'api'], function () use ($router) {
         $router->post('leads', ['middleware' => 'permission:leads.edit', 'uses' => 'LeadController@store']);
         $router->post('leads/{id}/convert-to-client', ['middleware' => 'permission:leads.edit', 'uses' => 'LeadController@convertToClient']);
         $router->get('clientes', ['middleware' => 'permission:clients.view', 'uses' => 'ClientController@index']);
+        $router->get('clientes/filter-options', ['middleware' => 'permission:clients.view', 'uses' => 'ClientController@filterOptions']);
         $router->post('clientes', ['middleware' => 'permission:clients.edit', 'uses' => 'ClientController@store']);
         $router->put('clientes/{id}', ['middleware' => 'permission:clients.edit', 'uses' => 'ClientController@update']);
         $router->patch('clientes/{id}', ['middleware' => 'permission:clients.edit', 'uses' => 'ClientController@update']);

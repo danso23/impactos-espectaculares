@@ -100,6 +100,10 @@ export function getQuotes(params: QuoteListParams = {}) {
   }
   if (params.date_from) qs.set("date_from", params.date_from)
   if (params.date_to) qs.set("date_to", params.date_to)
+  if (params.customer_type) qs.set("customer_type", params.customer_type)
+  if (params.customer_id) qs.set("customer_id", String(params.customer_id))
+  if (params.issuer_company_id) qs.set("issuer_company_id", String(params.issuer_company_id))
+  if (params.direction) qs.set("direction", params.direction)
 
   const query = qs.toString()
 
